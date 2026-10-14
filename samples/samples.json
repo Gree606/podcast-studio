@@ -1,0 +1,52 @@
+[
+  {
+    "id": "chem-reactions",
+    "title": "Chemical Reactions and Equations",
+    "subject": "Science",
+    "class": "10",
+    "blurb": "Rusting, rancidity and how to balance an equation.",
+    "file": "chem-reactions.md",
+    "source": "NCERT jesc101.pdf",
+    "words": 3030
+  },
+  {
+    "id": "control-coordination",
+    "title": "Control and Coordination",
+    "subject": "Science",
+    "class": "10",
+    "blurb": "Reflexes, the brain, plant movements and hormones.",
+    "file": "control-coordination.md",
+    "source": "NCERT jesc106.pdf",
+    "words": 2647
+  },
+  {
+    "id": "crop-production",
+    "title": "Crop Production and Management",
+    "subject": "Science",
+    "class": "8",
+    "blurb": "From kharif and rabi crops to irrigation and storage.",
+    "file": "crop-production.md",
+    "source": "NCERT hesc101.pdf",
+    "words": 4490
+  },
+  {
+    "id": "nationalism-europe",
+    "title": "The Rise of Nationalism in Europe",
+    "subject": "History",
+    "class": "10",
+    "blurb": "How nation-states were imagined and built in the 1800s.",
+    "file": "nationalism-europe.md",
+    "source": "NCERT jess301.pdf",
+    "words": 3471
+  },
+  {
+    "id": "nutrition-plants",
+    "title": "Nutrition in Plants",
+    "subject": "Science",
+    "class": "7",
+    "blurb": "Photosynthesis, parasites, and insect-eating plants.",
+    "file": "nutrition-plants.md",
+    "source": "NCERT gesc101.pdf",
+    "words": 2921
+  }
+]

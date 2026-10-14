@@ -107,7 +107,7 @@ def _furniture(lines_by_page: list[list[Line]]) -> set[str]:
     return {k for k, c in cnt.items() if c >= max(3, 0.4 * n)}
 
 
-ACTIVITY = re.compile(r"^\s*(activity|example|box)\s+\d+(\.\d+)*\s*$", re.I)
+ACTIVITY = re.compile(r"^\s*(activity|example|box)(\s+\d+(\.\d+)*)?\s*$", re.I)
 
 
 def _pretty_heading(t: str) -> str:
@@ -154,10 +154,13 @@ def _sections_from_lines(lines: list[Line], furniture: set[str]) -> tuple[str, l
             flush()
             last_heading_size = 0.0
             continue
-        if re.sub(r"\d+", "#", t.lower()) in furniture or re.fullmatch(r"[\divxlc]+", t.lower()):
+        if re.sub(r"\d+", "#", t.lower()) in furniture or re.fullmatch(r"\d+|[ivxlc]{2,}", t.lower()):
             continue
-        if CHAPTER_LINE.match(t) and len(t) < 20 or (title and t in title and ln.size >= body * 1.5):
+        if CHAPTER_LINE.match(t) and len(t) < 20 or (title and len(t) > 3 and t in title and ln.size >= body * 1.5):
             continue
+        toks = t.split()
+        if len(toks) >= 6 and sum(len(x) == 1 for x in toks) / len(toks) > 0.6:
+            continue  # letter-spaced running header ("T h e  R i s e  o f ...")
         letters = len(re.sub(r"[^A-Za-z]", "", t))
         if letters < 3:
             # decorative drop cap ("C" of "Consider") or stray "?" glyphs from margin boxes
