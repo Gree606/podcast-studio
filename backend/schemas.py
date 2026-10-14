@@ -63,7 +63,9 @@ class Turn(BaseModel):
     text: str
     # Filled after synthesis/stitching:
     tts_text: str | None = None  # normalised text actually sent to TTS
-    start: float | None = None  # seconds into the full episode
+    seg_start: float | None = None  # seconds into the segment's audio
+    seg_end: float | None = None
+    start: float | None = None  # seconds into the full episode (set when assembled)
     end: float | None = None
     wer: float | None = None
     asr_text: str | None = None
