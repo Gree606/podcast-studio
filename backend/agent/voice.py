@@ -26,6 +26,18 @@ STAGE = "voice"
 STYLE = {"host": "CONV", "expert": "CONV"}
 
 
+def script_mismatch(expected: str, heard: str) -> bool:
+    """True if we asked for Latin-script speech but the ASR replied mostly in another script
+    (e.g. Devanagari). Comparing WER across scripts would trigger pointless re-synthesis."""
+    letters = [c for c in heard if c.isalpha()]
+    if not letters:
+        return False
+    non_latin = sum(1 for c in letters if ord(c) > 0x24F) / len(letters)
+    exp_letters = [c for c in expected if c.isalpha()]
+    exp_latin = sum(1 for c in exp_letters if ord(c) <= 0x24F) / max(1, len(exp_letters))
+    return non_latin > 0.5 and exp_latin > 0.8
+
+
 async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np.ndarray:
     s = get_settings()
     sr = s.sample_rate
@@ -45,6 +57,10 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
             heard = await asr.transcribe(to_wav_bytes(resample(clip, sr, 16000), 16000))
         except ServiceError as e:
             ctx.emit(STAGE, "warning", f"Self-check skipped for turn {i + 1}: speech recogniser {e.user_message}.", seg.id)
+            return clip
+        if script_mismatch(turn.tts_text, heard):
+            ctx.emit(STAGE, "warning", f"Turn {i + 1}: the speech recogniser answered in a different script "
+                     f"(\"{heard[:40]}\"), so WER is meaningless; keeping this take. Set ASR_LANGUAGE to fix.", seg.id)
             return clip
         err = wer(turn.tts_text, heard)
         if attempt == 1:

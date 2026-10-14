@@ -7,7 +7,7 @@ Turn an NCERT chapter into a two-host conversational podcast. The podcast stays 
 ## What it does
 
 1. **Input.** Upload an NCERT chapter PDF (scanned pages go through OCR), paste text, or pick a bundled sample chapter. Then choose which sections to cover, the length and the tone.
-2. **Agent.** A small open model (Gemma) runs a Perceive, Plan, Act, Observe loop. The UI shows it live.
+2. **Agent.** A small, fast LLM (Gemini Flash; any OpenAI-compatible model also works) runs a Perceive, Plan, Act, Observe loop. The UI shows it live.
 3. **Output.** An MP3 episode with a transcript that follows the audio (click a line to jump to it), a per-segment "Sources" panel and a claim check.
 4. **Reviewer.** Regenerate any one segment, optionally with an instruction ("simpler", "add an example"). Only that segment is rewritten and re-recorded, and the episode is re-stitched. Every version is kept, and you can compare versions or switch back.
 
@@ -64,21 +64,31 @@ PDF/text ─► ingest.py  (PyMuPDF text layer; vision-LLM OCR for scanned pages
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env              # fill in endpoints; leave LLM_BASE_URL empty for demo mode
-uvicorn backend.main:app --port 8000   # single worker on purpose
-open http://localhost:8000
+cp .env.example .env                 # then replace the three DUMMY_ keys
+python scripts/check_apis.py         # one tiny call per API: confirms keys, voices, ASR script
+scripts/run_local.sh start           # background server on :8000 (logs: data/server.log)
+scripts/run_local.sh status | stop | restart
 ```
 
-If no LLM endpoint is set, the app runs in **demo (mock) mode**, with placeholder scripts and voices, and shows a banner saying so.
+While any required key is still a `DUMMY_` placeholder, the app runs in **demo mode** (placeholder scripts and beeps) and says so in a banner. On shared HPC login nodes, run `source scripts/dev_env.sh` first (it caps BLAS threads).
 
-On shared HPC login nodes, run `source scripts/dev_env.sh` first (it caps BLAS threads).
+## Providers
+
+| Service | Used for | Wire format (see `backend/clients/`) |
+|---|---|---|
+| **Gemini** (`gemini-flash-latest`) | planner, writer, critic, claim checks, OCR of scanned pages | `POST /v1beta/models/{model}:generateContent`, header `X-goog-api-key`. System prompt goes in `systemInstruction`; images as `inline_data`; `responseMimeType: application/json` for structured calls; thought parts are skipped and thinking tokens are counted. `LLM_PROVIDER=openai` switches to any OpenAI-compatible server (e.g. vLLM + Gemma). |
+| **Sarvam** `bulbul:v4-flash` | the two voices | `POST https://api.sarvam.ai/text-to-speech`, header `api-subscription-key`, body `{text, language_code: "en-IN", speaker, model, pace, speech_sample_rate}`, returns `{"audios": [base64 WAV]}`. Note: the field is `language_code`, not `target_language_code`, and the SDK's `convert_stream` yields chunks rather than bytes (checked in `sarvamai` 0.1.37). Default voices `simran_en_conversation` (host) and `dev_en_conversational` (explainer). Turns over 900 characters are split at sentence boundaries. |
+| **Bodhan** `indic-transcribe` | audio self-check | `POST https://api.bodhan.ai/v1/audio/transcriptions`, multipart `file` + `model`, header `Authorization: <key>` (no `Bearer`). Optional: if not configured, the self-check is skipped. If it answers in a different script (e.g. Devanagari for English speech), the self-check stands down instead of re-recording everything. |
+
+All calls have timeouts and retries with backoff. 429 responses wait for the server's `Retry-After` or Google `retryDelay`. Bad keys produce a plain-language error in the UI.
 
 ## Tests
 
 ```bash
-pytest -q                                  # 42 unit tests: allocation, WER, text norm, JSON repair,
-                                           # BM25, audio stitching, ingestion, tools, planner loop, critic rules
-MOCK_MODE=1 python scripts/smoke_test.py [chapter.pdf]   # end to end: upload → episode → regenerate → switch version
+pytest -q                                  # 54 unit tests
+MOCK_MODE=1 python scripts/smoke_test.py   # end to end with in-process mocks
+python scripts/contract_test.py            # REAL client code vs local fakes of Gemini/Sarvam/Bodhan
+                                           # (wire formats, auth headers, 429 retry, bad keys, regeneration)
 ```
 
 ## Evaluation and ablation
@@ -112,18 +122,9 @@ The app is a single Docker image (`Dockerfile`), and `render.yaml` is a Render b
 
 Every provider URL and key comes from environment variables (see `.env.example`). No secrets live in git.
 
-## API endpoint notes (findings so far)
-
-| Service | Interface the app expects | Status (2026-10-15) |
-|---|---|---|
-| LLM | OpenAI `/v1/chat/completions` (vLLM serving Gemma 4). The tool loop uses prompted JSON because the servers are not launched with `--enable-auto-tool-choice`. Gemma's empty `<\|channel>thought…<channel\|>` block is stripped. The 31B server's context is 20,480 tokens, so planner observations are truncated. | Cluster deployments currently down. A public endpoint is needed. |
-| TTS | `TTS_API_STYLE=openai` (`/v1/audio/speech`) or `json` (`/synthesize`, base64 or raw audio). Returns WAV or MP3; both are decoded. | No HTTP TTS service exists yet. The in-house Robin model is offline/batch only. |
-| ASR | OpenAI-style `/v1/audio/transcriptions` (multipart `file`, `language`). This is the Canary NIM HTTP shape. Riva gRPC would need an adapter. | Down. The self-check is skipped automatically if ASR is not configured. |
-| OCR | Gemma vision via `image_url` data URI, image before text. | Same as LLM. |
-
 ## Known limitations
 
 - Dense derivations and tables are summarised rather than read out.
 - Figures are not described.
-- English only for now. Both the TTS and ASR stacks support Indian languages, which makes this a natural extension.
+- English (Indian English voices) only for now. Sarvam and Bodhan both support Indian languages, which makes a Hindi/regional episode a natural extension.
 - Number and symbol reading is rule-based (`backend/textnorm.py`), so rare notation may still be read literally.

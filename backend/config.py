@@ -13,6 +13,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT = Path(__file__).resolve().parent.parent
 
 
+_PLACEHOLDERS = ("dummy", "your", "change", "replace", "xxx", "todo", "<")
+
+
+def is_set(value: str) -> bool:
+    """True for a real-looking secret; False for empty or placeholder values like DUMMY_REPLACE_ME."""
+    v = (value or "").strip().lower()
+    return bool(v) and not v.startswith(_PLACEHOLDERS)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -21,30 +30,42 @@ class Settings(BaseSettings):
     # app, the smoke test and the unit tests run with no network or credentials.
     mock_mode: bool = False
 
-    # --- LLM (OpenAI-compatible chat completions) --------------------------
-    llm_base_url: str = ""
+    # --- LLM ----------------------------------------------------------------
+    # "gemini" = Google Generative Language API (generateContent);
+    # "openai" = any OpenAI-compatible /v1/chat/completions server (e.g. vLLM serving Gemma).
+    llm_provider: str = "gemini"
+    llm_base_url: str = "https://generativelanguage.googleapis.com"
     llm_api_key: str = ""
-    llm_model: str = "google/gemma-3-27b-it"
+    llm_model: str = "gemini-flash-latest"
     llm_timeout_s: float = 120.0
-    llm_max_concurrency: int = 6
-    llm_vision: bool = True  # whether the LLM accepts image_url parts (used for OCR fallback)
+    llm_max_concurrency: int = 4
+    llm_attempts: int = 5  # retries cover 429 rate limits (we honour the server's retry delay)
+    # Gemini "thinking" tokens count against maxOutputTokens; this much headroom is added
+    # on top of each call's answer budget so thinking can't starve the answer.
+    llm_thinking_headroom: int = 4096
+    llm_vision: bool = True  # whether the LLM accepts images (used for OCR of scanned pages)
 
-    # --- TTS ---------------------------------------------------------------
-    tts_api_style: str = "openai"  # "openai" (/v1/audio/speech) or "json" (/synthesize, see clients/tts.py)
-    tts_base_url: str = ""
+    # --- TTS ----------------------------------------------------------------
+    # "sarvam" = Sarvam AI /text-to-speech; "openai" = /v1/audio/speech; "json" = /synthesize.
+    tts_api_style: str = "sarvam"
+    tts_base_url: str = "https://api.sarvam.ai"
     tts_api_key: str = ""
-    tts_model: str = ""
-    tts_voice_host: str = ""  # curious host
-    tts_voice_expert: str = ""  # explainer
-    tts_language: str = "en"
+    tts_model: str = "bulbul:v4-flash"
+    tts_voice_host: str = "simran_en_conversation"  # curious host (Riya)
+    tts_voice_expert: str = "dev_en_conversational"  # explainer (Arjun)
+    tts_language: str = "en-IN"
+    tts_pace: float = 1.05
     tts_timeout_s: float = 90.0
     tts_max_concurrency: int = 4
+    tts_max_chars: int = 900  # longer turns are split at sentence boundaries
 
-    # --- ASR ---------------------------------------------------------------
-    asr_base_url: str = ""
+    # --- ASR (self-check of our own audio) -----------------------------------
+    # OpenAI-style multipart POST {base}/v1/audio/transcriptions -> {"text": ...}
+    asr_base_url: str = "https://api.bodhan.ai"
     asr_api_key: str = ""
-    asr_model: str = ""
-    asr_language: str = "en"
+    asr_auth_prefix: str = ""  # Authorization header value = prefix + key ("" for Bodhan, "Bearer " for OpenAI)
+    asr_model: str = "indic-transcribe"
+    asr_language: str = ""  # sent only if set
     asr_timeout_s: float = 90.0
     asr_max_concurrency: int = 4
 
@@ -76,9 +97,19 @@ class Settings(BaseSettings):
     def sources_dir(self) -> Path:
         return self.data_dir / "sources"
 
+    def llm_ready(self) -> bool:
+        return bool(self.llm_base_url) and (is_set(self.llm_api_key) or self.llm_provider == "openai")
+
+    def tts_ready(self) -> bool:
+        return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style != "sarvam")
+
+    def asr_ready(self) -> bool:
+        return bool(self.asr_base_url) and is_set(self.asr_api_key)
+
     def effective_mock(self) -> bool:
-        """Fall back to mock mode if no LLM endpoint is configured at all."""
-        return self.mock_mode or not self.llm_base_url
+        """Demo mode unless both the LLM and TTS are configured with real keys.
+        (ASR is optional: without it the audio self-check is skipped.)"""
+        return self.mock_mode or not (self.llm_ready() and self.tts_ready())
 
 
 @lru_cache

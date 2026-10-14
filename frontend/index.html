@@ -108,7 +108,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 
 <dialog id="how">
   <h2>How the agent works</h2>
-  <p class="small">A small open model (Gemma) acts as an agent that <b>perceives, plans, acts and observes</b>, and spends extra thinking only where it's needed.</p>
+  <p class="small">A small, fast LLM (Gemini Flash) acts as an agent that <b>perceives, plans, acts and observes</b>, and spends extra thinking only where it's needed.</p>
   <div class="loop">
     <div><b>1. Plan (ReAct)</b><br>Explores the chapter with tools (search, read, define), then outlines segments. Every key fact cites a passage and is verified twice (rule check + model check).</div>
     <div><b>2. Write + critique (Reflexion)</b><br>Writes each segment as a dialogue; a strict critic scores it on 5 axes and the writer revises with lessons kept in memory.</div>
@@ -461,7 +461,7 @@ async function route() {
 }
 (async () => {
   $("#howBtn").onclick = () => $("#how").showModal();
-  try { CONFIG = await api("/api/config"); if (CONFIG.mock) $("#banner").innerHTML = `<div class="notice info small">Demo mode: model APIs are not connected, so scripts and voices are placeholders.</div>`; }
+  try { CONFIG = await api("/api/config"); if (CONFIG.mock) $("#banner").innerHTML = `<div class="notice info small">Demo mode: API keys are not configured yet, so scripts and voices are placeholders.</div>`; }
   catch (e) { showErr($("#banner"), "The server is waking up or unreachable. Please refresh in a few seconds."); }
   addEventListener("hashchange", route); route();
 })();

@@ -94,6 +94,8 @@ def _critic(messages: list[dict]) -> str:
 
 async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> str:
     await asyncio.sleep(0.01)
+    if "capital of India" in _text_of(messages[-1]):  # scripts/check_apis.py
+        return json.dumps({"answer": "New Delhi"})
     if task == "planner_step":
         return _planner(messages)
     if task in ("write", "revise", "claim_fix"):

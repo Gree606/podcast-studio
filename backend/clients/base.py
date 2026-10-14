@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 from typing import Any
 
 import httpx
@@ -17,6 +18,13 @@ import httpx
 log = logging.getLogger("podcast.clients")
 
 RETRY_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
+STATUS_MESSAGES = {
+    400: "rejected the request (HTTP 400)",
+    401: "rejected the API key (HTTP 401) - check the key in .env",
+    403: "refused access (HTTP 403) - check the API key and its permissions",
+    404: "endpoint or model was not found (HTTP 404)",
+    429: "is rate-limiting us (HTTP 429) - try again in a minute",
+}
 
 
 class ServiceError(RuntimeError):
@@ -29,21 +37,37 @@ class ServiceError(RuntimeError):
         self.detail = detail
 
 
+def retry_delay(resp: httpx.Response) -> float | None:
+    """Server-requested wait: a Retry-After header, or Google's RetryInfo ("retryDelay": "13s")."""
+    ra = resp.headers.get("retry-after")
+    if ra:
+        try:
+            return float(ra)
+        except ValueError:
+            pass
+    m = re.search(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"', resp.text[:4000])
+    return float(m.group(1)) if m else None
+
+
 _client: httpx.AsyncClient | None = None
+_client_loop: asyncio.AbstractEventLoop | None = None
 
 
 def http_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None or _client.is_closed:
+    """Shared connection pool, recreated if the event loop changed (an AsyncClient is bound to its loop)."""
+    global _client, _client_loop
+    loop = asyncio.get_running_loop()
+    if _client is None or _client.is_closed or _client_loop is not loop:
         _client = httpx.AsyncClient(limits=httpx.Limits(max_connections=64, max_keepalive_connections=16))
+        _client_loop = loop
     return _client
 
 
 async def close_http_client() -> None:
     global _client
-    if _client is not None:
+    if _client is not None and _client_loop is asyncio.get_running_loop():
         await _client.aclose()
-        _client = None
+    _client = None
 
 
 async def request_with_retry(
@@ -57,6 +81,7 @@ async def request_with_retry(
     **kwargs: Any,
 ) -> httpx.Response:
     last: Exception | None = None
+    server_wait: float | None = None
     for attempt in range(1, attempts + 1):
         try:
             if semaphore is not None:
@@ -71,13 +96,17 @@ async def request_with_retry(
         else:
             if resp.status_code < 400:
                 return resp
-            err = ServiceError(service, f"returned HTTP {resp.status_code}", resp.text[:300])
+            err = ServiceError(service, STATUS_MESSAGES.get(resp.status_code, f"returned HTTP {resp.status_code}"), resp.text[:300])
             if resp.status_code not in RETRY_STATUS or attempt >= attempts:
                 raise err
             last = err
+            server_wait = retry_delay(resp)
         if attempt >= attempts:
             break
         wait = min(20.0, (2 ** (attempt - 1)) * 1.5) * (0.7 + 0.6 * random.random())
+        if server_wait is not None:
+            wait = min(60.0, server_wait + random.random())
+            server_wait = None
         log.warning("%s attempt %d/%d failed (%s); retrying in %.1fs", service, attempt, attempts, last, wait)
         await asyncio.sleep(wait)
     if isinstance(last, httpx.TimeoutException):

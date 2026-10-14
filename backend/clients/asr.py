@@ -1,8 +1,9 @@
 """Speech recognition client, used only for the agent's self-check of its own audio.
 
 Wire format: OpenAI-style multipart POST {base}/v1/audio/transcriptions with
-``file`` + ``language`` (+ ``model``) -> {"text": ...}. This is the HTTP shape of
-the Canary NIM; the Riva gRPC path would need a small adapter here.
+``file`` (+ ``model``, optional ``language``) returning {"text": ...}. This is the Bodhan API
+(model "indic-transcribe", ``Authorization: <key>`` with no "Bearer" prefix) and also
+the OpenAI/Canary-NIM shape (set ASR_AUTH_PREFIX="Bearer ").
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ def _semaphore() -> asyncio.Semaphore:
 
 def asr_available() -> bool:
     s = get_settings()
-    return s.effective_mock() or bool(s.asr_base_url)
+    return s.effective_mock() or s.asr_ready()
 
 
 async def transcribe(wav_bytes: bytes) -> str:
@@ -35,12 +36,12 @@ async def transcribe(wav_bytes: bytes) -> str:
         from . import mock
 
         return await mock.mock_asr(wav_bytes)
-    headers = {}
-    if s.asr_api_key:
-        headers["Authorization"] = f"Bearer {s.asr_api_key}"
-    data = {"language": s.asr_language}
+    headers = {"Authorization": f"{s.asr_auth_prefix}{s.asr_api_key}"}
+    data = {}
     if s.asr_model:
         data["model"] = s.asr_model
+    if s.asr_language:
+        data["language"] = s.asr_language
     resp = await request_with_retry(
         "Speech recogniser", "POST", s.asr_base_url.rstrip("/") + "/v1/audio/transcriptions",
         files={"file": ("turn.wav", wav_bytes, "audio/wav")}, data=data, headers=headers,

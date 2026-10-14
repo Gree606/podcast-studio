@@ -1,8 +1,14 @@
-"""LLM client for an OpenAI-compatible /v1/chat/completions endpoint (vLLM serving Gemma).
+"""LLM client. Two wire formats, chosen by LLM_PROVIDER:
 
-We deliberately do NOT rely on server-side tool calling (`tools=`): the vLLM
-deployments are not launched with `--enable-auto-tool-choice`, so the agent asks
-for a JSON action in the prompt and we parse it (see agent/planner.py).
+* ``gemini``: Google Generative Language API,
+  POST {base}/v1beta/models/{model}:generateContent with an X-goog-api-key header.
+* ``openai``: any OpenAI-compatible /v1/chat/completions server (e.g. vLLM serving Gemma).
+
+The rest of the app always speaks OpenAI-style messages
+([{"role": "system"|"user"|"assistant", "content": str | parts}]); this module
+translates them. We don't use server-side tool calling: the agent asks for a JSON
+action in the prompt and parses it (see agent/planner.py), so it works the same
+on every backend.
 """
 from __future__ import annotations
 
@@ -20,6 +26,7 @@ from .usage import record
 # Gemma 4 emits an (often empty) thought channel before the answer; some servers
 # don't strip it. Also strip generic <think> blocks from other reasoning models.
 _THOUGHT_RE = re.compile(r"<\|channel\>thought.*?<channel\|>|<think>.*?</think>", re.S)
+_DATA_URI = re.compile(r"^data:([\w/+.-]+);base64,(.*)$", re.S)
 
 log = logging.getLogger("podcast.llm")
 _sem: asyncio.Semaphore | None = None
@@ -36,12 +43,107 @@ def clean_output(text: str) -> str:
     return _THOUGHT_RE.sub("", text or "").strip()
 
 
+# ---------------------------------------------------------------------------
+# Gemini translation
+# ---------------------------------------------------------------------------
+def to_gemini(messages: list[dict[str, Any]]) -> tuple[dict | None, list[dict]]:
+    """OpenAI-style messages -> (systemInstruction, contents). Consecutive same-role
+    turns are merged because Gemini expects user/model alternation."""
+    system_parts: list[dict] = []
+    contents: list[dict] = []
+    for m in messages:
+        content = m.get("content")
+        parts: list[dict] = []
+        if isinstance(content, str):
+            parts.append({"text": content})
+        else:
+            for p in content or []:
+                if p.get("type") == "text":
+                    parts.append({"text": p.get("text", "")})
+                elif p.get("type") == "image_url":
+                    url = (p.get("image_url") or {}).get("url", "")
+                    mm = _DATA_URI.match(url)
+                    if mm:
+                        parts.append({"inline_data": {"mime_type": mm.group(1), "data": mm.group(2)}})
+        if m.get("role") == "system":
+            system_parts += parts
+            continue
+        role = "model" if m.get("role") == "assistant" else "user"
+        if contents and contents[-1]["role"] == role:
+            contents[-1]["parts"] += parts
+        else:
+            contents.append({"role": role, "parts": parts})
+    system = {"parts": system_parts} if system_parts else None
+    return system, contents
+
+
+def from_gemini(data: dict) -> tuple[str, dict]:
+    """Extract answer text (skipping thought parts) and usage from a generateContent response."""
+    cands = data.get("candidates") or []
+    if not cands:
+        reason = (data.get("promptFeedback") or {}).get("blockReason", "no candidates")
+        raise ServiceError("Language model", f"declined to answer ({reason})")
+    cand = cands[0]
+    parts = (cand.get("content") or {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+    finish = cand.get("finishReason", "")
+    if not text.strip():
+        raise ServiceError("Language model", f"returned an empty answer ({finish or 'unknown reason'})")
+    um = data.get("usageMetadata") or {}
+    usage = {
+        "prompt_tokens": int(um.get("promptTokenCount", 0)),
+        "completion_tokens": int(um.get("candidatesTokenCount", 0)) + int(um.get("thoughtsTokenCount", 0)),
+    }
+    return text, usage
+
+
+async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model) -> tuple[str, dict]:
+    s = get_settings()
+    system, contents = to_gemini(messages)
+    gen: dict[str, Any] = {"temperature": temperature, "maxOutputTokens": max_tokens + s.llm_thinking_headroom}
+    if json_mode:
+        gen["responseMimeType"] = "application/json"
+    body: dict[str, Any] = {"contents": contents, "generationConfig": gen}
+    if system:
+        body["systemInstruction"] = system
+    resp = await request_with_retry(
+        "Language model", "POST", f"{base_url.rstrip('/')}/v1beta/models/{model}:generateContent",
+        json=body, headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
+        timeout=s.llm_timeout_s, attempts=s.llm_attempts, semaphore=_semaphore(),
+    )
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
+    return from_gemini(data)
+
+
+async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model) -> tuple[str, dict]:
+    s = get_settings()
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    resp = await request_with_retry(
+        "Language model", "POST", base_url.rstrip("/") + "/v1/chat/completions", json=body, headers=headers,
+        timeout=s.llm_timeout_s, attempts=s.llm_attempts, semaphore=_semaphore(),
+    )
+    try:
+        data = resp.json()
+        text = data["choices"][0]["message"]["content"] or ""
+    except (ValueError, KeyError, IndexError) as e:
+        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
+    u = data.get("usage") or {}
+    return text, {"prompt_tokens": int(u.get("prompt_tokens", 0)), "completion_tokens": int(u.get("completion_tokens", 0))}
+
+
 async def chat(
     messages: list[dict[str, Any]],
     *,
     task: str,
     temperature: float = 0.7,
     max_tokens: int = 1500,
+    json_mode: bool = False,
     endpoint: tuple[str, str, str] | None = None,
 ) -> str:
     """Return the assistant text. ``task`` labels the call for logs and the mock backend.
@@ -57,27 +159,11 @@ async def chat(
         return await mock.mock_chat(messages, task=task, temperature=temperature)
 
     base_url, api_key, model = endpoint or (s.llm_base_url, s.llm_api_key, s.llm_model)
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    call = _gemini_call if s.llm_provider == "gemini" else _openai_call
     t0 = time.time()
-    resp = await request_with_retry(
-        "Language model",
-        "POST",
-        base_url.rstrip("/") + "/v1/chat/completions",
-        json=body,
-        headers=headers,
-        timeout=s.llm_timeout_s,
-        semaphore=_semaphore(),
-    )
-    try:
-        data = resp.json()
-        text = data["choices"][0]["message"]["content"] or ""
-    except (ValueError, KeyError, IndexError) as e:
-        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
-    usage = data.get("usage") or {}
-    record(llm_calls=1, prompt_tokens=int(usage.get("prompt_tokens", 0)), completion_tokens=int(usage.get("completion_tokens", 0)))
+    text, usage = await call(messages, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode,
+                             base_url=base_url, api_key=api_key, model=model)
+    record(llm_calls=1, **usage)
     log.info("llm task=%s %.1fs tokens=%s", task, time.time() - t0, usage)
     return clean_output(text)
 
@@ -96,7 +182,7 @@ async def chat_json(
     msgs = list(messages)
     last_err: Exception | None = None
     for _ in range(retries + 1):
-        text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, endpoint=endpoint)
+        text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, json_mode=True, endpoint=endpoint)
         try:
             return extract_json(text, expect=expect)
         except JSONExtractError as e:

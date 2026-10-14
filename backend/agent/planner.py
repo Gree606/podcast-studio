@@ -56,7 +56,7 @@ async def run_planner(ctx: AgentContext) -> list[Segment]:
         if force:
             messages.append({"role": "user", "content": "You are out of tool calls. Call finish now with the complete outline."})
         ctx.status(STAGE, f"Planning: step {step}", 0.02 + 0.10 * min(step, s.planner_max_steps) / s.planner_max_steps)
-        raw = await chat(messages, task="planner_step", temperature=0.3, max_tokens=2500)
+        raw = await chat(messages, task="planner_step", temperature=0.3, max_tokens=2500, json_mode=True)
         try:
             act = extract_json(raw, expect=dict)
         except JSONExtractError:
