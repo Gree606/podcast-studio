@@ -114,7 +114,7 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
     if task == "ocr":
         return "Mock OCR text.\n\nThis page was a scanned image. " * 20
     if task == "judge":
-        return json.dumps({"naturalness": 3, "engagement": 3, "faithfulness": 4, "overall": 3.3, "comment": "mock"})
+        return json.dumps({"faithfulness": 4, "naturalness": 3, "engagement": 3, "pedagogy": 4, "comment": "mock"})
     return "{}"
 
 

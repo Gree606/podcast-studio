@@ -46,6 +46,8 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
             ctx.emit(STAGE, "warning", f"Self-check skipped for turn {i + 1}: speech recogniser {e.user_message}.", seg.id)
             return clip
         err = wer(turn.tts_text, heard)
+        if attempt == 1:
+            turn.first_wer = round(err, 3)
         if best is None or err < best[0]:
             best = (err, clip, heard)
         if err <= s.wer_threshold:

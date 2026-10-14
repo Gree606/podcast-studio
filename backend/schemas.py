@@ -67,7 +67,8 @@ class Turn(BaseModel):
     seg_end: float | None = None
     start: float | None = None  # seconds into the full episode (set when assembled)
     end: float | None = None
-    wer: float | None = None
+    wer: float | None = None  # WER of the kept take
+    first_wer: float | None = None  # WER of the first take (before any self-check retry)
     asr_text: str | None = None
     tts_attempts: int = 0
 

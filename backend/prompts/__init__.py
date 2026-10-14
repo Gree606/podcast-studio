@@ -163,3 +163,23 @@ Their current version is below. Follow the request while keeping the facts corre
 Current version:
 {current}
 """
+
+# ---------------------------------------------------------------------------
+# Evaluation-only judge (eval/run_eval.py). Deliberately different wording and
+# anchors from the in-loop critic, so we don't grade with the optimisation target.
+# ---------------------------------------------------------------------------
+EVAL_JUDGE = """You are evaluating an educational podcast script written from an NCERT textbook chapter. Be calibrated: 3 is average, 5 is broadcast quality.
+
+Source passages:
+{passages}
+
+Script:
+{script}
+
+Rate 1-5:
+- faithfulness: are all facts consistent with the passages (no invented specifics)?
+- naturalness: would this sound like two real people talking rather than text read aloud?
+- engagement: would a 14-year-old keep listening?
+- pedagogy: does it build understanding step by step, with correct terminology?
+
+Reply with ONLY JSON: {{"faithfulness": n, "naturalness": n, "engagement": n, "pedagogy": n, "comment": "<one sentence>"}}"""

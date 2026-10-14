@@ -11,3 +11,4 @@ wandb/
 data/
 .env
 *.tmp*
+eval/results/
