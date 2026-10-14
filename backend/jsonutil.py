@@ -92,7 +92,16 @@ def extract_json(text: str, expect: type | None = None) -> Any:
             idx = cand.find(opener)
             while idx != -1:
                 span = _balanced_span(cand, idx)
-                if span is not None:
+                if span is None:
+                    # unbalanced outer object = truncated output; close it rather than
+                    # returning one of its inner objects
+                    try:
+                        val = json.loads(_repair(_close_truncated(cand[idx:])))
+                        if expect is None or isinstance(val, expect):
+                            return val
+                    except json.JSONDecodeError:
+                        pass
+                else:
                     for attempt in (span, _repair(span)):
                         try:
                             val = json.loads(attempt)
@@ -101,13 +110,4 @@ def extract_json(text: str, expect: type | None = None) -> Any:
                         except json.JSONDecodeError:
                             pass
                 idx = cand.find(opener, idx + 1)
-            # truncated output: try closing it
-            idx = cand.find(opener)
-            if idx != -1:
-                try:
-                    val = json.loads(_repair(_close_truncated(cand[idx:])))
-                    if expect is None or isinstance(val, expect):
-                        return val
-                except json.JSONDecodeError:
-                    pass
     raise JSONExtractError(f"no JSON found in model output: {text[:200]!r}")

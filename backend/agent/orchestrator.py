@@ -103,12 +103,66 @@ async def assemble(ctx: AgentContext) -> None:
         (d / old).unlink()
 
 
+async def write_segments(ctx: AgentContext, segments: list[Segment], need_write: list[Segment]) -> None:
+    """Spend the episode's writer budget across segments (Snell et al.-style allocation).
+
+    Round 1 uses predicted difficulty; for the adaptive policy, leftover budget is then
+    reallocated to segments the verifier still scores below the acceptance bar.
+    """
+    s = get_settings()
+    policy = ctx.episode.settings.policy
+    total_budget = max(len(segments), round(s.budget_per_segment * len(segments)))
+    alloc = initial_allocation([x.difficulty for x in need_write], total_budget, policy, s.max_candidates_per_segment)
+    ctx.emit("write", "decision", f"Compute plan ({policy}): total budget {total_budget} writer calls; "
+             "first round " + ", ".join(f"{x.title[:24]}={a}" for x, a in zip(need_write, alloc)))
+    done_count = 0
+
+    async def search(seg: Segment, budget: int) -> int:
+        try:
+            return await run_search(ctx, seg, segments, budget, policy=policy, accept=s.accept_score)
+        except Exception:  # a bug or outage in one segment must not sink the episode
+            log.error("writing %s failed: %s", seg.id, traceback.format_exc())
+            ctx.emit("write", "error", f"Writing '{seg.title}' failed unexpectedly.", seg.id)
+            return budget
+
+    async def first_round(seg: Segment, budget: int) -> int:
+        nonlocal done_count
+        seg.status = "writing"
+        spent = await search(seg, budget)
+        done_count += 1
+        ctx.status("write", f"Writing: {done_count}/{len(need_write)} segments drafted", 0.15 + 0.45 * done_count / len(need_write))
+        return spent
+
+    spent = list(await asyncio.gather(*(first_round(x, a) for x, a in zip(need_write, alloc))))
+    for x, sp in zip(need_write, spent):
+        x.budget = sp
+    remaining = total_budget - sum(spent)
+    if policy != "adaptive" or remaining <= 0:
+        return
+
+    def best_score(x: Segment) -> float:
+        b = best_candidate(x)
+        return b.scores.overall if b and b.scores else 0.0
+
+    bests = [best_score(x) for x in need_write]
+    extra = reallocate(remaining, bests, [x.difficulty for x in need_write], spent, s.accept_score, s.max_candidates_per_segment)
+    if not any(extra):
+        ctx.emit("write", "decision", f"All segments met the bar; {remaining} call(s) of budget left unused.")
+        return
+    ctx.emit("write", "decision", f"Verifier-guided reallocation of {remaining} leftover call(s): " +
+             ", ".join(f"{x.title[:24]} +{e} (best {b:.2f})" for x, e, b in zip(need_write, extra, bests) if e))
+    ctx.status("write", "Improving the weakest segments", 0.6)
+    chosen = [(x, e) for x, e in zip(need_write, extra) if e]
+    more = await asyncio.gather(*(search(x, e) for x, e in chosen))
+    for (x, _), sp in zip(chosen, more):
+        x.budget += sp
+
+
 async def run_episode(eid: str) -> None:
     ep = store.get_episode(eid)
     if ep is None:
         return
     token = current_metrics.set(ep.metrics)
-    s = get_settings()
     try:
         async with store.lock(eid):
             ep.status, ep.error = "running", None
@@ -127,48 +181,10 @@ async def run_episode(eid: str) -> None:
             todo = [x for x in segments if not (x.status == "done" and x.current)]
 
             # ---- Act + Observe: write with compute-optimal allocation ----------------
-            policy = ep.settings.policy
-            total_budget = max(len(segments), round(s.budget_per_segment * len(segments)))
             need_write = [x for x in todo if best_candidate(x) is None]
             if need_write:
                 with _Timer(ep, "write"):
-                    alloc = initial_allocation([x.difficulty for x in need_write], total_budget, policy, s.max_candidates_per_segment)
-                    ctx.emit("write", "decision", f"Compute plan ({policy}): total budget {total_budget} writer calls; "
-                             "first round " + ", ".join(f"{x.title[:24]}={a}" for x, a in zip(need_write, alloc)))
-                    done_count = 0
-
-                    async def first_round(seg: Segment, budget: int) -> int:
-                        nonlocal done_count
-                        seg.status = "writing"
-                        try:
-                            spent = await run_search(ctx, seg, segments, budget, policy=policy, accept=s.accept_score)
-                        except Exception:  # a bug or outage in one segment must not sink the episode
-                            log.error("writing %s failed: %s", seg.id, traceback.format_exc())
-                            ctx.emit("write", "error", f"Writing '{seg.title}' failed unexpectedly.", seg.id)
-                            spent = budget
-                        done_count += 1
-                        ctx.status("write", f"Writing: {done_count}/{len(need_write)} segments drafted",
-                                   0.15 + 0.45 * done_count / len(need_write))
-                        return spent
-
-                    spent = list(await asyncio.gather(*(first_round(x, a) for x, a in zip(need_write, alloc))))
-                    for x, sp in zip(need_write, spent):
-                        x.budget = sp
-                    remaining = total_budget - sum(spent)
-                    if policy == "adaptive" and remaining > 0:
-                        bests = [(best_candidate(x).scores.overall if best_candidate(x) and best_candidate(x).scores else 0.0) for x in need_write]
-                        extra = reallocate(remaining, bests, [x.difficulty for x in need_write], spent, s.accept_score,
-                                           s.max_candidates_per_segment)
-                        if any(extra):
-                            ctx.emit("write", "decision", f"Verifier-guided reallocation of {remaining} leftover call(s): " +
-                                     ", ".join(f"{x.title[:24]} +{e} (best {b:.2f})" for x, e, b in zip(need_write, extra, bests) if e))
-                            ctx.status("write", "Improving the weakest segments", 0.6)
-                            more = await asyncio.gather(*(run_search(ctx, x, segments, e, policy=policy, accept=s.accept_score)
-                                                          for x, e in zip(need_write, extra) if e))
-                            for x, sp in zip([x for x, e in zip(need_write, extra) if e], more):
-                                x.budget += sp
-                        else:
-                            ctx.emit("write", "decision", f"All segments met the bar; {remaining} call(s) of budget left unused.")
+                    await write_segments(ctx, segments, need_write)
                 store.save_episode(ep)
 
             # ---- Verify claims + synthesise + ASR self-check -----------------------

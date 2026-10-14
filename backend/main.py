@@ -146,7 +146,7 @@ async def create_source(request: Request, file: UploadFile | None = File(None), 
         else:
             raise HTTPException(400, "Upload a PDF, paste some text, or pick a sample chapter.")
     except IngestError as e:
-        raise HTTPException(422, str(e))
+        raise HTTPException(422, str(e)) from None
     store.save_source(src)
     return source_summary(src)
 

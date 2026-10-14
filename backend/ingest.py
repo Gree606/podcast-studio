@@ -260,7 +260,7 @@ def _build_source(title: str, raw: list[RawSection], origin: str, max_words: int
         cur_page: int | None = None
         words = 0
 
-        def emit() -> None:
+        def emit() -> None:  # noqa: B023 - called only within this loop iteration
             nonlocal cur, words
             if cur:
                 cid = f"c{len(chunks) + 1}"

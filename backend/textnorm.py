@@ -45,7 +45,7 @@ def number_to_words(token: str) -> str:
     except ValueError:
         return token
     # Years read as "nineteen ninety eight" rather than "one thousand nine hundred..."
-    if 1100 <= n <= 2099 and n % 100 != 0 and len(token) == 4:
+    if (1100 <= n <= 1999 or 2010 <= n <= 2099) and n % 100 != 0 and len(token) == 4:
         return _int_words(n // 100) + " " + (("oh " + _ONES[n % 100]) if n % 100 < 10 else _int_words(n % 100))
     return _int_words(n)
 
