@@ -1,0 +1,34 @@
+# Render blueprint: one web service with a persistent disk for episodes.
+services:
+  - type: web
+    name: podcast-studio
+    runtime: docker
+    plan: starter            # needs an always-on plan (free plans sleep and lose in-flight jobs)
+    healthCheckPath: /api/health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 2
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: TTS_BASE_URL
+        sync: false
+      - key: TTS_API_KEY
+        sync: false
+      - key: TTS_API_STYLE
+        value: openai
+      - key: TTS_VOICE_HOST
+        sync: false
+      - key: TTS_VOICE_EXPERT
+        sync: false
+      - key: ASR_BASE_URL
+        sync: false
+      - key: ASR_API_KEY
+        sync: false

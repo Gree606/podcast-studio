@@ -9,6 +9,7 @@ Perceive -> Act -> Observe loop on the audio itself.
 from __future__ import annotations
 
 import asyncio
+import zlib
 
 import numpy as np
 
@@ -64,7 +65,7 @@ async def synthesize_version(ctx: AgentContext, seg: Segment, version: SegmentVe
     """Synthesise all turns of ``version`` (in parallel, capped by the TTS semaphore) and write the segment WAV."""
     sr = get_settings().sample_rate
     clips = await asyncio.gather(*(_synth_turn(ctx, seg, i, t) for i, t in enumerate(version.turns)))
-    res = stitch_turns(list(clips), [t.text for t in version.turns], sr, seed=hash(seg.id) & 0xFFFF)
+    res = stitch_turns(list(clips), [t.text for t in version.turns], sr, seed=zlib.crc32(seg.id.encode()))
     for t, (a, b) in zip(version.turns, res.spans):
         t.seg_start, t.seg_end = round(a, 3), round(b, 3)
     out_path.write_bytes(to_wav_bytes(res.audio, sr))

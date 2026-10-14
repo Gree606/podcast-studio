@@ -1,0 +1,10 @@
+fastapi==0.143.1
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+pydantic==2.14.1
+pydantic-settings==2.16.0
+python-multipart==0.0.32
+pymupdf==1.28.2
+numpy==2.5.4
+soundfile==0.14.0
+imageio-ffmpeg==0.6.0
