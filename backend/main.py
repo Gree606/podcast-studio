@@ -276,7 +276,8 @@ async def episode_audio(eid: str, download: bool = False):
     ep = _get_ep(eid)
     p = _safe_file(eid, ep.audio_file)
     fname = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in ep.title)[:60].strip() or "episode"
-    return FileResponse(p, media_type="audio/mpeg", filename=f"{fname}.mp3" if download else None)
+    ext = p.suffix.lstrip(".")
+    return FileResponse(p, media_type="audio/mpeg" if ext == "mp3" else "audio/wav", filename=f"{fname}.{ext}" if download else None)
 
 
 @app.get("/api/episodes/{eid}/segments/{sid}/audio")

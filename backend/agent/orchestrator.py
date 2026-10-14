@@ -18,7 +18,7 @@ import traceback
 
 import numpy as np
 
-from ..audio.stitch import concat_segments, decode_audio, encode_mp3
+from ..audio.stitch import concat_segments, decode_audio, encode_mp3, to_wav_bytes
 from ..clients.base import ServiceError
 from ..clients.usage import current_metrics
 from ..config import get_settings
@@ -93,9 +93,13 @@ async def assemble(ctx: AgentContext) -> None:
         for t in seg.current.turns:
             if t.seg_start is not None:
                 t.start, t.end = round(off + t.seg_start, 3), round(off + (t.seg_end or t.seg_start), 3)
-    rev = int(time.time())
-    name = f"episode_{rev}.mp3"
-    (d / name).write_bytes(await asyncio.to_thread(encode_mp3, audio, sr))
+    rev = int(time.time() * 1000)
+    try:
+        data, name = await asyncio.to_thread(encode_mp3, audio, sr), f"episode_{rev}.mp3"
+    except RuntimeError as e:  # never lose a finished episode over the encoder: serve WAV instead
+        log.warning("mp3 encode failed, falling back to wav: %s", e)
+        data, name = to_wav_bytes(audio, sr), f"episode_{rev}.wav"
+    (d / name).write_bytes(data)
     old = ep.audio_file
     ep.audio_file = name
     ep.duration = round(len(audio) / sr, 1)

@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import random
 import subprocess
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -42,7 +43,7 @@ def decode_audio(data: bytes, sr: int | None = None) -> np.ndarray:
     except Exception:
         pass
     proc = subprocess.run(
-        [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-f", "f32le", "-ac", "1", "-ar", str(sr), "pipe:1"],
+        [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-threads", "1", "-i", "pipe:0", "-f", "f32le", "-ac", "1", "-ar", str(sr), "pipe:1"],
         input=data, capture_output=True, timeout=120,
     )
     if proc.returncode != 0 or not proc.stdout:
@@ -189,13 +190,18 @@ def concat_segments(segment_audio: list[np.ndarray], sr: int, gap_s: float = 0.9
     return limit(audio), offsets
 
 
-def encode_mp3(audio: np.ndarray, sr: int, bitrate: str = "96k") -> bytes:
+def encode_mp3(audio: np.ndarray, sr: int, bitrate: str = "96k", attempts: int = 3) -> bytes:
+    """Encode with ffmpeg/LAME. Single-threaded and retried: on hosts with tight
+    thread limits ffmpeg can fail to spawn worker threads intermittently."""
     pcm = (np.clip(audio, -1, 1) * 32767).astype("<i2").tobytes()
-    proc = subprocess.run(
-        [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", str(sr), "-ac", "1", "-i", "pipe:0",
-         "-codec:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", "pipe:1"],
-        input=pcm, capture_output=True, timeout=300,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError("mp3 encode failed: " + proc.stderr.decode(errors="ignore")[:200])
-    return proc.stdout
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-threads", "1", "-filter_threads", "1",
+           "-f", "s16le", "-ar", str(sr), "-ac", "1", "-i", "pipe:0",
+           "-codec:a", "libmp3lame", "-b:a", bitrate, "-threads", "1", "-f", "mp3", "pipe:1"]
+    err = ""
+    for i in range(attempts):
+        proc = subprocess.run(cmd, input=pcm, capture_output=True, timeout=300)
+        if proc.returncode == 0 and proc.stdout:
+            return proc.stdout
+        err = proc.stderr.decode(errors="ignore")[:200]
+        time.sleep(0.5 * (i + 1))
+    raise RuntimeError("mp3 encode failed: " + err)
