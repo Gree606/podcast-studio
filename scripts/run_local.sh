@@ -2,7 +2,8 @@
 # Start / stop / status of Podcast Studio on this machine (background, logs to data/server.log).
 #   scripts/run_local.sh start [PORT]   # default port 8000 (or next free one)
 #   scripts/run_local.sh stop | status | restart
-# Keys are read from .env. With DUMMY_ keys the app runs in demo mode.
+# API keys are read from ~/.config/podcast-studio/secrets.env (create it with
+# python scripts/init_secrets.py). With DUMMY_ keys the app runs in demo mode.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/dev_env.sh
@@ -17,7 +18,8 @@ case "${1:-start}" in
     if running; then echo "Already running (pid $(cat $PIDFILE)) on port $(cat data/server.port)"; exit 0; fi
     PORT="${2:-8000}"
     while (exec 3<>/dev/tcp/127.0.0.1/$PORT) 2>/dev/null; do PORT=$((PORT+1)); done
-    nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port "$PORT" --workers 1 >>"$LOG" 2>&1 &
+    UVICORN=(.venv/bin/uvicorn); [[ -x .venv/bin/uvicorn ]] || UVICORN=(python3 -m uvicorn)
+    nohup "${UVICORN[@]}" backend.main:app --host 0.0.0.0 --port "$PORT" --workers 1 >>"$LOG" 2>&1 &
     echo $! > $PIDFILE; echo "$PORT" > data/server.port
     for _ in $(seq 1 40); do curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null && break; sleep 0.5; done
     if curl -sf "http://127.0.0.1:$PORT/api/health"; then

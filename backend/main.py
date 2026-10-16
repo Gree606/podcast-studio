@@ -19,10 +19,11 @@ from pydantic import BaseModel, Field
 from . import jobs
 from .agent.orchestrator import regenerate_segment, run_episode, switch_version
 from .clients.base import close_http_client
-from .config import ROOT, get_settings
+from .config import ROOT, get_settings, secrets_path
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
 from .agent.context import LENGTHS
 from .prompts import PROMPT_VERSION
+from .quiz import build_quiz
 from .schemas import Episode, EpisodeSettings, new_id
 from .store import store
 
@@ -87,11 +88,27 @@ def estimate_minutes(length: str, words: int) -> dict:
     return {"audio_minutes": round(audio, 1), "wait_minutes": round(wait, 1)}
 
 
+# Kid-facing names for the episode settings; ``value`` is what EpisodeSettings accepts.
+PRESETS = {
+    "length": [
+        {"value": "short", "label": "Quick Bite", "emoji": "🍪", "hint": "A speedy snack of the big ideas"},
+        {"value": "medium", "label": "Story Time", "emoji": "📖", "hint": "The whole story, nice and easy"},
+        {"value": "long", "label": "Deep Dive", "emoji": "🤿", "hint": "Every corner of the chapter"},
+    ],
+    "tone": [
+        {"value": "casual", "label": "Fun", "emoji": "🎈", "hint": "Jokes, wow-moments and everyday examples"},
+        {"value": "balanced", "label": "Balanced", "emoji": "⚖️", "hint": "Friendly and clear"},
+        {"value": "serious", "label": "Exam Hero", "emoji": "🏆", "hint": "Key terms and what to remember for tests"},
+    ],
+}
+
+
 @app.get("/api/config")
 async def config():
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
-            "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS}}
+            "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS},
+            "presets": PRESETS, "secrets_path": str(secrets_path()), "configured": s.configured()}
 
 
 # --- samples -----------------------------------------------------------------------
@@ -324,10 +341,36 @@ async def episode_sources(eid: str):
                      for c in seg.chunk_ids if c in by_id] for seg in ep.segments}
 
 
+@app.get("/api/episodes/{eid}/quiz")
+async def episode_quiz(eid: str):
+    """Fill-in-the-blank questions built only from the episode's verified key facts ([] = no quiz)."""
+    ep = _get_ep(eid)
+    return build_quiz(ep, store.get_source(ep.source_id))
+
+
 # --- frontend ----------------------------------------------------------------------
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/")
 async def index():
-    return FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
+    return FileResponse(FRONTEND / "index.html", media_type="text/html", headers=NO_CACHE)
+
+
+@app.get("/app.css")
+async def app_css():
+    return FileResponse(FRONTEND / "app.css", media_type="text/css", headers=NO_CACHE)
+
+
+@app.get("/app.js")
+async def app_js():
+    return FileResponse(FRONTEND / "app.js", media_type="text/javascript", headers=NO_CACHE)
+
+
+@app.get("/classic")
+async def classic():
+    """The previous single-file UI, kept as a fallback."""
+    return FileResponse(FRONTEND / "classic.html", media_type="text/html", headers=NO_CACHE)
 
 
 @app.get("/favicon.ico")

@@ -3,468 +3,285 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Podcast Studio · NCERT chapters as conversations</title>
+<meta name="color-scheme" content="light dark">
+<title>Chapter Chat · turn your textbook chapter into a podcast</title>
+<meta name="description" content="Pick an NCERT chapter and two friendly hosts turn it into a fact-checked podcast, with a quiz at the end.">
 <link rel="icon" href="/favicon.ico">
-<style>
-:root{
-  --bg:#f6f7fb; --card:#fff; --ink:#1c1f2a; --muted:#5d6475; --line:#e3e6ee; --brand:#4f46e5; --brand-ink:#fff;
-  --brand-soft:#eef0ff; --ok:#0f7b4f; --ok-soft:#e5f6ee; --warn:#9a5b00; --warn-soft:#fff4dd; --bad:#b42318; --bad-soft:#fdeceb;
-  --host:#0e7490; --host-soft:#e6f6f9; --expert:#7c3aed; --expert-soft:#f3edff; --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
-}
-@media (prefers-color-scheme: dark){:root{
-  --bg:#0f1117; --card:#171a23; --ink:#e8eaf0; --muted:#a2a8b8; --line:#2a2f3c; --brand:#8b85ff; --brand-ink:#0f1117; --brand-soft:#23234a;
-  --ok:#4ade80; --ok-soft:#12301f; --warn:#fbbf24; --warn-soft:#33270c; --bad:#f87171; --bad-soft:#3a1616;
-  --host:#5ad1e6; --host-soft:#0f2a31; --expert:#b69cff; --expert-soft:#241b3d; --shadow:none;}}
-*{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif}
-a{color:var(--brand)} button,input,select,textarea{font:inherit;color:inherit}
-.wrap{max-width:1040px;margin:0 auto;padding:16px}
-header.top{display:flex;align-items:center;gap:12px;padding:8px 0 16px}
-header.top .logo{width:38px;height:38px} header.top h1{font-size:1.25rem;margin:0} header.top p{margin:0;color:var(--muted);font-size:.9rem}
-header.top nav{margin-left:auto;display:flex;gap:8px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
-h2{font-size:1.1rem;margin:0 0 12px} h3{font-size:1rem;margin:0 0 8px}
-.muted{color:var(--muted)} .small{font-size:.875rem} .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:600;display:inline-flex;gap:8px;align-items:center;text-decoration:none;color:var(--ink)}
-.btn:hover{border-color:var(--brand)} .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)} .btn.primary:hover{filter:brightness(1.08)}
-.btn.big{padding:13px 22px;font-size:1.05rem} .btn.sm{padding:5px 10px;font-size:.85rem;font-weight:600} .btn.ghost{background:transparent}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
-.tab{padding:10px 14px;border:none;background:none;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
-.tab[aria-selected=true]{color:var(--brand);border-bottom-color:var(--brand)}
-.samples{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.sample{border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;background:var(--card);text-align:left}
-.sample:hover,.sample:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-soft)}
-.sample b{display:block} .sample .tag{font-size:.75rem;color:var(--muted)}
-.drop{border:2px dashed var(--line);border-radius:12px;padding:28px;text-align:center;cursor:pointer}
-.drop.over{border-color:var(--brand);background:var(--brand-soft)}
-textarea{width:100%;min-height:180px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--card)}
-input[type=text]{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--card);min-width:0}
-.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:600;background:var(--brand-soft);color:var(--brand)}
-.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
-.seg-list{display:grid;gap:6px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px}
-.seg-list label{display:flex;gap:8px;align-items:center;cursor:pointer;padding:4px 6px;border-radius:8px} .seg-list label:hover{background:var(--brand-soft)}
-.choice{display:flex;gap:6px;flex-wrap:wrap}
-.choice input{position:absolute;opacity:0;pointer-events:none}
-.choice label{border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
-.choice input:checked+label{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
-.choice input:focus-visible+label{outline:2px solid var(--brand)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media (max-width:760px){.grid2{grid-template-columns:1fr}}
-.notice{border-radius:10px;padding:10px 12px;background:var(--warn-soft);color:var(--warn);font-size:.9rem;margin:8px 0}
-.notice.err{background:var(--bad-soft);color:var(--bad)} .notice.info{background:var(--brand-soft);color:var(--brand)}
-.stepper{display:flex;gap:6px;margin:12px 0}
-.step{flex:1;text-align:center;font-size:.8rem;font-weight:600;color:var(--muted);padding-top:8px;border-top:4px solid var(--line)}
-.step.active{color:var(--brand);border-color:var(--brand)} .step.done{color:var(--ok);border-color:var(--ok)}
-.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden} .bar>i{display:block;height:100%;background:var(--brand);transition:width .6s}
-.trace{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:.86rem;background:var(--bg)}
-.ev{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:5px 4px;border-bottom:1px dashed var(--line)} .ev:last-child{border:none}
-.ev .k{font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
-.k.thought{color:#b45309} .k.action{color:var(--brand)} .k.observation{color:var(--ok)} .k.decision{color:#be185d} .k.warning{color:var(--warn)} .k.error{color:var(--bad)} .k.info{color:var(--muted)}
-.ev .seg{color:var(--muted);font-size:.75rem}
-.player{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
-.player audio{width:100%;margin-top:8px}
-.segment{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
-.segment>.head{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--bg);flex-wrap:wrap}
-.segment>.head h3{margin:0;flex:1;min-width:180px}
-.turns{padding:6px 10px}
-.turn{display:grid;grid-template-columns:76px 1fr;gap:10px;padding:7px 6px;border-radius:8px;cursor:pointer}
-.turn:hover{background:var(--bg)} .turn.now{background:var(--brand-soft)}
-.who{font-weight:700;font-size:.85rem} .who.host{color:var(--host)} .who.expert{color:var(--expert)}
-.turn .ts{display:block;font-weight:400;color:var(--muted);font-size:.75rem}
-.regen{border-top:1px solid var(--line);padding:10px 14px;display:grid;gap:8px;background:var(--bg)}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:3px 10px;font-size:.8rem;cursor:pointer}
-.chip:hover{border-color:var(--brand)}
-.versions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.vbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:2px 8px;font-size:.8rem;cursor:pointer}
-.vbtn.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
-details.src{padding:0 14px 10px} details.src summary{cursor:pointer;color:var(--muted);font-size:.85rem;padding:6px 0}
-.passage{font-size:.85rem;border-left:3px solid var(--line);padding:4px 10px;margin:6px 0;color:var(--muted)}
-.claims{padding:0 14px 10px} .claim-bad{color:var(--bad);font-size:.85rem}
-table{border-collapse:collapse;width:100%;font-size:.88rem} th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top} th{color:var(--muted);font-weight:600}
-.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
-.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px} .kpi b{display:block;font-size:1.3rem} .kpi span{color:var(--muted);font-size:.8rem}
-.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.hidden{display:none!important}
-dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);color:var(--ink);max-width:680px;padding:22px}
-dialog::backdrop{background:rgba(0,0,0,.4)}
-.loop{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0} .loop div{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:.85rem}
-@media (max-width:600px){.loop{grid-template-columns:1fr 1fr}.turn{grid-template-columns:1fr}.ev{grid-template-columns:1fr}}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-</style>
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
+
+<!-- Character art, reused everywhere with <use href="#av-host"> / <use href="#av-expert"> -->
+<svg class="defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <title>Character drawings</title>
+  <symbol id="av-host" viewBox="0 0 120 120">
+    <title>Riya, the curious host</title>
+    <circle cx="60" cy="60" r="58" fill="var(--host-bg, #ffe1ea)"/>
+    <path d="M92 52c10 6 14 22 6 34-3-10-8-17-14-20z" fill="#3b2418"/>
+    <circle cx="60" cy="66" r="30" fill="#f1bf98"/>
+    <path d="M29 62c-2-22 13-36 31-36s34 13 31 34c-9-3-17-10-21-18-7 9-24 17-41 20z" fill="#3b2418"/>
+    <circle cx="86" cy="40" r="6" fill="#ff6b8a"/>
+    <ellipse cx="49" cy="68" rx="3.4" ry="4.2" fill="#2b1a12"/>
+    <ellipse cx="71" cy="68" rx="3.4" ry="4.2" fill="#2b1a12"/>
+    <circle cx="50.4" cy="66.4" r="1.2" fill="#fff"/><circle cx="72.4" cy="66.4" r="1.2" fill="#fff"/>
+    <circle cx="42" cy="77" r="4.5" fill="#ff8fa3" opacity=".55"/><circle cx="78" cy="77" r="4.5" fill="#ff8fa3" opacity=".55"/>
+    <path class="mouth" d="M51 80q9 8 18 0" fill="none" stroke="#7a2e2e" stroke-width="3" stroke-linecap="round"/>
+    <path d="M24 66a36 36 0 0 1 72 0" fill="none" stroke="#ff6b8a" stroke-width="6" stroke-linecap="round"/>
+    <rect x="17" y="60" width="13" height="22" rx="6" fill="#ff6b8a"/><rect x="90" y="60" width="13" height="22" rx="6" fill="#ff6b8a"/>
+    <path d="M24 80q-2 16 16 18" fill="none" stroke="#ff6b8a" stroke-width="3"/><circle cx="42" cy="98" r="4" fill="#5a4bd6"/>
+  </symbol>
+  <symbol id="av-expert" viewBox="0 0 120 120">
+    <title>Arjun, the explainer</title>
+    <circle cx="60" cy="60" r="58" fill="var(--expert-bg, #dff4ff)"/>
+    <circle cx="60" cy="66" r="30" fill="#c98e63"/>
+    <path d="M30 60c-3-20 10-34 30-34 19 0 33 12 30 33-6-8-11-12-14-17-9 6-28 11-46 18z" fill="#1d1d2b"/>
+    <circle cx="48" cy="68" r="8" fill="none" stroke="#1d1d2b" stroke-width="2.6"/>
+    <circle cx="72" cy="68" r="8" fill="none" stroke="#1d1d2b" stroke-width="2.6"/>
+    <path d="M56 68h8" stroke="#1d1d2b" stroke-width="2.6"/>
+    <circle cx="48" cy="68" r="3" fill="#1d1d2b"/><circle cx="72" cy="68" r="3" fill="#1d1d2b"/>
+    <circle cx="49.2" cy="66.8" r="1" fill="#fff"/><circle cx="73.2" cy="66.8" r="1" fill="#fff"/>
+    <path class="mouth" d="M51 82q9 7 18 0" fill="none" stroke="#5b2a1a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M24 66a36 36 0 0 1 72 0" fill="none" stroke="#14b8a6" stroke-width="6" stroke-linecap="round"/>
+    <rect x="17" y="60" width="13" height="22" rx="6" fill="#14b8a6"/><rect x="90" y="60" width="13" height="22" rx="6" fill="#14b8a6"/>
+  </symbol>
+</svg>
+
+<a class="skip" href="#app">Skip to content</a>
+<div class="sky" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+
 <div class="wrap">
   <header class="top">
-    <img class="logo" src="/favicon.ico" alt="">
-    <div><h1>Podcast Studio</h1><p>Turn any NCERT chapter into a two-host podcast, fact-checked against the book.</p></div>
-    <nav><button class="btn ghost sm" id="howBtn" type="button">How it works</button><a class="btn ghost sm" href="#/" id="newBtn">New episode</a></nav>
+    <a class="brand" href="#/" id="brandHome">
+      <svg class="logo" viewBox="0 0 64 64" role="img" aria-label="Chapter Chat logo">
+        <title>Chapter Chat</title>
+        <rect x="4" y="4" width="56" height="56" rx="18" fill="#7b5cff"/>
+        <rect x="23" y="12" width="18" height="28" rx="9" fill="#fff"/>
+        <path d="M17 32a15 15 0 0 0 30 0" fill="none" stroke="#ffd166" stroke-width="4" stroke-linecap="round"/>
+        <path d="M32 47v6M24 54h16" stroke="#ffd166" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="28.5" cy="24" r="2" fill="#7b5cff"/><circle cx="35.5" cy="24" r="2" fill="#7b5cff"/>
+        <path d="M28 30q4 4 8 0" fill="none" stroke="#7b5cff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span><b>Chapter Chat</b><small>Your textbook, as a podcast</small></span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <button class="btn ghost sm" id="howBtn" type="button">❓ How it works</button>
+      <button class="btn ghost sm" id="teacherToggle" type="button" aria-pressed="false" title="Show how the AI agent made the episode">🎓 Teacher view</button>
+      <a class="btn sm primary" href="#/" id="newBtn">✨ New episode</a>
+    </nav>
   </header>
-  <div id="banner"></div>
-  <main id="app" aria-live="polite"></main>
-  <footer class="muted small" style="padding:20px 0">Built for <i>Recent Advances in Generative AI</i> (IIT Madras). Content comes only from the chapter you provide; always cross-check with your textbook.</footer>
+
+  <ol class="journey" id="journey" aria-label="Your progress">
+    <li data-step="pick"><span>1</span>Pick</li>
+    <li data-step="choose"><span>2</span>Choose</li>
+    <li data-step="make"><span>3</span>Make</li>
+    <li data-step="listen"><span>4</span>Listen</li>
+  </ol>
+
+  <section class="setup hidden" id="setup" aria-labelledby="setupTitle">
+    <details open>
+      <summary><b id="setupTitle">🔑 Grown-up setup needed</b> <span class="muted">· the app is in demo mode (placeholder voices)</span></summary>
+      <p>To use the real AI writer and voices, put the API keys in this file <b>on the computer running the app</b>, then restart the app:</p>
+      <p><code id="setupPath"></code></p>
+      <ul class="setup-list" id="setupList"></ul>
+      <p class="small muted">Don't have the file yet? Run <code>python scripts/init_secrets.py</code> once and it is created for you with placeholders to replace. Keys are never shown on this page.</p>
+    </details>
+  </section>
+  <div id="demoNote"></div>
+
+  <main id="app" tabindex="-1"></main>
+
+  <footer class="foot small muted">
+    Made for <i>Recent Advances in Generative AI</i> (IIT Madras). Everything the hosts say comes from the chapter you give them, and every fact is checked against the book. Still, your textbook is the boss: double-check before exams!
+    · <a href="/classic">Classic view</a>
+  </footer>
 </div>
 
-<dialog id="how">
-  <h2>How the agent works</h2>
-  <p class="small">A small, fast LLM (Gemini Flash) acts as an agent that <b>perceives, plans, acts and observes</b>, and spends extra thinking only where it's needed.</p>
-  <div class="loop">
-    <div><b>1. Plan (ReAct)</b><br>Explores the chapter with tools (search, read, define), then outlines segments. Every key fact cites a passage and is verified twice (rule check + model check).</div>
-    <div><b>2. Write + critique (Reflexion)</b><br>Writes each segment as a dialogue; a strict critic scores it on 5 axes and the writer revises with lessons kept in memory.</div>
-    <div><b>3. Adaptive compute</b><br>Harder segments get more drafts; easy ones stop early. Leftover budget flows to whichever segment the critic says is weakest (after Snell et al.).</div>
-    <div><b>4. Fact-check + record</b><br>Every claim in the final script is checked against the book. Each line is voiced, then transcribed back by speech recognition; garbled lines are re-recorded.</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="confetti" id="confetti" aria-hidden="true"></div>
+
+<dialog id="how" aria-labelledby="howTitle">
+  <h2 id="howTitle">How Chapter Chat works</h2>
+  <div class="how-grid">
+    <div><span class="big-emoji">📖</span><b>1. Read &amp; plan</b><p>An AI agent explores the chapter with tools (search, read, define) and plans the episode. Every key fact must point to a passage in the book, and is checked twice.</p></div>
+    <div><span class="big-emoji">✍️</span><b>2. Write &amp; polish</b><p>It writes each part as a chat between Riya and Arjun. A strict critic scores the draft on 5 things; the writer learns from the feedback and tries again. Harder parts get more tries.</p></div>
+    <div><span class="big-emoji">🔎</span><b>3. Fact-check &amp; record</b><p>Every claim in the script is checked against the book. Each line is spoken, then listened to by speech recognition; mumbled lines are re-recorded.</p></div>
+    <div><span class="big-emoji">🎧</span><b>4. Listen &amp; play</b><p>Tap any line to jump there. Want a part simpler or more fun? One tap rewrites just that part. Then try the quiz!</p></div>
   </div>
-  <p class="small">After it's done, you're the reviewer: regenerate any segment with an instruction ("simpler", "add an example"). Only that segment is rewritten and re-recorded, and you can switch between versions.</p>
-  <form method="dialog"><button class="btn primary">Got it</button></form>
+  <p class="small muted">Grown-ups and teachers: press <b>🎓 Teacher view</b> to see the agent's full reasoning trace, quality scores, compute budget, claim check, sources and every version.</p>
+  <form method="dialog"><button class="btn primary" type="submit">Got it 👍</button></form>
 </dialog>
 
+<!-- ============================================================ home: pick + choose -->
 <template id="tpl-home">
-  <section class="card">
-    <h2>1. Choose a chapter</h2>
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-tab="samples">Try a sample</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="upload">Upload PDF</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="paste">Paste text</button>
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Turn any chapter into a <span class="hl">podcast</span> 🎙️</h1>
+      <p>Riya and Arjun read your textbook chapter, chat about it like friends, and check every fact against the book. Then you get a quiz!</p>
     </div>
-    <div data-pane="samples"><p class="muted small">No file handy? Pick one of these NCERT chapters. One click and you're set.</p><div class="samples" id="samples"><span class="spinner"></span></div></div>
-    <div data-pane="upload" class="hidden">
-      <label class="drop" id="drop" tabindex="0"><input type="file" id="file" accept="application/pdf,.pdf,.txt,.md" class="sr">
-        <b>Drop an NCERT chapter PDF here</b><br><span class="muted small">or click to choose a file · one chapter, up to 25 MB · scanned pages are read with OCR</span></label>
-    </div>
-    <div data-pane="paste" class="hidden">
-      <label for="pasteTitle" class="small muted">Title (optional)</label><br><input type="text" id="pasteTitle" placeholder="e.g. Light: Reflection and Refraction" style="width:100%;margin-bottom:8px">
-      <label for="pasteText" class="sr">Chapter text</label>
-      <textarea id="pasteText" placeholder="Paste a chapter or section here (at least a few paragraphs). Headings on their own line are detected as sections."></textarea>
-      <div class="row" style="margin-top:8px"><button class="btn" id="pasteGo" type="button">Use this text</button></div>
-    </div>
-    <div id="srcStatus"></div>
-  </section>
-  <section class="card hidden" id="configure">
-    <h2>2. Shape your episode</h2>
-    <div class="grid2">
-      <div>
-        <h3 id="srcTitle"></h3><p class="muted small" id="srcMeta"></p><div id="srcNotes"></div>
-        <div class="row" style="justify-content:space-between"><b class="small">Sections to cover</b><span class="small"><a href="#" id="selAll">all</a> · <a href="#" id="selNone">none</a></span></div>
-        <div class="seg-list" id="sections" role="group" aria-label="Sections"></div>
-      </div>
-      <div>
-        <b class="small">Length</b>
-        <div class="choice" id="length" role="radiogroup" aria-label="Length"></div>
-        <b class="small" style="display:block;margin-top:12px">Tone</b>
-        <div class="choice" role="radiogroup" aria-label="Tone">
-          <input type="radio" name="tone" id="t-casual" value="casual"><label for="t-casual">Casual</label>
-          <input type="radio" name="tone" id="t-balanced" value="balanced" checked><label for="t-balanced">Balanced</label>
-          <input type="radio" name="tone" id="t-serious" value="serious"><label for="t-serious">Exam-focused</label>
-        </div>
-        <details style="margin-top:12px"><summary class="small muted">Host names</summary>
-          <div class="row" style="margin-top:8px"><label class="small">Curious host <input type="text" id="hostName" value="Riya" maxlength="20" size="10"></label>
-          <label class="small">Explainer <input type="text" id="expertName" value="Arjun" maxlength="20" size="10"></label></div></details>
-        <p class="small muted" id="estimate" style="margin-top:14px"></p>
-        <button class="btn primary big" id="generate" type="button">🎙️ Make my podcast</button>
-      </div>
+    <div class="hero-crew" aria-hidden="true">
+      <svg class="avatar bob" viewBox="0 0 120 120" role="img" aria-label="Riya"><title>Riya</title><use href="#av-host"/></svg>
+      <svg class="avatar bob late" viewBox="0 0 120 120" role="img" aria-label="Arjun"><title>Arjun</title><use href="#av-expert"/></svg>
     </div>
   </section>
-  <section class="card hidden" id="recentCard"><h2>Your recent episodes</h2><div id="recent"></div></section>
+
+  <section class="card" id="pickCard" aria-labelledby="pickTitle">
+    <h2 id="pickTitle"><span class="step-badge">1</span> Pick a chapter</h2>
+    <div class="tabs" role="tablist" aria-label="Where the chapter comes from">
+      <button class="tab" role="tab" type="button" aria-selected="true" data-tab="samples">📚 Ready-made chapters</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="upload">📄 Upload a PDF</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="paste">✏️ Paste text</button>
+    </div>
+    <div data-pane="samples" role="tabpanel">
+      <div class="samples" id="samples"><span class="spinner" role="img" aria-label="Loading"></span></div>
+    </div>
+    <div data-pane="upload" role="tabpanel" class="hidden">
+      <label class="drop" id="drop" tabindex="0">
+        <input type="file" id="file" accept="application/pdf,.pdf,.txt,.md" class="sr">
+        <span class="drop-emoji" aria-hidden="true">🪄</span>
+        <b>Drop your chapter PDF into the magic box</b>
+        <span class="muted small">or tap to choose a file · one chapter, up to 25 MB · scanned pages work too</span>
+      </label>
+    </div>
+    <div data-pane="paste" role="tabpanel" class="hidden">
+      <label for="pasteTitle" class="small">Title (optional)</label>
+      <input type="text" id="pasteTitle" placeholder="e.g. Light: Reflection and Refraction">
+      <label for="pasteText" class="small">Chapter text</label>
+      <textarea id="pasteText" placeholder="Paste a chapter or a section here (a few paragraphs at least). Headings on their own line become sections."></textarea>
+      <div class="row"><button class="btn" id="pasteGo" type="button">👉 Use this text</button></div>
+    </div>
+    <div id="srcStatus" aria-live="polite"></div>
+  </section>
+
+  <section class="card hidden" id="configure" aria-labelledby="chooseTitle">
+    <h2 id="chooseTitle"><span class="step-badge">2</span> Choose your adventure</h2>
+    <div class="chosen">
+      <div><b class="chosen-title" id="srcTitle"></b><span class="muted small" id="srcMeta"></span></div>
+    </div>
+    <div id="srcNotes"></div>
+    <div class="config-grid">
+      <div>
+        <div class="row between"><h3>Which parts?</h3><span class="small"><button class="link" id="selAll" type="button">all</button> · <button class="link" id="selNone" type="button">none</button></span></div>
+        <div class="section-chips" id="sections" role="group" aria-label="Sections to cover"></div>
+      </div>
+      <div>
+        <h3>How long?</h3>
+        <div class="presets" id="lengthChoices" role="radiogroup" aria-label="Length"></div>
+        <h3>What style?</h3>
+        <div class="presets" id="toneChoices" role="radiogroup" aria-label="Style"></div>
+        <details class="names">
+          <summary class="small">🎭 Rename the hosts</summary>
+          <div class="row">
+            <label class="small">Curious host <input type="text" id="hostName" value="Riya" maxlength="20" size="10"></label>
+            <label class="small">Explainer <input type="text" id="expertName" value="Arjun" maxlength="20" size="10"></label>
+          </div>
+        </details>
+      </div>
+    </div>
+    <div class="go-row">
+      <p class="small" id="estimate"></p>
+      <button class="btn primary big" id="generate" type="button">🎙️ Make my podcast!</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="recentCard" aria-labelledby="recentTitle">
+    <h2 id="recentTitle">🎧 Your episodes</h2>
+    <div class="recent" id="recent"></div>
+  </section>
 </template>
 
+<!-- ============================================================ episode: make + listen -->
 <template id="tpl-episode">
-  <section class="card" id="progressCard">
-    <div class="row" style="justify-content:space-between"><h2 id="epTitle" style="margin:0"></h2><span id="epStatus"></span></div>
-    <div class="stepper" id="stepper">
-      <div class="step" data-s="plan">Read &amp; plan</div><div class="step" data-s="write">Write &amp; critique</div>
-      <div class="step" data-s="voice">Fact-check &amp; record</div><div class="step" data-s="assemble">Mix</div>
+  <section class="card make" id="makeCard" aria-labelledby="epTitle">
+    <div class="row between"><h2 id="epTitle"></h2><span id="epStatus"></span></div>
+    <div class="crew">
+      <figure class="crew-member">
+        <svg class="avatar working" viewBox="0 0 120 120" role="img" aria-label="Host"><title>Host</title><use href="#av-host"/></svg>
+        <figcaption id="crewHost">Riya</figcaption>
+      </figure>
+      <div class="thought" id="thought" aria-live="polite"></div>
+      <figure class="crew-member">
+        <svg class="avatar working late" viewBox="0 0 120 120" role="img" aria-label="Explainer"><title>Explainer</title><use href="#av-expert"/></svg>
+        <figcaption id="crewExpert">Arjun</figcaption>
+      </figure>
     </div>
-    <div class="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100"><i id="bar" style="width:2%"></i></div>
-    <p class="small" id="epMsg" style="margin:8px 0 0"></p>
-    <div id="epActions" class="row" style="margin-top:8px"></div>
-  </section>
-  <section class="player hidden" id="player">
-    <div class="row" style="justify-content:space-between"><b id="plTitle"></b>
-      <div class="row"><a class="btn sm" id="dlMp3" href="#">⬇ MP3</a><a class="btn sm" id="dlTxt" href="#">⬇ Transcript</a><button class="btn sm" id="share" type="button">🔗 Copy link</button></div></div>
-    <audio id="audio" controls preload="metadata"></audio>
-  </section>
-  <section class="card">
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-tab="script">Script &amp; review</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="trace">Agent trace</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="insights">Quality &amp; compute</button>
+    <div class="track" id="track">
+      <div class="stations">
+        <span class="station" data-s="plan"><i aria-hidden="true">📖</i>Read &amp; plan</span>
+        <span class="station" data-s="write"><i aria-hidden="true">✍️</i>Write &amp; polish</span>
+        <span class="station" data-s="voice"><i aria-hidden="true">🔎</i>Check &amp; record</span>
+        <span class="station" data-s="assemble"><i aria-hidden="true">🎧</i>Mix</span>
+      </div>
+      <div class="rail" id="progress" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <i id="bar"></i><span class="rocket" id="rocket" aria-hidden="true">🚀</span>
+      </div>
     </div>
-    <div data-pane="script"><p class="muted small" id="scriptHint">Segments appear here as they're written. Click any line to jump to it.</p><div id="segments"></div></div>
-    <div data-pane="trace" class="hidden"><p class="muted small">Every thought, tool call, observation and decision the agent made, live.</p>
-      <div class="row small" style="margin-bottom:8px"><label><input type="checkbox" id="followTrace" checked> Follow latest</label></div>
-      <div class="trace" id="trace"></div></div>
-    <div data-pane="insights" class="hidden" id="insights"></div>
+    <p class="ep-msg" id="epMsg"></p>
+    <p class="small muted" id="epWait"></p>
+    <div class="row" id="epActions">
+      <button class="btn primary hidden" id="resumeBtn" type="button">🔁 Try again</button>
+    </div>
+  </section>
+
+  <section class="card player hidden" id="player" aria-labelledby="plTitle">
+    <div class="row between">
+      <h2 id="plTitle"></h2>
+      <div class="row">
+        <a class="btn sm" id="dlMp3" href="#">⬇️ Audio</a>
+        <a class="btn sm" id="dlTxt" href="#">📝 Script</a>
+        <button class="btn sm" id="share" type="button">🔗 Copy link</button>
+      </div>
+    </div>
+    <div class="stage">
+      <figure class="stage-member" id="stageHost">
+        <svg class="avatar" viewBox="0 0 120 120" role="img" aria-label="Host"><title>Host</title><use href="#av-host"/></svg>
+        <figcaption id="nameHost">Riya</figcaption>
+      </figure>
+      <div class="caption" id="nowLine" aria-live="off">Press play and follow along! 👇</div>
+      <figure class="stage-member" id="stageExpert">
+        <svg class="avatar" viewBox="0 0 120 120" role="img" aria-label="Explainer"><title>Explainer</title><use href="#av-expert"/></svg>
+        <figcaption id="nameExpert">Arjun</figcaption>
+      </figure>
+    </div>
+    <div class="controls">
+      <button class="btn play" id="playBtn" type="button" aria-label="Play">▶</button>
+      <audio id="audio" controls preload="metadata"></audio>
+      <button class="btn sm" id="speedBtn" type="button" aria-label="Playback speed">1×</button>
+    </div>
+    <div class="badges" id="trustBadge"></div>
+  </section>
+
+  <section class="card" id="scriptCard" aria-labelledby="scriptTitle">
+    <h2 id="scriptTitle">💬 The conversation</h2>
+    <p class="muted small" id="scriptHint">Parts appear here as they are written. Tap any line to hear it.</p>
+    <div id="segments"></div>
+  </section>
+
+  <section class="card quiz hidden" id="quizCard" aria-labelledby="quizTitle">
+    <h2 id="quizTitle">🧠 Quiz time!</h2>
+    <div id="quizBody" aria-live="polite"></div>
+  </section>
+
+  <section class="card teacher-only" id="teacherPanel" aria-labelledby="teacherTitle">
+    <h2 id="teacherTitle">🎓 How the agent made this episode</h2>
+    <div class="tabs" role="tablist" aria-label="Agent details">
+      <button class="tab" role="tab" type="button" aria-selected="true" data-tab="trace">🧭 Agent trace</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="quality">📊 Quality &amp; compute</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="claims">✅ Claim check</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="sources">📚 Sources</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="versions">🗂️ Versions</button>
+    </div>
+    <div data-pane="trace" role="tabpanel">
+      <p class="muted small">Every thought, tool call, observation and decision the agent made (ReAct planner, Reflexion critic loop, claim check, audio self-check), live.</p>
+      <label class="small"><input type="checkbox" id="followTrace" checked> Follow latest</label>
+      <div class="trace" id="teacherTrace"></div>
+    </div>
+    <div data-pane="quality" role="tabpanel" class="hidden" id="teacherQuality"></div>
+    <div data-pane="claims" role="tabpanel" class="hidden" id="teacherClaims"></div>
+    <div data-pane="sources" role="tabpanel" class="hidden" id="teacherSources"></div>
+    <div data-pane="versions" role="tabpanel" class="hidden" id="teacherVersions"></div>
   </section>
 </template>
 
-<script>
-"use strict";
-const $ = (s, el = document) => el.querySelector(s);
-const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmtT = s => s == null ? "" : `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
-let CONFIG = {lengths:{}}, pollTimer = null, epState = null, traceLen = 0, sources = null, currentAudioFile = null;
-
-async function api(path, opts = {}) {
-  let r;
-  try { r = await fetch(path, opts); }
-  catch { throw new Error("Can't reach the server. Check your connection and try again."); }
-  let data = null; try { data = await r.json(); } catch {}
-  if (!r.ok) throw new Error((data && data.detail) || `Request failed (${r.status}). Please try again.`);
-  return data;
-}
-function showErr(el, msg) { el.innerHTML = `<div class="notice err" role="alert">${esc(msg)}</div>`; }
-function tabs(root) {
-  $$(".tab", root).forEach(t => t.onclick = () => {
-    $$(".tab", root).forEach(x => x.setAttribute("aria-selected", x === t));
-    $$("[data-pane]", root).forEach(p => p.classList.toggle("hidden", p.dataset.pane !== t.dataset.tab));
-  });
-}
-function myEpisodes() { try { return JSON.parse(localStorage.getItem("myEpisodes") || "[]"); } catch { return []; } }
-function rememberEpisode(id, title) { const l = myEpisodes().filter(x => x.id !== id); l.unshift({id, title, t: Date.now()}); localStorage.setItem("myEpisodes", JSON.stringify(l.slice(0, 12))); }
-
-// ---------------------------------------------------------------- home
-let SOURCE = null;
-async function renderHome() {
-  stopPoll();
-  const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-home").content.cloneNode(true)); tabs(app);
-  try {
-    const samples = await api("/api/samples");
-    $("#samples").innerHTML = samples.length ? samples.map(s => `<button class="sample" type="button" data-id="${esc(s.id)}"><span class="tag">${esc(s.subject)} · Class ${esc(s.class)}</span><b>${esc(s.title)}</b><span class="small muted">${esc(s.blurb || "")}</span></button>`).join("") : `<p class="muted">No samples bundled.</p>`;
-    $$(".sample").forEach(b => b.onclick = () => loadSource({sample_id: b.dataset.id}, b));
-  } catch (e) { showErr($("#samples"), e.message); }
-  const drop = $("#drop"), file = $("#file");
-  drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } };
-  ["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) loadSource({file: e.dataTransfer.files[0]}); });
-  file.onchange = () => file.files[0] && loadSource({file: file.files[0]});
-  $("#pasteGo").onclick = () => loadSource({text: $("#pasteText").value, title: $("#pasteTitle").value});
-  const mine = myEpisodes();
-  if (mine.length) {
-    $("#recentCard").classList.remove("hidden");
-    $("#recent").innerHTML = mine.map(x => `<div class="row" style="justify-content:space-between;padding:4px 0"><a href="#/episode/${esc(x.id)}">${esc(x.title)}</a><span class="small muted">${new Date(x.t).toLocaleString()}</span></div>`).join("");
-  }
-}
-
-async function loadSource(input, btn) {
-  const st = $("#srcStatus");
-  st.innerHTML = `<p class="row small"><span class="spinner"></span> ${input.file ? "Reading your PDF (scanned pages take a little longer)…" : "Loading chapter…"}</p>`;
-  const fd = new FormData();
-  if (input.sample_id) fd.append("sample_id", input.sample_id);
-  if (input.file) fd.append("file", input.file);
-  if (input.text != null) { if (input.text.trim().split(/\s+/).length < 80) { showErr(st, "Please paste at least a few paragraphs (80+ words)."); return; } fd.append("text", input.text); }
-  if (input.title) fd.append("title", input.title);
-  try {
-    SOURCE = await api("/api/sources", {method: "POST", body: fd});
-    st.innerHTML = ""; showConfigure();
-  } catch (e) { showErr(st, e.message); }
-}
-
-function showConfigure() {
-  const c = $("#configure"); c.classList.remove("hidden");
-  $("#srcTitle").textContent = SOURCE.title;
-  $("#srcMeta").textContent = `${SOURCE.word_count.toLocaleString()} words · ${SOURCE.sections.length} sections`;
-  $("#srcNotes").innerHTML = SOURCE.notes.map(n => `<div class="notice info small">${esc(n)}</div>`).join("");
-  $("#sections").innerHTML = SOURCE.sections.map(s => `<label><input type="checkbox" value="${esc(s.id)}" checked> <span>${esc(s.title)}</span> <span class="small muted" style="margin-left:auto">${s.word_count}w</span></label>`).join("");
-  const L = CONFIG.lengths, names = {short: "Short", medium: "Medium", long: "Long"};
-  $("#length").innerHTML = Object.keys(L).map(k => `<input type="radio" name="length" id="l-${k}" value="${k}" ${k === "medium" ? "checked" : ""}><label for="l-${k}">${names[k]} <span class="small muted">~${Math.round(L[k].audio_minutes)} min</span></label>`).join("");
-  const upd = () => {
-    const k = $("input[name=length]:checked").value, sel = $$("#sections input:checked").length;
-    $("#estimate").textContent = `About ${Math.round(L[k].audio_minutes)} minutes of audio. Making it takes roughly ${Math.ceil(L[k].wait_minutes)}–${Math.ceil(L[k].wait_minutes * 1.8)} minutes; you can watch the agent work meanwhile.` + (sel === 0 ? " Select at least one section." : "");
-    $("#generate").disabled = sel === 0;
-  };
-  $$("#length input, #sections input").forEach(i => i.onchange = upd); upd();
-  $("#selAll").onclick = e => { e.preventDefault(); $$("#sections input").forEach(i => i.checked = true); upd(); };
-  $("#selNone").onclick = e => { e.preventDefault(); $$("#sections input").forEach(i => i.checked = false); upd(); };
-  $("#generate").onclick = createEpisode;
-  c.scrollIntoView({behavior: "smooth", block: "start"});
-}
-
-async function createEpisode() {
-  const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Starting…`;
-  const all = $$("#sections input"), sel = all.filter(i => i.checked).map(i => i.value);
-  const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value,
-    host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
-  try {
-    const r = await api("/api/episodes", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({source_id: SOURCE.id, settings})});
-    rememberEpisode(r.id, SOURCE.title); location.hash = `#/episode/${r.id}`;
-  } catch (e) { btn.disabled = false; btn.textContent = "🎙️ Make my podcast"; showErr($("#estimate"), e.message); }
-}
-
-// ---------------------------------------------------------------- episode
-function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
-async function renderEpisode(id) {
-  stopPoll(); epState = null; traceLen = 0; sources = null; currentAudioFile = null;
-  const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
-  $("#audio").addEventListener("timeupdate", highlightTurn);
-  $("#share").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("#share").textContent = "✓ Copied"; } catch { prompt("Copy this link:", location.href); } };
-  await poll(id);
-}
-
-async function poll(id) {
-  let ep;
-  try { ep = await api(`/api/episodes/${id}?since=${traceLen}`); }
-  catch (e) {
-    if (/not found/i.test(e.message)) { $("#app").innerHTML = `<div class="card"><div class="notice err">${esc(e.message)}</div><a class="btn" href="#/">Start a new episode</a></div>`; return; }
-    $("#epMsg").innerHTML = `<span class="pill warn">Connection hiccup, retrying…</span>`; pollTimer = setTimeout(() => poll(id), 4000); return;
-  }
-  appendTrace(ep.trace); traceLen = ep.trace_len;
-  const prev = epState; epState = ep;
-  rememberEpisode(ep.id, ep.title);
-  renderProgress(ep);
-  const segsChanged = !prev || JSON.stringify(prev.segments.map(s => [s.status, s.active_version, s.versions.length, s.error])) !== JSON.stringify(ep.segments.map(s => [s.status, s.active_version, s.versions.length, s.error]));
-  if (segsChanged) renderSegments(ep);
-  if (ep.audio_file && ep.audio_file !== currentAudioFile) setAudio(ep);
-  renderInsights(ep);
-  const active = ["queued", "running"].includes(ep.status) || ep.busy;
-  if (active) pollTimer = setTimeout(() => poll(id), ep.status === "queued" ? 2500 : 1500);
-}
-
-function renderProgress(ep) {
-  $("#epTitle").textContent = ep.title;
-  const badge = {queued: ["", "Queued"], running: ["", "Working"], done: ["ok", "Ready"], failed: ["bad", "Stopped"], interrupted: ["warn", "Interrupted"]}[ep.status];
-  $("#epStatus").innerHTML = `<span class="pill ${badge[0]}">${ep.busy && ep.status === "done" ? '<span class="spinner"></span> Updating' : badge[1]}</span>`;
-  const order = ["plan", "write", "voice", "assemble"], idx = ep.status === "done" ? 4 : Math.max(0, order.indexOf(ep.stage));
-  $$("#stepper .step").forEach((s, i) => { s.classList.toggle("done", i < idx); s.classList.toggle("active", i === idx && ep.status !== "done"); });
-  const pct = Math.round((ep.status === "done" ? 1 : ep.progress) * 100);
-  $("#bar").style.width = Math.max(2, pct) + "%"; $(".bar").setAttribute("aria-valuenow", pct);
-  let msg = esc(ep.message);
-  if (ep.queue_position) msg = `Waiting in line (position ${ep.queue_position}). Other listeners are generating right now; this starts automatically.`;
-  if (ep.error) msg = `<span class="notice err" style="display:block">${esc(ep.message)}</span>`;
-  $("#epMsg").innerHTML = (["queued","running"].includes(ep.status) ? '<span class="spinner"></span> ' : "") + msg;
-  $("#epActions").innerHTML = ["failed","interrupted"].includes(ep.status) && !ep.busy ? `<button class="btn primary" id="resume" type="button">↻ Resume</button>` : "";
-  if ($("#resume")) $("#resume").onclick = async () => { try { await api(`/api/episodes/${ep.id}/resume`, {method: "POST"}); poll(ep.id); } catch (e) { showErr($("#epActions"), e.message); } };
-  $("#progressCard").classList.toggle("hidden", ep.status === "done" && !ep.busy);
-}
-
-function setAudio(ep) {
-  currentAudioFile = ep.audio_file;
-  const a = $("#audio"), t = a.currentTime, wasPlaying = !a.paused;
-  a.src = `/api/episodes/${ep.id}/audio?f=${encodeURIComponent(ep.audio_file)}`;
-  a.addEventListener("loadedmetadata", () => { if (t) a.currentTime = Math.min(t, a.duration || t); if (wasPlaying) a.play().catch(() => {}); }, {once: true});
-  $("#player").classList.remove("hidden");
-  $("#plTitle").textContent = `${ep.title} · ${fmtT(ep.duration)}`;
-  $("#dlMp3").href = `/api/episodes/${ep.id}/audio?download=true`;
-  $("#dlTxt").href = `/api/episodes/${ep.id}/transcript`;
-}
-
-const QUICK = ["Make it shorter", "Explain more simply", "Add an everyday example", "More casual and fun", "Slow down on the key term"];
-function renderSegments(ep) {
-  const box = $("#segments"), names = {host: ep.settings.host_name, expert: ep.settings.expert_name};
-  const open = new Set($$("details.src[open]", box).map(d => d.dataset.seg));
-  const drafts = Object.fromEntries($$(".regen input", box).map(i => [i.dataset.seg, i.value]));
-  if (!ep.segments.length) { box.innerHTML = `<p class="muted small"><span class="spinner"></span> The agent is still reading the chapter…</p>`; return; }
-  $("#scriptHint").classList.toggle("hidden", ep.status === "done");
-  box.innerHTML = ep.segments.map(s => {
-    const v = s.versions.find(x => x.version === s.active_version);
-    const busy = ["writing", "synthesizing", "checking"].includes(s.status) && (ep.busy || ep.status === "running");
-    const statusPill = s.status === "failed" ? `<span class="pill bad">failed</span>` : busy ? `<span class="pill"><span class="spinner"></span> ${esc(s.status)}</span>` : s.status === "pending" ? `<span class="pill">waiting</span>` : "";
-    const score = v && v.scores ? `<span class="pill ${v.scores.overall >= 4 ? "ok" : v.scores.overall >= 3.3 ? "" : "warn"}" title="Critic score (1-5)">★ ${v.scores.overall.toFixed(1)}</span>` : "";
-    const bad = v ? v.claims.filter(c => !c.supported) : [];
-    const claims = v && v.claims.length ? `<span class="pill ${bad.length ? "warn" : "ok"}" title="Claims checked against the chapter">✓ ${v.claims.length - bad.length}/${v.claims.length} facts</span>` : "";
-    const versions = s.versions.length > 1 ? `<div class="versions small"><span class="muted">Versions:</span>${s.versions.map(x => `<button type="button" class="vbtn ${x.version === s.active_version ? "on" : ""}" data-act="ver" data-seg="${s.id}" data-v="${x.version}" title="${esc(x.instruction || "original")}" ${ep.busy ? "disabled" : ""}>v${x.version}</button>`).join("")}<button type="button" class="vbtn" data-act="preview" data-seg="${s.id}">▶ compare</button><audio class="hidden" data-prev="${s.id}" controls></audio></div>` : "";
-    const turns = v ? v.turns.map((t, i) => `<div class="turn" data-start="${t.start ?? ""}" data-end="${t.end ?? ""}" tabindex="0"><span class="who ${t.speaker}">${esc(names[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span><span>${esc(t.text)}</span></div>`).join("") : (s.error ? `<div class="notice err">${esc(s.error)}</div>` : `<p class="muted small" style="padding:6px">${s.status === "pending" ? "Waiting for its turn…" : "Being written…"}</p>`);
-    return `<article class="segment" id="${s.id}">
-      <div class="head"><h3>${s.index + 1}. ${esc(s.title)}</h3>${statusPill}${score}${claims}<span class="pill" title="Difficulty predicted by the planner">difficulty ${s.difficulty}/5</span></div>
-      ${s.error && v ? `<div class="notice err" style="margin:8px 14px">${esc(s.error)}</div>` : ""}
-      <div class="turns">${turns}</div>
-      ${bad.length ? `<div class="claims">${bad.map(c => `<div class="claim-bad">⚠ Not found in the chapter: “${esc(c.claim)}”</div>`).join("")}</div>` : ""}
-      <details class="src" data-seg="${s.id}" ${open.has(s.id) ? "open" : ""}><summary>Sources from the chapter</summary><div data-srcbox="${s.id}"><span class="spinner"></span></div></details>
-      ${ep.status === "done" || s.versions.length ? `<div class="regen">${versions}
-        <div class="row"><label class="sr" for="in-${s.id}">Instruction for ${esc(s.title)}</label><input type="text" id="in-${s.id}" data-seg="${s.id}" placeholder="Optional: how should this part change?" style="flex:1" maxlength="300" value="${esc(drafts[s.id] || "")}">
-        <button class="btn sm primary" type="button" data-act="regen" data-seg="${s.id}" ${ep.busy || ep.status !== "done" ? "disabled" : ""}>↻ Regenerate this part</button></div>
-        <div class="chips">${QUICK.map(q => `<button type="button" class="chip" data-act="chip" data-seg="${s.id}">${q}</button>`).join("")}</div></div>` : ""}
-    </article>`;
-  }).join("");
-  $$(".turn", box).forEach(el => { const go = () => { const a = $("#audio"); if (el.dataset.start && a.src) { a.currentTime = +el.dataset.start; a.play().catch(() => {}); } }; el.onclick = go; el.onkeydown = e => e.key === "Enter" && go(); });
-  $$("[data-act]", box).forEach(b => b.onclick = () => segAction(b));
-  $$("details.src", box).forEach(d => d.ontoggle = () => d.open && fillSources(d.dataset.seg));
-  open.forEach(fillSources);
-}
-
-async function segAction(b) {
-  const ep = epState, seg = b.dataset.seg;
-  if (b.dataset.act === "chip") { $(`#in-${seg}`).value = b.textContent; return; }
-  if (b.dataset.act === "preview") {
-    const a = $(`audio[data-prev="${seg}"]`), s = ep.segments.find(x => x.id === seg);
-    const other = s.versions.filter(x => x.version !== s.active_version).map(x => x.version);
-    const v = other.length ? Math.max(...other) : s.active_version;
-    a.src = `/api/episodes/${ep.id}/segments/${seg}/audio?version=${v}`; a.classList.remove("hidden"); a.title = `Version ${v}`; a.play().catch(() => {}); return;
-  }
-  b.disabled = true;
-  try {
-    if (b.dataset.act === "regen") {
-      await api(`/api/episodes/${ep.id}/segments/${seg}/regenerate`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({instruction: $(`#in-${seg}`).value})});
-      $(`#in-${seg}`).value = "";
-    } else if (b.dataset.act === "ver") {
-      await api(`/api/episodes/${ep.id}/segments/${seg}/activate`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({version: +b.dataset.v})});
-    }
-    stopPoll(); poll(ep.id);
-  } catch (e) { b.disabled = false; alert(e.message); }
-}
-
-async function fillSources(segId) {
-  const box = $(`[data-srcbox="${segId}"]`); if (!box) return;
-  try {
-    if (!sources) sources = await api(`/api/episodes/${epState.id}/sources`);
-    box.innerHTML = (sources[segId] || []).map(p => `<div class="passage"><b>${esc(p.section)}</b>${p.page ? ` · p.${p.page}` : ""}<br>${esc(p.text)}</div>`).join("") || `<span class="small muted">No passages recorded.</span>`;
-  } catch (e) { box.textContent = e.message; }
-}
-
-function highlightTurn() {
-  const t = $("#audio").currentTime; let cur = null;
-  $$(".turn").forEach(el => { const on = el.dataset.start !== "" && t >= +el.dataset.start && t < +el.dataset.end + 0.3; el.classList.toggle("now", on); if (on) cur = el; });
-  if (cur && cur !== highlightTurn.last && !$("#audio").paused) { highlightTurn.last = cur; const r = cur.getBoundingClientRect(); if (r.top < 120 || r.bottom > innerHeight) cur.scrollIntoView({block: "center", behavior: "smooth"}); }
-}
-
-function appendTrace(events) {
-  const box = $("#trace"); if (!box || !events.length) return;
-  const segName = id => { const s = epState && epState.segments.find(x => x.id === id); return s ? `seg ${s.index + 1}` : ""; };
-  box.insertAdjacentHTML("beforeend", events.map(e => `<div class="ev"><span class="k ${e.kind}">${esc(e.kind)}<br><span class="seg">${esc(e.stage)} ${esc(segName(e.segment_id))}</span></span><span>${esc(e.text)}</span></div>`).join(""));
-  if ($("#followTrace").checked) box.scrollTop = box.scrollHeight;
-}
-
-function renderInsights(ep) {
-  const m = ep.metrics, segs = ep.segments;
-  const done = segs.filter(s => s.versions.length);
-  const claims = done.flatMap(s => s.versions.find(v => v.version === s.active_version)?.claims || []);
-  const sup = claims.filter(c => c.supported).length;
-  const turns = done.flatMap(s => s.versions.find(v => v.version === s.active_version)?.turns || []);
-  const wers = turns.filter(t => t.wer != null).map(t => t.wer), retried = turns.filter(t => t.tts_attempts > 1).length;
-  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
-  const sc = avg(done.map(s => s.versions.find(v => v.version === s.active_version)?.scores?.overall).filter(x => x != null));
-  const k = (v, l) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`;
-  $("#insights").innerHTML = `<div class="kpis">
-    ${k(sc != null ? sc.toFixed(2) + "/5" : "–", "avg critic score")}
-    ${k(claims.length ? Math.round(100 * sup / claims.length) + "%" : "–", `claims supported by the chapter (${sup}/${claims.length})`)}
-    ${k(wers.length ? (100 * avg(wers)).toFixed(1) + "%" : "–", `audio self-check WER · ${retried} line(s) re-recorded`)}
-    ${k(m.llm_calls, "LLM calls")}${k(((m.prompt_tokens + m.completion_tokens) / 1000).toFixed(1) + "k", "tokens")}
-    ${k(Object.values(m.stage_seconds).reduce((a, b) => a + b, 0).toFixed(0) + "s", "agent time")}</div>
-    <h3>Adaptive test-time compute (policy: ${esc(ep.settings.policy)})</h3>
-    <p class="small muted">Each segment's writer budget was set from its predicted difficulty, then topped up where the critic still scored it below the bar. Easy segments stop early; hard ones get more drafts.</p>
-    <div style="overflow-x:auto"><table><thead><tr><th>Segment</th><th>Difficulty</th><th>Writer calls</th><th>Draft scores (★ chosen)</th><th>Lessons in memory</th></tr></thead><tbody>
-    ${segs.map(s => { const best = s.candidates.reduce((b, c) => (c.scores && (!b || c.scores.overall > b.scores.overall)) ? c : b, null);
-      return `<tr><td>${s.index + 1}. ${esc(s.title)}</td><td>${s.difficulty}/5</td><td>${s.budget || s.candidates.length}</td>
-      <td>${s.candidates.map(c => `<span class="${best && c.index === best.index ? "pill ok" : ""}" title="${esc(c.feedback || "")}">${c.round ? "rev" : "draft"} ${c.scores ? c.scores.overall.toFixed(2) : "–"}${best && c.index === best.index ? " ★" : ""}</span>`).join(" · ") || "–"}</td>
-      <td class="small">${s.reflections.slice(-2).map(esc).join("<br>") || "–"}</td></tr>`; }).join("")}
-    </tbody></table></div>
-    <h3 style="margin-top:16px">Time per stage</h3><p class="small">${Object.entries(m.stage_seconds).map(([k, v]) => `${esc(k)}: ${v}s`).join(" · ") || "–"}</p>`;
-}
-
-// ---------------------------------------------------------------- router
-async function route() {
-  const m = location.hash.match(/^#\/episode\/([\w-]+)/);
-  if (m) renderEpisode(m[1]); else renderHome();
-  window.scrollTo(0, 0);
-}
-(async () => {
-  $("#howBtn").onclick = () => $("#how").showModal();
-  try { CONFIG = await api("/api/config"); if (CONFIG.mock) $("#banner").innerHTML = `<div class="notice info small">Demo mode: API keys are not configured yet, so scripts and voices are placeholders.</div>`; }
-  catch (e) { showErr($("#banner"), "The server is waking up or unreachable. Please refresh in a few seconds."); }
-  addEventListener("hashchange", route); route();
-})();
-</script>
+<script src="/app.js" defer></script>
 </body>
 </html>

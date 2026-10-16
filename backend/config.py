@@ -1,16 +1,27 @@
-"""Runtime configuration, read from environment variables (and an optional .env file).
+"""Runtime configuration, read from environment variables and two optional env files.
 
 Every provider-specific value (URLs, keys, model names, voices) lives here so the
 rest of the code never touches os.environ directly. Secrets are never logged.
+
+Load order (later wins): the repo ``.env`` (non-secret settings), then the secrets
+file outside the repo (``~/.config/podcast-studio/secrets.env``, or the path in
+``PODCAST_SECRETS_FILE``), then real environment variables.
 """
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_SECRETS_FILE = Path("~/.config/podcast-studio/secrets.env")
+
+
+def secrets_path() -> Path:
+    """Where the API keys live: outside the repo, so nothing working in the repo sees them."""
+    return Path(os.environ.get("PODCAST_SECRETS_FILE") or DEFAULT_SECRETS_FILE).expanduser()
 
 
 _PLACEHOLDERS = ("dummy", "your", "change", "replace", "xxx", "todo", "<")
@@ -106,6 +117,10 @@ class Settings(BaseSettings):
     def asr_ready(self) -> bool:
         return bool(self.asr_base_url) and is_set(self.asr_api_key)
 
+    def configured(self) -> dict[str, bool]:
+        """Which providers have real-looking keys (never the keys themselves)."""
+        return {"llm": self.llm_ready(), "tts": self.tts_ready(), "asr": self.asr_ready()}
+
     def effective_mock(self) -> bool:
         """Demo mode unless both the LLM and TTS are configured with real keys.
         (ASR is optional: without it the audio self-check is skipped.)"""
@@ -114,7 +129,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    s = Settings()
+    s = Settings(_env_file=(ROOT / ".env", secrets_path()))
     s.episodes_dir.mkdir(parents=True, exist_ok=True)
     s.sources_dir.mkdir(parents=True, exist_ok=True)
     return s
