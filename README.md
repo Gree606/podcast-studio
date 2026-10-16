@@ -9,7 +9,8 @@ Turn an NCERT chapter into a two-host conversational podcast. The podcast stays 
 1. **Input.** Upload an NCERT chapter PDF (scanned pages go through OCR), paste text, or pick a bundled sample chapter. Then choose which sections to cover, the length and the tone.
 2. **Agent.** A small, fast LLM (Gemini Flash; any OpenAI-compatible model also works) runs a Perceive, Plan, Act, Observe loop. The UI shows it live.
 3. **Output.** An MP3 episode with a transcript that follows the audio (click a line to jump to it), a per-segment "Sources" panel and a claim check.
-4. **Reviewer.** Regenerate any one segment, optionally with an instruction ("simpler", "add an example"). Only that segment is rewritten and re-recorded, and the episode is re-stitched. Every version is kept, and you can compare versions or switch back.
+4. **Listen & play.** A kid-friendly player ("Chapter Chat", ages 10-15): the two cartoon hosts light up as they speak, the line being spoken is highlighted, and one tap ("🐣 Simpler", "🍎 Add an example", "🎈 Make it fun") rewrites just that part. A quiz at the end is built only from verified key facts (fill-in-the-blank; a wrong option is never a word from the cited passage). A **🎓 Teacher view** shows the agent trace, quality & compute, claim check, sources and every version. The previous UI is still at `/classic`.
+5. **Reviewer.** Regenerate any one segment, optionally with an instruction ("simpler", "add an example"). Only that segment is rewritten and re-recorded, and the episode is re-stitched. Every version is kept, and you can compare versions or switch back.
 
 ## Architecture
 
@@ -64,11 +65,15 @@ PDF/text ─► ingest.py  (PyMuPDF text layer; vision-LLM OCR for scanned pages
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env                 # then replace the three DUMMY_ keys
+cp .env.example .env                 # optional: non-secret settings (models, voices, knobs)
+python scripts/init_secrets.py       # creates ~/.config/podcast-studio/secrets.env (owner-only)
+#   ...open that file and replace the three DUMMY_ values: LLM_API_KEY, TTS_API_KEY, ASR_API_KEY
 python scripts/check_apis.py         # one tiny call per API: confirms keys, voices, ASR script
 scripts/run_local.sh start           # background server on :8000 (logs: data/server.log)
 scripts/run_local.sh status | stop | restart
 ```
+
+**Where the keys live.** API keys are kept *outside* the repo, in `~/.config/podcast-studio/secrets.env` (or the file named by `PODCAST_SECRETS_FILE`), so nothing working inside the repo ever sees them. Load order, later wins: repo `.env`, then the secrets file, then real environment variables (so a host like Render can still set keys as env vars). The app and `/api/config` only ever report *whether* each key is set, never its value.
 
 While any required key is still a `DUMMY_` placeholder, the app runs in **demo mode** (placeholder scripts and beeps) and says so in a banner. On shared HPC login nodes, run `source scripts/dev_env.sh` first (it caps BLAS threads).
 
@@ -120,7 +125,7 @@ The app is a single Docker image (`Dockerfile`), and `render.yaml` is a Render b
 - an always-on plan, so there is no cold start while a TA is waiting;
 - `/api/health` as the health check.
 
-Every provider URL and key comes from environment variables (see `.env.example`). No secrets live in git.
+Every provider URL comes from environment variables (see `.env.example`); keys come from the secrets file or environment variables. No secrets live in git.
 
 ## Known limitations
 

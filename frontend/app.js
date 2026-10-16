@@ -27,7 +27,7 @@ const STATIONS = ["plan", "write", "voice", "assemble"];
 
 let CONFIG = {lengths: {}, presets: DEFAULT_PRESETS};
 let SOURCE = null, epState = null, pollTimer = null, traceLen = 0, traceEvents = [];
-let sourcesCache = null, currentAudioFile = null, lineIndex = [], quiz = null, quizLoadedFor = null;
+let sourcesCache = null, currentAudioFile = null, lineIndex = [], quiz = null, quizLoadedFor = null, viewId = 0;
 
 // ------------------------------------------------------------------ helpers
 async function api(path, opts = {}) {
@@ -110,9 +110,11 @@ function renderSetup() {
 // ------------------------------------------------------------------ home: pick + choose
 async function renderHome() {
   stopPoll(); journey("pick");
+  const view = ++viewId;
   const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-home").content.cloneNode(true)); tabs(app);
   try {
     const samples = await api("/api/samples");
+    if (view !== viewId) return; // the user already moved on
     $("#samples").innerHTML = samples.length ? samples.map((s, i) => `
       <button class="sample c${i % 6}" type="button" data-id="${esc(s.id)}">
         <span class="emoji" aria-hidden="true">${chapterEmoji(s.title, s.subject, i)}</span>
@@ -120,7 +122,7 @@ async function renderHome() {
         <b>${esc(s.title)}</b><span class="blurb">${esc(s.blurb || "")}</span>
       </button>`).join("") : `<p class="muted">No ready-made chapters here. Upload a PDF or paste some text instead!</p>`;
     $$(".sample").forEach(b => b.onclick = () => { $$(".sample").forEach(x => x.classList.toggle("sel", x === b)); loadSource({sample_id: b.dataset.id}); });
-  } catch (e) { showErr($("#samples"), e.message); }
+  } catch (e) { if (view === viewId) showErr($("#samples"), e.message); }
 
   const drop = $("#drop"), file = $("#file");
   drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } };
@@ -146,10 +148,12 @@ async function loadSource(input) {
   if (input.file) fd.append("file", input.file);
   if (input.text != null) fd.append("text", input.text);
   if (input.title) fd.append("title", input.title);
+  const view = viewId;
   try {
-    SOURCE = await api("/api/sources", {method: "POST", body: fd});
-    st.innerHTML = ""; showConfigure();
-  } catch (e) { showErr(st, e.message); }
+    const src = await api("/api/sources", {method: "POST", body: fd});
+    if (view !== viewId) return;
+    SOURCE = src; st.innerHTML = ""; showConfigure();
+  } catch (e) { if (view === viewId) showErr(st, e.message); }
 }
 
 function presetGroup(box, name, items, checked) {
@@ -198,7 +202,7 @@ const names = ep => ({host: ep.settings.host_name || "Riya", expert: ep.settings
 const currentVersion = s => s.versions.find(v => v.version === s.active_version);
 
 async function renderEpisode(id) {
-  stopPoll();
+  stopPoll(); viewId += 1;
   epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
   const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   journey("make");
@@ -222,10 +226,11 @@ async function renderEpisode(id) {
     catch (e) { toast(e.message, "err"); }
     finally { $("#resumeBtn").disabled = false; }
   };
-  await poll(id);
+  await poll(id, viewId);
 }
 
-async function poll(id) {
+async function poll(id, view = viewId) {
+  if (view !== viewId) return;
   let ep;
   try { ep = await api(`/api/episodes/${id}?since=${traceLen}`); }
   catch (e) {
@@ -233,10 +238,11 @@ async function poll(id) {
       $("#app").innerHTML = `<div class="card"><div class="notice err">😕 ${esc(e.message)}</div><a class="btn primary" href="#/">✨ Make a new episode</a></div>`;
       return;
     }
+    if (view !== viewId) return;
     if ($("#epMsg")) $("#epMsg").innerHTML = `<span class="pill warn">📡 Connection hiccup, trying again…</span>`;
-    pollTimer = setTimeout(() => poll(id), 4000); return;
+    pollTimer = setTimeout(() => poll(id, view), 4000); return;
   }
-  if (!$("#makeCard")) return; // navigated away
+  if (view !== viewId || !$("#makeCard")) return; // navigated away while waiting
   traceEvents.push(...ep.trace); traceLen = ep.trace_len;
   const prev = epState; epState = ep;
   rememberEpisode(ep.id, ep.title);
@@ -249,7 +255,7 @@ async function poll(id) {
   if (ep.status === "done" && quizLoadedFor !== ep.id) loadQuiz(ep);
   if (prev && prev.status !== "done" && ep.status === "done") { toast("🎉 Your podcast is ready! Press play."); confetti(40); }
   const active = ["queued", "running"].includes(ep.status) || ep.busy;
-  if (active) pollTimer = setTimeout(() => poll(id), ep.status === "queued" ? 2500 : 1500);
+  if (active) pollTimer = setTimeout(() => poll(id, view), ep.status === "queued" ? 2500 : 1500);
 }
 
 function friendly(e) {
@@ -331,7 +337,7 @@ function renderTrust(ep) {
     : `<span class="badge">✅ Fact-checked from your chapter · ${claims.length}/${claims.length} facts found in the book</span>`);
   parts.push(`<span class="badge plain">🧩 ${ep.segments.length} parts</span>`);
   if (ep.duration) parts.push(`<span class="badge plain">⏱️ ${fmtT(ep.duration)}</span>`);
-  if (failed) parts.push(`<span class="badge warn">⚠️ ${failed} part${failed > 1 ? "s" : ""} need a redo: use “Try again” on ${failed > 1 ? "them" : "it"}</span>`);
+  if (failed) parts.push(`<span class="badge warn">⚠️ ${failed} part${failed > 1 ? "s" : ""} didn't finish: tap a “Make this part…” button under ${failed > 1 ? "them" : "it"} to redo</span>`);
   $("#trustBadge").innerHTML = parts.join("");
 }
 
@@ -460,8 +466,10 @@ function onTime() {
 // ------------------------------------------------------------------ quiz
 async function loadQuiz(ep) {
   quizLoadedFor = ep.id;
+  const view = viewId;
   try {
     const qs = await api(`/api/episodes/${ep.id}/quiz`);
+    if (view !== viewId) return;
     if (!qs.length) { $("#quizCard").classList.add("hidden"); return; }
     quiz = {questions: qs, i: 0, results: [], answered: false};
     $("#quizCard").classList.remove("hidden");

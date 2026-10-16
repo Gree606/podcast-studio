@@ -4,7 +4,7 @@ of Gemini, Sarvam and Bodhan (scripts/fake_providers.py), end to end.
 This checks request/response wiring, auth headers, retries on 429, friendly
 errors on bad keys, and the full upload -> episode -> regenerate flow, all with
 zero API credits. Real-API behaviour (voices, quality, rate limits) is checked
-separately by scripts/check_apis.py once keys are in .env.
+separately by scripts/check_apis.py once keys are in the secrets file.
 
 Run:  python scripts/contract_test.py
 """

@@ -20,7 +20,7 @@ log = logging.getLogger("podcast.clients")
 RETRY_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
 STATUS_MESSAGES = {
     400: "rejected the request (HTTP 400)",
-    401: "rejected the API key (HTTP 401) - check the key in .env",
+    401: "rejected the API key (HTTP 401) - check the key in the secrets file",
     403: "refused access (HTTP 403) - check the API key and its permissions",
     404: "endpoint or model was not found (HTTP 404)",
     429: "is rate-limiting us (HTTP 429) - try again in a minute",

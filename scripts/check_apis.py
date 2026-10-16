@@ -1,6 +1,6 @@
-"""Check the real API keys in .env with one tiny call per service (costs well under a cent).
+"""Check the real API keys (in ~/.config/podcast-studio/secrets.env) with one tiny call per service (costs well under a cent).
 
-Run after putting keys in .env:   python scripts/check_apis.py
+Run after putting keys in the secrets file:   python scripts/check_apis.py
 Checks:
   1. Gemini: a JSON-mode reply, plus how many "thinking" tokens it used
   2. Sarvam: one short clip per configured voice (also saved to data/api_check/ so you can listen)
@@ -22,6 +22,7 @@ from backend.audio.stitch import decode_audio, resample, to_wav_bytes  # noqa: E
 from backend.audio.wer import wer  # noqa: E402
 from backend.clients import asr, llm, tts  # noqa: E402
 from backend.clients.base import ServiceError  # noqa: E402
+from backend.config import secrets_path  # noqa: E402
 from backend.clients.usage import current_metrics  # noqa: E402
 from backend.config import get_settings  # noqa: E402
 from backend.schemas import Metrics  # noqa: E402
@@ -47,7 +48,7 @@ async def main() -> int:
 
     print("1. LLM")
     if not s.llm_ready():
-        line(False, "LLM_API_KEY is missing or still a placeholder in .env")
+        line(False, f"LLM_API_KEY is missing or still a placeholder in {secrets_path()}")
     else:
         try:
             t0 = time.time()
@@ -62,7 +63,7 @@ async def main() -> int:
     print("2. TTS")
     clip_path = None
     if not s.tts_ready():
-        line(False, "TTS_API_KEY is missing or still a placeholder in .env")
+        line(False, f"TTS_API_KEY is missing or still a placeholder in {secrets_path()}")
     else:
         for role, voice in (("host", s.tts_voice_host), ("expert", s.tts_voice_expert)):
             try:
