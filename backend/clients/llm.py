@@ -97,7 +97,7 @@ def from_gemini(data: dict) -> tuple[str, dict]:
     return text, usage
 
 
-async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model) -> tuple[str, dict]:
+async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None) -> tuple[str, dict]:
     s = get_settings()
     system, contents = to_gemini(messages)
     gen: dict[str, Any] = {"temperature": temperature, "maxOutputTokens": max_tokens + s.llm_thinking_headroom}
@@ -109,7 +109,7 @@ async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url
     resp = await request_with_retry(
         "Language model", "POST", f"{base_url.rstrip('/')}/v1beta/models/{model}:generateContent",
         json=body, headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
-        timeout=s.llm_timeout_s, attempts=s.llm_attempts, semaphore=_semaphore(),
+        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(),
     )
     try:
         data = resp.json()
@@ -118,7 +118,7 @@ async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url
     return from_gemini(data)
 
 
-async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model) -> tuple[str, dict]:
+async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None) -> tuple[str, dict]:
     s = get_settings()
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -126,7 +126,7 @@ async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url
     body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
     resp = await request_with_retry(
         "Language model", "POST", base_url.rstrip("/") + "/v1/chat/completions", json=body, headers=headers,
-        timeout=s.llm_timeout_s, attempts=s.llm_attempts, semaphore=_semaphore(),
+        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(),
     )
     try:
         data = resp.json()
@@ -161,11 +161,41 @@ async def chat(
     base_url, api_key, model = endpoint or (s.llm_base_url, s.llm_api_key, s.llm_model)
     call = _gemini_call if s.llm_provider == "gemini" else _openai_call
     t0 = time.time()
-    text, usage = await call(messages, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode,
-                             base_url=base_url, api_key=api_key, model=model)
+    text, usage, used = await _call_with_fallback(call, messages, temperature=temperature, max_tokens=max_tokens,
+                                                  json_mode=json_mode, base_url=base_url, api_key=api_key,
+                                                  models=model_chain(model, explicit=endpoint is not None))
     record(llm_calls=1, **usage)
-    log.info("llm task=%s %.1fs tokens=%s", task, time.time() - t0, usage)
+    log.info("llm task=%s model=%s %.1fs tokens=%s", task, used, time.time() - t0, usage)
     return clean_output(text)
+
+
+FALLBACK_STATUS = {404, 429, 500, 502, 503, 504}
+
+
+def model_chain(model: str, *, explicit: bool = False) -> list[str]:
+    """The main model, then the configured fallbacks (deduplicated). An explicit endpoint
+    (the eval judge) never falls back, so its scores always come from the model it names."""
+    if explicit:
+        return [model]
+    extra = [m.strip() for m in get_settings().llm_fallback_models.split(",") if m.strip()]
+    return list(dict.fromkeys([model, *extra]))
+
+
+async def _call_with_fallback(call, messages, *, models: list[str], **kw) -> tuple[str, dict, str]:
+    """Try each model in turn when one is overloaded/rate-limited/retired. Other errors
+    (bad key, bad request, malformed answer) are raised at once: another model won't fix them."""
+    s = get_settings()
+    last: ServiceError | None = None
+    for i, m in enumerate(models):
+        try:
+            text, usage = await call(messages, model=m, attempts=s.llm_attempts_per_model if i < len(models) - 1 else s.llm_attempts, **kw)
+            return text, usage, m
+        except ServiceError as e:
+            if e.status not in FALLBACK_STATUS or i == len(models) - 1:
+                raise
+            last = e
+            log.warning("model %s unavailable (%s); falling back to %s", m, e.user_message, models[i + 1])
+    raise last or ServiceError("Language model", "is unavailable")
 
 
 async def chat_json(

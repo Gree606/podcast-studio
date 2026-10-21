@@ -47,7 +47,11 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     llm_base_url: str = "https://generativelanguage.googleapis.com"
     llm_api_key: str = ""
-    llm_model: str = "gemini-flash-latest"
+    llm_model: str = "gemini-3.6-flash"
+    # Tried in order when the main model is overloaded (503), rate-limited (429) or retired (404).
+    # Measured 2026-10-21: popular models regularly return 503 "high demand" for minutes at a time.
+    llm_fallback_models: str = "gemini-3.5-flash,gemini-flash-latest,gemini-flash-lite-latest"
+    llm_attempts_per_model: int = 2  # retries on one model before moving to the next
     llm_timeout_s: float = 120.0
     llm_max_concurrency: int = 4
     llm_attempts: int = 5  # retries cover 429 rate limits (we honour the server's retry delay)

@@ -80,3 +80,30 @@ def test_no_fake_ocr_text_outside_mock_mode(monkeypatch):
     s2 = Settings(_env_file=None, mock_mode=True, ocr_mode="llm")
     monkeypatch.setattr(ocr, "get_settings", lambda: s2)
     assert ocr.ocr_available() is True
+
+
+def test_llm_falls_back_to_next_model_when_overloaded(monkeypatch):
+    """503 on the main model -> next model answers; a bad key (401) is never retried on other models."""
+    import asyncio
+
+    from backend.clients import llm
+
+    tried = []
+
+    async def fake_call(messages, *, model, attempts, **kw):
+        tried.append(model)
+        if model == "busy-model":
+            raise ServiceError("Language model", "returned HTTP 503", status=503)
+        if model == "bad-key-model":
+            raise ServiceError("Language model", "rejected the API key", status=401)
+        return "ok", {"prompt_tokens": 1, "completion_tokens": 1}
+
+    text, _, used = asyncio.run(llm._call_with_fallback(fake_call, [], models=["busy-model", "good-model"], temperature=0,
+                                                        max_tokens=10, json_mode=False, base_url="", api_key=""))
+    assert (text, used, tried) == ("ok", "good-model", ["busy-model", "good-model"])
+    tried.clear()
+    with pytest.raises(ServiceError, match="API key"):
+        asyncio.run(llm._call_with_fallback(fake_call, [], models=["bad-key-model", "good-model"], temperature=0,
+                                            max_tokens=10, json_mode=False, base_url="", api_key=""))
+    assert tried == ["bad-key-model"]
+    assert llm.model_chain("judge-model", explicit=True) == ["judge-model"]

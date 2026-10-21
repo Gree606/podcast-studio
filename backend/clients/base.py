@@ -30,11 +30,12 @@ STATUS_MESSAGES = {
 class ServiceError(RuntimeError):
     """An external service failed after retries. ``user_message`` is safe to show in the UI."""
 
-    def __init__(self, service: str, user_message: str, detail: str = ""):
+    def __init__(self, service: str, user_message: str, detail: str = "", status: int | None = None):
         super().__init__(f"{service}: {user_message} {detail}".strip())
         self.service = service
         self.user_message = user_message
         self.detail = detail
+        self.status = status  # HTTP status if the service answered with an error, else None
 
 
 def retry_delay(resp: httpx.Response) -> float | None:
@@ -96,7 +97,8 @@ async def request_with_retry(
         else:
             if resp.status_code < 400:
                 return resp
-            err = ServiceError(service, STATUS_MESSAGES.get(resp.status_code, f"returned HTTP {resp.status_code}"), resp.text[:300])
+            err = ServiceError(service, STATUS_MESSAGES.get(resp.status_code, f"returned HTTP {resp.status_code}"), resp.text[:300],
+                               status=resp.status_code)
             if resp.status_code not in RETRY_STATUS or attempt >= attempts:
                 raise err
             last = err
