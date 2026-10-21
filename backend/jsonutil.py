@@ -77,6 +77,26 @@ def _close_truncated(s: str) -> str:
     return s + "".join(reversed(stack))
 
 
+def _jsonl_objects(text: str) -> list:
+    """Parse text made of several consecutive top-level JSON objects ({...}\n{...}); [] otherwise."""
+    out, i, t = [], 0, text.strip()
+    while i < len(t):
+        if t[i] in " \n\r\t,":
+            i += 1
+            continue
+        if t[i] != "{":
+            return []
+        span = _balanced_span(t, i)
+        if span is None:
+            return []
+        try:
+            out.append(json.loads(_repair(span)))
+        except json.JSONDecodeError:
+            return []
+        i += len(span)
+    return out
+
+
 def extract_json(text: str, expect: type | None = None) -> Any:
     """Parse the first JSON object/array found in ``text``.
 
@@ -85,7 +105,18 @@ def extract_json(text: str, expect: type | None = None) -> Any:
     if text is None:
         raise JSONExtractError("empty response")
     candidates: list[str] = [m.group(1) for m in _FENCE.finditer(text)] + [text]
-    openers = "{[" if expect is not list else "[{"
+    if expect is dict:
+        openers = "{["
+    elif expect is list:
+        openers = "[{"
+    else:
+        # No preference: take whichever bracket comes first, so a top-level list of objects
+        # isn't mistaken for its own first element.
+        first_obj, first_arr = text.find("{"), text.find("[")
+        openers = "[{" if first_arr != -1 and (first_obj == -1 or first_arr < first_obj) else "{["
+        objs = _jsonl_objects(text)
+        if len(objs) > 1:  # several top-level objects in a row (JSON Lines): return them as a list
+            return objs
     for cand in candidates:
         cand = cand.strip()
         for opener in openers:

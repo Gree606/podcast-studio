@@ -169,3 +169,16 @@ def test_concat_segments_offsets():
     audio, offs = concat_segments([_tone(1.0), _tone(1.0)], SR, gap_s=0.9, with_stings=False)
     assert offs == [0.0, pytest.approx(1.9, abs=0.01)]
     assert np.max(np.abs(audio)) <= 0.951
+
+
+def test_extract_json_top_level_list_is_not_cut_to_its_first_item():
+    """Regression (real Gemini output): a list of turns came back as only its first turn."""
+    text = '[{"speaker": "host", "text": "Hi"}, {"speaker": "expert", "text": "Hello"}]'
+    assert extract_json(text) == [{"speaker": "host", "text": "Hi"}, {"speaker": "expert", "text": "Hello"}]
+    assert extract_json(text, expect=dict) == {"speaker": "host", "text": "Hi"}  # explicit dict still honoured
+
+
+def test_extract_json_lines_of_objects():
+    text = '{"speaker": "host", "text": "Hi"}\n{"speaker": "expert", "text": "Hello"}'
+    assert extract_json(text) == [{"speaker": "host", "text": "Hi"}, {"speaker": "expert", "text": "Hello"}]
+    assert extract_json('{"a": 1}') == {"a": 1}

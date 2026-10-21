@@ -56,7 +56,13 @@ async def run_planner(ctx: AgentContext) -> list[Segment]:
         if force:
             messages.append({"role": "user", "content": "You are out of tool calls. Call finish now with the complete outline."})
         ctx.status(STAGE, f"Planning: step {step}", 0.02 + 0.10 * min(step, s.planner_max_steps) / s.planner_max_steps)
-        raw = await chat(messages, task="planner_step", temperature=0.3, max_tokens=2500, json_mode=True)
+        try:
+            raw = await chat(messages, task="planner_step", temperature=0.3, max_tokens=2500, json_mode=True)
+        except ServiceError as e:
+            if "MALFORMED" not in e.user_message:
+                raise
+            # Gemini's JSON mode sometimes fails outright; plain text + our JSON repair works.
+            raw = await chat(messages, task="planner_step", temperature=0.3, max_tokens=2500, json_mode=False)
         try:
             act = extract_json(raw, expect=dict)
         except JSONExtractError:
