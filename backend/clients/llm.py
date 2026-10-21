@@ -232,11 +232,22 @@ async def chat_json(
     """Chat and parse JSON; on a parse failure, show the model its output and ask it to fix it."""
     msgs = list(messages)
     last_err: Exception | None = None
+    json_mode = True
     for _ in range(retries + 1):
-        text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, json_mode=True, endpoint=endpoint)
+        try:
+            text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode, endpoint=endpoint)
+        except ServiceError as e:
+            # Gemini sometimes fails *inside* its JSON mode (finishReason MALFORMED_RESPONSE). Plain
+            # text plus our own JSON repair usually works, so retry once without it.
+            if json_mode and "MALFORMED" in e.user_message:
+                log.warning("task=%s: JSON mode failed (%s); retrying in plain-text mode", task, e.user_message)
+                json_mode, last_err = False, e
+                continue
+            raise
         try:
             return extract_json(text, expect=expect)
         except JSONExtractError as e:
+            log.warning("task=%s: unparseable model output: %r", task, text[:400])
             last_err = e
             msgs = msgs + [
                 {"role": "assistant", "content": text[:4000]},

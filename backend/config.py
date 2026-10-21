@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     # Measured on api.bodhan.ai (2026-10-21): 14 calls/min sustained is fine; ~30/min gets HTTP 429
     # after ~16 calls. The client paces itself to this many calls in any 60 s window (0 = no pacing).
     asr_requests_per_minute: int = 14
-    asr_min_words: int = 3  # shorter lines ("Okay.") are not self-checked: WER on 1-2 words is noise
+    asr_min_words: int = 6  # shorter lines ("Right!", "Wait, really?") are not self-checked: WER on a few words is noise, and Bodhan allows ~14 calls/min
 
     # --- OCR ---------------------------------------------------------------
     # "bodhan" = Bodhan Indic-OCR (OpenAI-style /v1/chat/completions, model indic-ocr);

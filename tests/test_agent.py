@@ -100,3 +100,17 @@ def test_deterministic_critic_flags_monologues_and_missing_facts():
     text = " ".join(issues)
     assert "monologue" in text and "banned" in text and "not covered" in text
     assert penalty > 0.5
+
+
+@pytest.mark.parametrize("data", [
+    [{"speaker": "host", "text": "Hi there!"}, {"speaker": "expert", "text": "Hello."},
+     {"speaker": "host", "text": "Ready?"}, {"speaker": "expert", "text": "Yes."}],                      # bare list
+    {"dialogue": [{"role": "Riya", "line": "Hi there!"}, {"role": "Arjun", "line": "Hello."},
+                  {"role": "Riya", "line": "Ready?"}, {"role": "Arjun", "line": "Yes."}]},              # other keys
+    {"segment": {"conversation": ["Riya: Hi there!", "Arjun: Hello.", "Riya: Ready?", "Arjun: Yes."]}},  # nested, "Name: line"
+    {"turns": [{"Riya": "Hi there!"}, {"Arjun": "Hello."}, {"Riya": "Ready?"}, {"Arjun": "Yes."}]},      # {"Name": line}
+])
+def test_parse_turns_accepts_real_model_variants(data):
+    turns = parse_turns(data, "Riya", "Arjun")
+    assert [t.speaker for t in turns] == ["host", "expert", "host", "expert"]
+    assert turns[0].text == "Hi there!"

@@ -69,7 +69,7 @@ async def verify_and_fix(ctx: AgentContext, seg: Segment, segments: list[Segment
     msgs.append({"role": "assistant", "content": '{"turns": ' + _turns_json(turns) + "}"})
     msgs.append({"role": "user", "content": CLAIM_FIX.format(claims="; ".join(f'"{c.claim}"' for c in bad))})
     try:
-        data = await chat_json(msgs, task="claim_fix", temperature=0.3, max_tokens=2600)
+        data = await chat_json(msgs, task="claim_fix", expect=None, temperature=0.3, max_tokens=2600)
         fixed = parse_turns(data, st.host_name, st.expert_name)
     except Exception as e:  # includes WriterError / ServiceError
         ctx.emit(STAGE, "warning", f"Fix attempt failed ({type(e).__name__}); keeping the draft and flagging claims.", seg.id)

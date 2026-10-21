@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import re
 
+import logging
+
 from ..clients.llm import chat_json
 from ..prompts import (POSITION_FIRST, POSITION_LAST, POSITION_MIDDLE, REGEN_INSTRUCTION, REVISE_USER, WRITER_SYSTEM,
                        WRITER_USER)
 from ..schemas import Segment, Turn
 from .context import AgentContext
 
+log = logging.getLogger("podcast.writer")
 SHOW = "Chapter Chat"
 MAX_TURN_WORDS = 75
 TONES = {
@@ -27,22 +30,59 @@ def script_text(turns: list[Turn], names: tuple[str, str] | None = None) -> str:
     return "\n".join(f"{i}. {h if t.speaker == 'host' else e}: {t.text}" for i, t in enumerate(turns, 1))
 
 
-def parse_turns(data: dict, host_name: str, expert_name: str) -> list[Turn]:
-    raw = data.get("turns") if isinstance(data, dict) else None
+TURN_KEYS = ("turns", "dialogue", "dialog", "script", "conversation", "lines", "segment", "exchanges")
+SPEAKER_KEYS = ("speaker", "role", "name", "host", "who")
+TEXT_KEYS = ("text", "line", "content", "dialogue", "utterance", "says")
+_NAMED_LINE = re.compile(r"^\s*([A-Za-z][\w ]{0,20}?)\s*:\s*(.+)$")
+
+
+def _find_turn_list(data) -> list | None:
+    """Real models don't always use our exact schema: accept a bare list, an alternative key,
+    or one level of nesting ({"segment": {"dialogue": [...]}})."""
+    if isinstance(data, list):
+        return data
+    if not isinstance(data, dict):
+        return None
+    for k in TURN_KEYS:
+        v = data.get(k)
+        if isinstance(v, list):
+            return v
+        if isinstance(v, dict):
+            inner = _find_turn_list(v)
+            if inner is not None:
+                return inner
+    lists = [v for v in data.values() if isinstance(v, list) and v and all(isinstance(x, (dict, str)) for x in v)]
+    return lists[0] if len(lists) == 1 else None
+
+
+def _speaker_and_text(r) -> tuple[str, str]:
+    if isinstance(r, str):  # "Riya: So what's a reaction?"
+        m = _NAMED_LINE.match(r)
+        return (m.group(1), m.group(2)) if m else ("", r)
+    if not isinstance(r, dict):
+        return "", ""
+    sp = next((str(r[k]) for k in SPEAKER_KEYS if isinstance(r.get(k), str)), "")
+    text = next((str(r[k]) for k in TEXT_KEYS if isinstance(r.get(k), str)), "")
+    if not sp and not text and len(r) == 1:  # {"Riya": "So what's a reaction?"}
+        sp, text = next(iter(r.items()))
+        text = str(text)
+    return sp, text
+
+
+def parse_turns(data, host_name: str, expert_name: str) -> list[Turn]:
+    raw = _find_turn_list(data)
     if not isinstance(raw, list):
         raise WriterError("no 'turns' list")
     turns: list[Turn] = []
     for r in raw:
-        if not isinstance(r, dict):
-            continue
-        sp = str(r.get("speaker", "")).strip().lower()
-        text = str(r.get("text", "")).strip()
+        sp, text = _speaker_and_text(r)
+        sp, text = sp.strip().lower(), text.strip()
         text = re.sub(r"\[[^\]]{1,30}\]|\*[^*]{1,30}\*", "", text).strip()  # stage directions
         if not text:
             continue
-        if sp in ("host", host_name.lower()):
+        if sp in ("host", host_name.lower()) or sp.startswith(host_name.lower()):
             speaker = "host"
-        elif sp in ("expert", expert_name.lower()):
+        elif sp in ("expert", expert_name.lower()) or sp.startswith(expert_name.lower()):
             speaker = "expert"
         else:
             speaker = "expert" if turns and turns[-1].speaker == "host" else "host"
@@ -95,8 +135,12 @@ async def write(ctx: AgentContext, seg: Segment, segments: list[Segment], *, tem
                 instruction: str | None = None, current: list[Turn] | None = None) -> list[Turn]:
     msgs = build_messages(ctx, seg, segments, instruction=instruction, current=current)
     st = ctx.episode.settings
-    data = await chat_json(msgs, task="write", temperature=temperature, max_tokens=2600)
-    return parse_turns(data, st.host_name, st.expert_name)
+    data = await chat_json(msgs, task="write", expect=None, temperature=temperature, max_tokens=2600)
+    try:
+        return parse_turns(data, st.host_name, st.expert_name)
+    except WriterError:
+        log.warning("writer output had no usable dialogue: %r", str(data)[:400])
+        raise
 
 
 async def revise(ctx: AgentContext, seg: Segment, segments: list[Segment], draft: list[Turn], feedback: str,
@@ -105,5 +149,5 @@ async def revise(ctx: AgentContext, seg: Segment, segments: list[Segment], draft
     msgs = build_messages(ctx, seg, segments)
     msgs.append({"role": "user", "content": REVISE_USER.format(
         draft=script_text(draft, (st.host_name, st.expert_name)), feedback=feedback)})
-    data = await chat_json(msgs, task="revise", temperature=temperature, max_tokens=2600)
+    data = await chat_json(msgs, task="revise", expect=None, temperature=temperature, max_tokens=2600)
     return parse_turns(data, st.host_name, st.expert_name)
