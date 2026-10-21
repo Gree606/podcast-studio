@@ -2,10 +2,8 @@
 Runs offline in mock mode, CPU only, without network dependencies.
 """
 from pathlib import Path
-import pytest
 from fastapi.testclient import TestClient
 
-from backend import config as config_mod
 from backend.config import get_settings
 from backend.ingest import ingest_text
 from backend.main import app
