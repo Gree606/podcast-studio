@@ -67,3 +67,16 @@ def test_retry_delay_parses_header_and_google_retryinfo():
     body = '{"error": {"details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "13s"}]}}'
     assert retry_delay(httpx.Response(429, text=body)) == 13.0
     assert retry_delay(httpx.Response(429, text="{}")) is None
+
+
+def test_no_fake_ocr_text_outside_mock_mode(monkeypatch):
+    """A real deployment without OCR must skip scanned pages, never insert mock OCR text."""
+    from backend.clients import ocr
+    from backend.config import Settings
+
+    s = Settings(_env_file=None, mock_mode=False, llm_api_key="", ocr_mode="llm")
+    monkeypatch.setattr(ocr, "get_settings", lambda: s)
+    assert ocr.ocr_available() is False
+    s2 = Settings(_env_file=None, mock_mode=True, ocr_mode="llm")
+    monkeypatch.setattr(ocr, "get_settings", lambda: s2)
+    assert ocr.ocr_available() is True

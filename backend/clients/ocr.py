@@ -33,7 +33,9 @@ def ocr_available() -> bool:
         return bool(s.ocr_base_url)
     if s.ocr_mode == "bodhan" and s.ocr_ready():
         return True
-    return s.llm_mock() or s.llm_vision  # LLM vision (or its offline fake)
+    # LLM vision. Its offline fake is only for MOCK_MODE (tests/demos): with a real deployment that
+    # merely lacks the LLM key, fake OCR text would silently replace the student's chapter.
+    return s.mock_mode or (s.llm_ready() and s.llm_vision)
 
 
 def bodhan_request(png: bytes) -> dict:
