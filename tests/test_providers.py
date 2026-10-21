@@ -107,3 +107,29 @@ def test_llm_falls_back_to_next_model_when_overloaded(monkeypatch):
                                             max_tokens=10, json_mode=False, base_url="", api_key=""))
     assert tried == ["bad-key-model"]
     assert llm.model_chain("judge-model", explicit=True) == ["judge-model"]
+
+
+def test_exhausted_daily_quota_is_skipped_and_reported(monkeypatch):
+    """A 429 with a retry delay of hours marks the model exhausted; when all are, the user gets a clear message."""
+    import asyncio
+
+    from backend.clients import llm
+
+    monkeypatch.setattr(llm, "_exhausted", {})
+    tried = []
+
+    async def fake_call(messages, *, model, attempts, **kw):
+        tried.append(model)
+        if model in ("capped-a", "capped-b"):
+            e = ServiceError("Language model", "is rate-limiting us", status=429)
+            e.retry_after = 45000
+            raise e
+        return "ok", {"prompt_tokens": 1, "completion_tokens": 1}
+
+    kw = dict(temperature=0, max_tokens=10, json_mode=False, base_url="", api_key="")
+    assert asyncio.run(llm._call_with_fallback(fake_call, [], models=["capped-a", "lite"], **kw))[2] == "lite"
+    tried.clear()
+    assert asyncio.run(llm._call_with_fallback(fake_call, [], models=["capped-a", "lite"], **kw))[2] == "lite"
+    assert tried == ["lite"]  # the exhausted model is not even tried again
+    with pytest.raises(ServiceError, match="free daily quota"):
+        asyncio.run(llm._call_with_fallback(fake_call, [], models=["capped-a", "capped-b"], **kw))

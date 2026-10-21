@@ -181,20 +181,41 @@ def model_chain(model: str, *, explicit: bool = False) -> list[str]:
     return list(dict.fromkeys([model, *extra]))
 
 
+# model -> monotonic time until which its quota is known to be used up (e.g. a free-tier daily cap)
+_exhausted: dict[str, float] = {}
+
+
+def _quota_message(until_s: float) -> str:
+    hours = max(1, round(until_s / 3600))
+    return (f"has used up its free daily quota (the Gemini free tier allows about 20 requests per model per day); "
+            f"it resets in about {hours} h, or enable billing on the API key to lift the cap")
+
+
 async def _call_with_fallback(call, messages, *, models: list[str], **kw) -> tuple[str, dict, str]:
-    """Try each model in turn when one is overloaded/rate-limited/retired. Other errors
-    (bad key, bad request, malformed answer) are raised at once: another model won't fix them."""
+    """Try each model in turn when one is overloaded/rate-limited/retired. A model whose quota is
+    used up for hours is skipped immediately for the rest of that window. Other errors (bad key,
+    bad request, malformed answer) are raised at once: another model won't fix them."""
     s = get_settings()
+    now = time.monotonic()
+    live = [m for m in models if _exhausted.get(m, 0) <= now]
+    if not live:
+        raise ServiceError("Language model", _quota_message(min(_exhausted[m] for m in models) - now), status=429)
     last: ServiceError | None = None
-    for i, m in enumerate(models):
+    for i, m in enumerate(live):
         try:
-            text, usage = await call(messages, model=m, attempts=s.llm_attempts_per_model if i < len(models) - 1 else s.llm_attempts, **kw)
+            text, usage = await call(messages, model=m, attempts=s.llm_attempts_per_model if i < len(live) - 1 else s.llm_attempts, **kw)
             return text, usage, m
         except ServiceError as e:
-            if e.status not in FALLBACK_STATUS or i == len(models) - 1:
+            if e.status not in FALLBACK_STATUS:
                 raise
+            if e.retry_after:
+                _exhausted[m] = time.monotonic() + e.retry_after
             last = e
-            log.warning("model %s unavailable (%s); falling back to %s", m, e.user_message, models[i + 1])
+            if i == len(live) - 1:
+                break
+            log.warning("model %s unavailable (%s); falling back to %s", m, e.user_message, live[i + 1])
+    if last is not None and all(_exhausted.get(m, 0) > time.monotonic() for m in models):
+        raise ServiceError("Language model", _quota_message(min(_exhausted[m] for m in models) - time.monotonic()), status=429)
     raise last or ServiceError("Language model", "is unavailable")
 
 

@@ -18,6 +18,7 @@ import httpx
 log = logging.getLogger("podcast.clients")
 
 RETRY_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
+MAX_WAIT_S = 90.0  # longer server-requested waits are reported instead of slept through
 STATUS_MESSAGES = {
     400: "rejected the request (HTTP 400)",
     401: "rejected the API key (HTTP 401) - check the key in the secrets file",
@@ -36,6 +37,7 @@ class ServiceError(RuntimeError):
         self.user_message = user_message
         self.detail = detail
         self.status = status  # HTTP status if the service answered with an error, else None
+        self.retry_after: float | None = None  # seconds the service asked us to wait, if any
 
 
 def retry_delay(resp: httpx.Response) -> float | None:
@@ -103,6 +105,11 @@ async def request_with_retry(
                 raise err
             last = err
             server_wait = retry_delay(resp)
+            if server_wait is not None and server_wait > MAX_WAIT_S:
+                # e.g. a daily quota that resets in hours: waiting is pointless, let the caller
+                # switch to another model (or tell the user) right away.
+                err.retry_after = server_wait
+                raise err
         if attempt >= attempts:
             break
         wait = min(20.0, (2 ** (attempt - 1)) * 1.5) * (0.7 + 0.6 * random.random())
