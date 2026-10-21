@@ -97,13 +97,14 @@ function setTeacher(on) {
 function renderSetup() {
   const c = CONFIG.configured, box = $("#setup");
   const items = [["llm", "LLM_API_KEY", "Google Gemini: writes and checks the script"], ["tts", "TTS_API_KEY", "Sarvam AI: the two voices"],
-    ["asr", "ASR_API_KEY", "Bodhan: listens back to check the audio"]];
-  if (c && items.some(([k]) => !c[k])) {
+    ["asr", "ASR_API_KEY", "Bodhan: listens back to check the audio"], ["ocr", "OCR_API_KEY", "Bodhan Indic-OCR: reads scanned PDF pages"]];
+  if (c && items.some(([k]) => k in c && !c[k])) {
     box.classList.remove("hidden");
+    $("#setupTitle").textContent = items.some(([k]) => c[k]) ? "🔑 Almost there: some keys are still missing" : "🔑 Grown-up setup needed";
     $("#setupPath").textContent = CONFIG.secrets_path || "~/.config/podcast-studio/secrets.env";
-    $("#setupList").innerHTML = items.map(([k, name, what]) => `<li>${c[k] ? "✅" : "⬜"} <code>${name}</code> ${esc(what)}${c[k] ? " · set" : ""}</li>`).join("");
+    $("#setupList").innerHTML = items.filter(([k]) => k in c).map(([k, name, what]) => `<li>${c[k] ? "✅" : "⬜"} <code>${name}</code> ${esc(what)}${c[k] ? " · working" : " · demo placeholder until set"}</li>`).join("");
   } else box.classList.add("hidden");
-  $("#demoNote").innerHTML = CONFIG.mock && !(c && items.some(([k]) => !c[k]))
+  $("#demoNote").innerHTML = CONFIG.mock && !(c && items.some(([k]) => k in c && !c[k]))
     ? `<div class="notice info small">🧪 Demo mode: scripts and voices are placeholders.</div>` : "";
 }
 
@@ -494,7 +495,7 @@ function answer(b) {
   quiz.answered = true;
   const q = quiz.questions[quiz.i], pick = q.options[+b.dataset.k], right = pick === q.answer;
   quiz.results[quiz.i] = right;
-  $$(".q-opt").forEach(x => { x.disabled = true; if (q.options[+x.dataset.k] === q.answer) x.classList.add("right"); });
+  $$(".q-opt", $("#quizBody")).forEach(x => { x.disabled = true; if (q.options[+x.dataset.k] === q.answer) x.classList.add("right"); });
   if (!right) b.classList.add("wrong");
   const where = `${esc(q.section)}${q.page ? `, page ${q.page}` : ""}`;
   const fb = document.createElement("div");
@@ -502,8 +503,8 @@ function answer(b) {
   fb.innerHTML = `<p><b>${right ? ["🎉 Yes! Spot on!", "🌟 Brilliant!", "🙌 You got it!"][quiz.i % 3] : `🤔 Not quite. The answer is “${esc(q.answer)}”.`}</b></p>
     <p class="small">📖 The book says (${where}): “${esc(q.fact)}”</p>
     <button type="button" class="btn primary" data-next="1">${quiz.i + 1 < quiz.questions.length ? "Next question ➡️" : "See my score 🏁"}</button>`;
-  b.closest(".card").querySelector(".q-options").after(fb);
-  $(".q-progress").outerHTML = quizProgress();
+  $(".q-options", $("#quizBody")).after(fb);
+  $(".q-progress", $("#quizBody")).outerHTML = quizProgress();
   if (right) confetti(18);
   const next = $("[data-next]", fb);
   next.onclick = () => { quiz.i += 1; quiz.answered = false; renderQuiz(); $("#quizCard").scrollIntoView({block: "nearest"}); };

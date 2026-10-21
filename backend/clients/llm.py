@@ -152,7 +152,7 @@ async def chat(
     uses it to grade with a different judge model than the one that wrote the script.
     """
     s = get_settings()
-    if s.effective_mock():
+    if s.llm_mock():
         from . import mock
 
         record(llm_calls=1)

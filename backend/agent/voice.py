@@ -43,7 +43,7 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
     sr = s.sample_rate
     turn.tts_text = normalize_for_tts(turn.text)
     best: tuple[float, np.ndarray, str] | None = None
-    check = asr.asr_available()
+    check = asr.asr_available() and len(turn.tts_text.split()) >= s.asr_min_words
     for attempt in range(1, s.max_tts_retries + 2):
         turn.tts_attempts = attempt
         raw = await tts.synthesize(turn.tts_text, turn.speaker, style=STYLE.get(turn.speaker))

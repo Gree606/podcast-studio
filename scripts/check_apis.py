@@ -20,13 +20,14 @@ sys.path.insert(0, str(ROOT))
 from backend.agent.voice import script_mismatch  # noqa: E402
 from backend.audio.stitch import decode_audio, resample, to_wav_bytes  # noqa: E402
 from backend.audio.wer import wer  # noqa: E402
-from backend.clients import asr, llm, tts  # noqa: E402
+from backend.clients import asr, llm, ocr, tts  # noqa: E402
 from backend.clients.base import ServiceError  # noqa: E402
 from backend.config import secrets_path  # noqa: E402
 from backend.clients.usage import current_metrics  # noqa: E402
 from backend.config import get_settings  # noqa: E402
 from backend.schemas import Metrics  # noqa: E402
 
+OCR_SAMPLE = "Plants make their own food by photosynthesis using sunlight and water."
 SAMPLE = "Hi, I'm your host. Today we're learning how plants make food using sunlight, water and carbon dioxide."
 
 
@@ -36,7 +37,7 @@ def line(ok: bool | None, msg: str) -> None:
 
 async def main() -> int:
     s = get_settings()
-    print(f"Provider config: LLM={s.llm_provider}:{s.llm_model}  TTS={s.tts_api_style}:{s.tts_model}  ASR={s.asr_model}")
+    print(f"Provider config: LLM={s.llm_provider}:{s.llm_model}  TTS={s.tts_api_style}:{s.tts_model}  ASR={s.asr_model}  OCR={s.ocr_mode}")
     if s.mock_mode:
         print("MOCK_MODE=1 is set; unset it to check real APIs.")
         return 1
@@ -95,6 +96,27 @@ async def main() -> int:
                 line(e < 0.35, f"heard \"{heard[:100]}\" (WER {e:.0%})")
         except ServiceError as e:
             line(False, f"{e.service} {e.user_message}  {e.detail[:300]}")
+
+    print("4. OCR (scanned PDF pages)")
+    if s.ocr_mode != "bodhan":
+        line(None, f"OCR_MODE={s.ocr_mode}: scanned pages are read by {'the LLM' if s.ocr_mode == 'llm' else s.ocr_mode}")
+    elif not s.ocr_ready():
+        line(False, f"OCR_API_KEY is missing or still a placeholder in {secrets_path()}")
+    else:
+        import fitz
+
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=300)
+        page.insert_text((40, 80), "Chapter 1", fontsize=22)
+        page.insert_text((40, 130), OCR_SAMPLE, fontsize=14)
+        png = page.get_pixmap(dpi=150).tobytes("png")
+        try:
+            t0 = time.time()
+            text = await ocr.ocr_page(png)
+            e = wer(OCR_SAMPLE, " ".join(text.split()[-len(OCR_SAMPLE.split()):]))
+            line(e < 0.35, f"{s.ocr_model} read \"{' '.join(text.split())[:100]}\" (WER {e:.0%}) in {time.time() - t0:.1f}s")
+        except ServiceError as err:
+            line(False, f"{err.service} {err.user_message}  {err.detail[:300]}")
 
     print("\nReady for real episodes." if ok_llm and ok_tts else "\nFix the failures above, then re-run.")
     return 0 if ok_llm and ok_tts else 1

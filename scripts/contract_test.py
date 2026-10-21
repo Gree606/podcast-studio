@@ -35,16 +35,17 @@ PORT = free_port()
 BASE = f"http://127.0.0.1:{PORT}"
 os.environ.update({
     "MOCK_MODE": "0", "DATA_DIR": tempfile.mkdtemp(prefix="podcast_contract_"),
+    "PODCAST_SECRETS_FILE": os.path.join(tempfile.mkdtemp(), "none.env"),  # never touch the real keys
     "LLM_PROVIDER": "gemini", "LLM_BASE_URL": BASE, "LLM_API_KEY": "test-gemini-key", "LLM_MODEL": "gemini-flash-latest",
     "TTS_API_STYLE": "sarvam", "TTS_BASE_URL": BASE, "TTS_API_KEY": "test-sarvam-key",
     "ASR_BASE_URL": BASE, "ASR_API_KEY": "test-bodhan-key", "ASR_AUTH_PREFIX": "", "ASR_MODEL": "indic-transcribe",
-    "OCR_MODE": "llm",
+    "OCR_MODE": "bodhan", "OCR_BASE_URL": BASE, "OCR_API_KEY": "test-bodhan-key",
 })
 
 import uvicorn  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend.clients import llm, tts  # noqa: E402
+from backend.clients import llm, ocr, tts  # noqa: E402
 from backend.clients.base import ServiceError  # noqa: E402
 from backend.config import get_settings  # noqa: E402
 from backend.main import app  # noqa: E402
@@ -114,6 +115,8 @@ def main() -> None:
     s = get_settings()
     check(not s.effective_mock(), "running with REAL clients (mock mode off)")
     asyncio.run(error_paths())
+    text = asyncio.run(ocr.ocr_page(b"\x89PNG\r\n\x1a\nfake"))
+    check("photosynthesis" in text and fake_providers.LOG[-1]["api"] == "bodhan-ocr", "Bodhan Indic-OCR wire format (scanned pages)")
     fake_providers.reset()
 
     print("end-to-end (Gemini + Sarvam + Bodhan wire formats):")

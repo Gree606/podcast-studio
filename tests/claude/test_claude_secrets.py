@@ -114,7 +114,7 @@ def test_init_secrets_creates_owner_only_template_and_never_overwrites(tmp_path)
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
             values[k] = v
-    assert set(values) == {"LLM_API_KEY", "TTS_API_KEY", "ASR_API_KEY"}
+    assert set(values) == {"LLM_API_KEY", "TTS_API_KEY", "ASR_API_KEY", "OCR_API_KEY"}
     assert all(v.startswith("DUMMY_") for v in values.values())
     assert not any(v in out1 for v in values.values())
 
@@ -135,11 +135,12 @@ def test_config_reports_path_and_configured_flags_only(settings_from):
     with TestClient(main_mod.app) as c:
         cfg = c.get("/api/config").json()
     assert cfg["secrets_path"] == os.environ["PODCAST_SECRETS_FILE"]
-    assert cfg["configured"] == {"llm": False, "tts": False, "asr": False}
+    assert cfg["configured"] == {"llm": False, "tts": False, "asr": False, "ocr": False}
 
-    settings_from(secrets="LLM_API_KEY=AIzaSyRealLooking123\nTTS_API_KEY=sk_real_looking_456\nASR_API_KEY=bodhan_real_789\n")
+    settings_from(secrets="LLM_API_KEY=AIzaSyRealLooking123\nTTS_API_KEY=sk_real_looking_456\nASR_API_KEY=bodhan_real_789\n"
+                          "OCR_API_KEY=bodhan_ocr_000\n", env={"OCR_MODE": "bodhan"})
     with TestClient(main_mod.app) as c:
         r = c.get("/api/config")
-    assert r.json()["configured"] == {"llm": True, "tts": True, "asr": True}
-    for secret in ("AIzaSyRealLooking123", "sk_real_looking_456", "bodhan_real_789"):
+    assert r.json()["configured"] == {"llm": True, "tts": True, "asr": True, "ocr": True}
+    for secret in ("AIzaSyRealLooking123", "sk_real_looking_456", "bodhan_real_789", "bodhan_ocr_000"):
         assert secret not in r.text

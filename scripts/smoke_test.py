@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("MOCK_MODE", "1")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="podcast_smoke_")
+os.environ.setdefault("PODCAST_SECRETS_FILE", os.path.join(tempfile.mkdtemp(), "none.env"))  # never touch the real keys
 
 from fastapi.testclient import TestClient  # noqa: E402
 

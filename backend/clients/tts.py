@@ -122,7 +122,7 @@ def _join_wavs(chunks: list[bytes]) -> bytes:
 async def synthesize(text: str, speaker: str, *, style: str | None = None) -> bytes:
     s = get_settings()
     record(tts_calls=1, tts_chars=len(text))
-    if s.effective_mock():
+    if s.tts_mock():
         from . import mock
 
         return await mock.mock_tts(text, speaker)

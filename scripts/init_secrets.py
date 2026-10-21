@@ -21,7 +21,7 @@ from backend.config import secrets_path  # noqa: E402
 TEMPLATE = """\
 # Podcast Studio API keys. Keep this file private: it lives outside the repo on purpose.
 # Replace each DUMMY_ value with your real key, save, then restart the app
-# (scripts/run_local.sh restart). Until all three are real, the app runs in demo mode.
+# (scripts/run_local.sh restart). Each service switches from demo to real as soon as its key is set.
 
 # Google Gemini (script writing, fact checks, OCR): https://aistudio.google.com/apikey
 LLM_API_KEY=DUMMY_REPLACE_WITH_GEMINI_KEY
@@ -31,6 +31,9 @@ TTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY
 
 # Bodhan (speech recognition self-check of the audio)
 ASR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
+
+# Bodhan Indic-OCR (reads scanned PDF pages; used when OCR_MODE=bodhan). Often the same key as ASR.
+OCR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
 """
 
 
@@ -54,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     path = (args.path or secrets_path()).expanduser()
     if create(path):
         print(f"Created {path} (owner-only).")
-        print("Open it, replace the three DUMMY_ values with your keys, then restart the app.")
+        print("Open it, replace the DUMMY_ values with your keys, then restart the app.")
     else:
         print(f"{path} already exists; left it unchanged.")
     if args.path and args.path.expanduser() != secrets_path():

@@ -131,6 +131,26 @@ async def bodhan(file: UploadFile = File(...), model: str = Form(None), authoriz
     return {"text": best[1]}
 
 
+@app.post("/v1/chat/completions")
+async def bodhan_ocr(request: Request, authorization: str | None = Header(None)):
+    """Bodhan Indic-OCR: Bearer auth, model indic-ocr, exactly one user message holding one image data URI."""
+    if not authorization or not authorization.startswith("Bearer ") or authorization == "Bearer BADKEY":
+        return JSONResponse(status_code=401, content={"error": "unauthorized"})
+    body = await request.json()
+    msgs = body.get("messages") or []
+    parts = msgs[0].get("content") if len(msgs) == 1 and msgs[0].get("role") == "user" else None
+    if body.get("model") != "indic-ocr" or not isinstance(parts, list) or len(parts) != 1 or parts[0].get("type") != "image_url":
+        return JSONResponse(status_code=422, content={"error": "expected one user message with one image_url part"})
+    url = parts[0]["image_url"]["url"]
+    if not url.startswith(("data:image/png;base64,", "data:image/jpeg;base64,")) or any(k in body for k in ("language", "temperature")):
+        return JSONResponse(status_code=422, content={"error": "PNG/JPEG data URI only; no language or temperature"})
+    LOG.append({"api": "bodhan-ocr", "bytes": len(base64.b64decode(url.split(",", 1)[1]))})
+    text = "Chapter 1\n\nPlants make their own food by photosynthesis."
+    return {"id": "fake", "object": "chat.completion", "model": "indic-ocr",
+            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": text}}],
+            "blocks": [{"order": 0, "label": "Section-title", "type": "SectionHeader", "text": "Chapter 1"}]}
+
+
 def reset() -> None:
     LOG.clear()
     _tts_durations.clear()

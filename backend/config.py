@@ -76,15 +76,24 @@ class Settings(BaseSettings):
     asr_api_key: str = ""
     asr_auth_prefix: str = ""  # Authorization header value = prefix + key ("" for Bodhan, "Bearer " for OpenAI)
     asr_model: str = "indic-transcribe"
-    asr_language: str = ""  # sent only if set
+    asr_language: str = ""  # "" = the TTS language ("en" for en-IN); "auto" = let the service detect it
     asr_timeout_s: float = 90.0
-    asr_max_concurrency: int = 4
+    # Bodhan rate-limits bursts (HTTP 429 seen at 4 parallel calls), so stay gentle and retry longer.
+    asr_max_concurrency: int = 2
+    asr_attempts: int = 5
+    # Measured on api.bodhan.ai (2026-10-21): 14 calls/min sustained is fine; ~30/min gets HTTP 429
+    # after ~16 calls. The client paces itself to this many calls in any 60 s window (0 = no pacing).
+    asr_requests_per_minute: int = 14
+    asr_min_words: int = 3  # shorter lines ("Okay.") are not self-checked: WER on 1-2 words is noise
 
     # --- OCR ---------------------------------------------------------------
+    # "bodhan" = Bodhan Indic-OCR (OpenAI-style /v1/chat/completions, model indic-ocr);
     # "llm" = send rasterised pages to the vision LLM; "http" = dedicated OCR endpoint; "off".
     ocr_mode: str = "llm"
-    ocr_base_url: str = ""
+    ocr_base_url: str = ""  # bodhan: defaults to https://api.bodhan.ai
     ocr_api_key: str = ""
+    ocr_model: str = "indic-ocr"
+    ocr_timeout_s: float = 120.0
 
     # --- pipeline knobs ------------------------------------------------------
     data_dir: Path = ROOT / "data"
@@ -114,17 +123,43 @@ class Settings(BaseSettings):
     def tts_ready(self) -> bool:
         return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style != "sarvam")
 
+    def asr_language_code(self) -> str:
+        """Language sent to the ASR. Without it, short English lines ("No way!") came back in
+        Telugu or Gujarati script and the self-check had to be skipped."""
+        if self.asr_language == "auto":
+            return ""
+        return self.asr_language or self.tts_language.split("-")[0].lower()
+
     def asr_ready(self) -> bool:
         return bool(self.asr_base_url) and is_set(self.asr_api_key)
 
+    def ocr_ready(self) -> bool:
+        if self.ocr_mode == "bodhan":
+            return is_set(self.ocr_api_key)
+        if self.ocr_mode == "http":
+            return bool(self.ocr_base_url)
+        return self.ocr_mode == "llm" and self.llm_ready() and self.llm_vision
+
     def configured(self) -> dict[str, bool]:
         """Which providers have real-looking keys (never the keys themselves)."""
-        return {"llm": self.llm_ready(), "tts": self.tts_ready(), "asr": self.asr_ready()}
+        return {"llm": self.llm_ready(), "tts": self.tts_ready(), "asr": self.asr_ready(), "ocr": self.ocr_ready()}
+
+    # Each service is real as soon as its own key is set, so e.g. real voices work while
+    # the LLM key is still a placeholder. MOCK_MODE=1 forces every service to the local fake.
+    def llm_mock(self) -> bool:
+        return self.mock_mode or not self.llm_ready()
+
+    def tts_mock(self) -> bool:
+        return self.mock_mode or not self.tts_ready()
+
+    def asr_mock(self) -> bool:
+        """The ASR only checks our own audio: placeholder voices get the placeholder checker."""
+        return self.tts_mock()
 
     def effective_mock(self) -> bool:
-        """Demo mode unless both the LLM and TTS are configured with real keys.
+        """Demo mode (shown in the UI) unless both the LLM and TTS are configured with real keys.
         (ASR is optional: without it the audio self-check is skipped.)"""
-        return self.mock_mode or not (self.llm_ready() and self.tts_ready())
+        return self.llm_mock() or self.tts_mock()
 
 
 @lru_cache

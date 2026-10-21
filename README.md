@@ -75,6 +75,8 @@ scripts/run_local.sh status | stop | restart
 
 **Where the keys live.** API keys are kept *outside* the repo, in `~/.config/podcast-studio/secrets.env` (or the file named by `PODCAST_SECRETS_FILE`), so nothing working inside the repo ever sees them. Load order, later wins: repo `.env`, then the secrets file, then real environment variables (so a host like Render can still set keys as env vars). The app and `/api/config` only ever report *whether* each key is set, never its value.
 
+Each service switches from its offline fake to the real API as soon as its own key is set (so real voices work even while the LLM key is a placeholder). `OCR_MODE=bodhan` reads scanned pages with Bodhan Indic-OCR (`OCR_API_KEY`). The ASR self-check sends the language (default: the TTS language) and paces itself to 14 calls/minute, Bodhan's measured sustained limit.
+
 While any required key is still a `DUMMY_` placeholder, the app runs in **demo mode** (placeholder scripts and beeps) and says so in a banner. On shared HPC login nodes, run `source scripts/dev_env.sh` first (it caps BLAS threads).
 
 ## Providers
