@@ -10,12 +10,19 @@ Exit code 0 only if LLM and TTS work (ASR is optional for the app).
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+# Use the same key file as scripts/run_local.sh: the PODCAST_SECRETS_FILE line of the repo .env.
+if not os.environ.get("PODCAST_SECRETS_FILE") and (ROOT / ".env").exists():
+    for _line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
+        if _line.startswith("PODCAST_SECRETS_FILE="):
+            os.environ["PODCAST_SECRETS_FILE"] = _line.split("=", 1)[1].strip().strip("\"'")
 
 from backend.agent.voice import script_mismatch  # noqa: E402
 from backend.audio.stitch import decode_audio, resample, to_wav_bytes  # noqa: E402
