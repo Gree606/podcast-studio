@@ -195,3 +195,18 @@ def test_very_short_lines_skip_the_self_check(monkeypatch):
     assert calls == [] and short.wer is None
     asyncio.run(voice._synth_turn(Ctx(), seg, 1, long))
     assert calls == [1] and long.wer == 0.0
+
+
+def test_asr_without_a_key_never_calls_the_service(monkeypatch):
+    from backend.clients import asr
+
+    s = settings(tts_api_key="sk_real", asr_api_key="")
+    monkeypatch.setattr(asr, "get_settings", lambda: s)
+
+    async def no_http(*a, **kw):
+        raise AssertionError("unauthenticated ASR request")
+
+    monkeypatch.setattr(asr, "request_with_retry", no_http)
+    assert asr.asr_available() is False  # the self-check is skipped in the pipeline
+    with pytest.raises(ServiceError, match="not configured"):
+        asyncio.run(asr.transcribe(b"RIFF"))

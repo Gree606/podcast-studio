@@ -61,6 +61,10 @@ async def transcribe(wav_bytes: bytes) -> str:
         from . import mock
 
         return await mock.mock_asr(wav_bytes)
+    if not s.asr_ready():
+        # Never send an unauthenticated request. (A fake recogniser would be wrong here: with real
+        # voices it can't know what was said, so it would trigger paid re-recordings.)
+        raise ServiceError("Speech recogniser", "is not configured (ASR_API_KEY is missing)")
     await _pace()
     headers = {"Authorization": f"{s.asr_auth_prefix}{s.asr_api_key}"}
     data = {}
