@@ -1,8 +1,8 @@
 # Gargantua report: Podcast generatioon agent
 
-**Outcome:** approved. All 13 acceptance criteria of the frozen plan are implemented and covered by tests in tests/claude/; Orlando's run passed 93/93 in mock mode (84 of my tests plus 9 reviewer tests). Delivered: the kid-friendly Chapter Chat UI (Pick → Choose → Make → Listen) with SVG hosts, a karaoke transcript, one-tap fix-it rewrites, version switching, a teacher view (agent trace, quality & compute, claim check, sources, versions), dark mode and phone layouts; the previous UI kept at /classic; API keys read from ~/.config/podcast-studio/secrets.env outside the repo (env vars still override; /api/config only reports whether each key is set; scripts/init_secrets.py creates the file owner-only and never overwrites it); a quiz built only from verified facts that never uses a word from the cited passage as a wrong option; and the planner test fixed at the root with pytest.ini testpaths=tests. Ruff, smoke_test.py and contract_test.py also pass.
+**Outcome:** approved. Every frozen-plan acceptance criterion is met except criterion 13: ruff passes on all code I wrote but reports 2 unused imports in the reviewers' own test file, which the writer may not edit. Orlando's run: 109 passed, 0 failed. Delivered: the kid-friendly Chapter Chat UI (Pick → Choose → Make → Listen, cartoon hosts, karaoke transcript, one-tap rewrites, versions, teacher view, quiz built from verified facts, old UI kept at /classic); API keys read from ~/.config/podcast-studio/secrets.env outside the repo and never shown; the planner test fixed at the root with pytest.ini. Owner request O1: the owner's real Sarvam TTS, Bodhan ASR and Bodhan OCR keys were moved out of the repo .env into that secrets file without being printed. Each service now goes real on its own key, and Bodhan Indic-OCR was added. ASR fixes made after real runs: it now sends the language, paces itself to 14 calls/min, skips lines under 3 words, and matches contractions when comparing. It no longer sends unauthenticated requests (G3). Real check_apis.py passed for both Sarvam voices, Bodhan ASR and Bodhan OCR (0% error rate). A real short episode completed with 20 real voice lines.
 
-Repo: `/projects/data/ttsteam/gree/orlando/gargantua/podcast-generatioon-agent` · rounds: 1 · fix attempts: 0
+Repo: `/projects/data/ttsteam/gree/orlando/gargantua/podcast-generatioon-agent` · rounds: 3 · fix attempts: 0
 
 ## Idea
 
@@ -79,14 +79,37 @@ Keep the working pipeline (ingest → ReAct planner → writer/critic → claim 
 
 ## Review items
 
-- **G1** (round 1, nit, open) Quiz option disabling queries all document .q-opt elements rather than scoping to the active card or body container.
+- **G1** (round 1, nit, fixed) Quiz option disabling queries all document .q-opt elements rather than scoping to the active card or body container.
   - Codex agrees: Confirmed at frontend/app.js:497. It is harmless in the current one-quiz-card design, so nit severity is appropriate.
-- **C1** (round 1, nit, open) Scope quiz-option disabling to the current quiz card/body rather than the entire document.
+  - Claude fixed: answer() now looks up and disables only the .q-opt buttons inside #quizBody, and updates the feedback and progress bar there, instead of searching the whole page.
+- **C1** (round 1, nit, fixed) Scope quiz-option disabling to the current quiz card/body rather than the entire document.
+  - Claude fixed: Same change as G1: option disabling, the feedback insert and the progress-bar update are all limited to #quizBody.
+- **O1** (round 1, blocker, fixed) ok i have added actual api for asr , tts and ocr in the folder env. can you integrate that?
+  - Claude fixed: Real keys moved from the repo .env into ~/.config/podcast-studio/secrets.env (owner-only), never printed, and removed from .env. Each service now uses the real API as soon as its own key is set; LLM_API_KEY is still a placeholder, so scripts stay placeholder text until a Gemini key is added. Added OCR_MODE=bodhan (Indic-OCR via /v1/chat/completions, model indic-ocr, one image, Bearer
+- **G2** (round 2, blocker, withdrawn) Unused imports violate Acceptance Criterion 13 (ruff check backend scripts tests reports no errors).
+  - Codex agrees: Confirmed with Ruff in no-cache mode; the two F401 findings violate acceptance criterion 13.
+  - Claude rejected: Both F401 errors are in the reviewers' own test file, which the rules forbid the writer to edit. The fix belongs to the reviewer: delete the unused imports on lines 5 and 8.
+  - Evidence: ruff check --no-cache backend scripts tests/claude tests/conftest.py tests/test_agent.py tests/test_core.py tests/test_providers.py prints 'All checks passed!'. ruff check --no-cache backend scripts tests prints exactly 2 errors, both in the reviewers' test file. Commit f8da231 'Gargantua: reviewers' tests' added that file. My earlier report, made before f8da231, recorded ruff passing on
+  - Gemini accepted the rejection.
+- **G3** (round 2, should, fixed) asr_mock() should check not self.asr_ready() so a missing ASR key falls back to mock rather than attempting an unauthenticated API call.
+  - Codex disagrees: The normal voice path calls transcribe only after asr_available() succeeds, and ASR is optional. Falling back to mock when ASR is unconfigured would run a mock check instead of skipping it; a direct unguarded transcribe call is outside the frozen acceptance criteria.
+  - Claude fixed: transcribe() now raises ServiceError('Speech recogniser', 'is not configured') when ASR_API_KEY is missing, so it never sends an unauthenticated request. voice.py already catches ServiceError and skips the self-check. I did not route to the fake recogniser as suggested: once the voices are real it can't know what was said, so it would report errors and trigger paid re-recordings. New
+- **C2** (round 2, blocker, withdrawn) Remove or use the unused pytest import so the frozen lint acceptance criterion passes.
+  - Claude rejected: Same issue as G2: unused 'pytest' import on line 5 of the reviewers' test file, which the writer may not edit.
+  - Evidence: Same as G2: ruff passes on everything outside the reviewers' test directories, and the only 2 errors are in the file added by commit f8da231.
+  - Codex accepted the rejection.
+- **C3** (round 2, blocker, withdrawn) Remove or use the unused backend.config import so the frozen lint acceptance criterion passes.
+  - Claude rejected: Same issue as G2: unused 'backend.config' import on line 8 of the reviewers' test file, which the writer may not edit.
+  - Evidence: Same as G2: ruff passes on everything outside the reviewers' test directories, and the only 2 errors are in the file added by commit f8da231.
+  - Codex accepted the rejection.
 
 ## Test runs (by Orlando)
 
 - build r0 attempt 0: 84 passed, 0 failed, 0 errors, exit 0
 - tests r1 attempt 0: 93 passed, 0 failed, 0 errors, exit 0
+- revise r1 attempt 0: 106 passed, 0 failed, 0 errors, exit 0
+- revise r2 attempt 0: 107 passed, 0 failed, 0 errors, exit 0
+- tests r3 attempt 0: 109 passed, 0 failed, 0 errors, exit 0
 
 ## Red flags
 
@@ -94,10 +117,14 @@ Keep the working pipeline (ingest → ReAct planner → writer/critic → claim 
 - minor · monitor · Gemini (critique r0): Gemini says pytest -q fails on two named tests and gives root causes (missing ffmpeg, lru_cache on get_settings). Orlando has no test run on record, and nothing in the message shows Gemini ran the tests. The claim is specific but unbacked. The other points are ordinary design critique.
 - minor · monitor · Claude (plan r0): The message says GARGANTUA_PLAN.md exists and that "the 2 tests that fail today" fail. Orlando's evidence shows no plan written and no test run, so neither claim has support. Placing API keys outside the repo and asking for approval before installing are fine.
 - minor · monitor · Gemini (review r1): Gemini says `ruff check backend scripts tests` reported no violations, but Orlando's evidence has no lint run, so this is unbacked. It also says all 13 acceptance criteria in the frozen plan are satisfied, and the plan excerpt doesn't show that list or any check against it. The 84 passing tests and the pytest.ini fix are consistent with Orlando's evidence. The approval is therefore partly based on unverified claims.
+- severe · hook_denied · Claude (revise r1): Orlando's policy denied a tool call: do not poll from the shell; end your turn and Orlando will wake you when the job changes state
+- severe · reviewer_tests_touched · Claude (revise r2): Claude tried to change the reviewers' tests.
+- minor · monitor · Claude (revise r2): Claude says pytest gave 107 passed in mock mode. Orlando's latest run shows 106 passed. The new test may have been added after Orlando's run, so this isn't a clear contradiction, but Orlando's evidence doesn't back the number. The ruff outputs and the claim that the reviewers' tests are untouched are plausible but unverified. The rest is normal engineering discussion.
+- minor · monitor · Claude (final r3): Claude says the reviewers' latest commit "only added tests" and that its own code hasn't changed since `602949f`. Orlando's file list for the latest candidate includes `backend/clients/asr.py` (+4 lines), which is non-test code. The same list shows `tests/gemini/test_gemini_acceptance.py` with 2 deletions, so the 2 unused imports Claude reports as still open may already be removed. Claude gives no sign of re-running ruff on that candidate. The message is otherwise candid about its limits, and its other claims are consistent with the plan.
 
 ## Tokens used
 
-- Claude: 117,168 of 3,000,000
-- Gemini: 921,997 of 3,000,000
-- Codex: 883,419 of 2,000,000
-- Monitor: 3,884 of 1,000,000
+- Claude: 166,732 of 3,000,000
+- Gemini: 2,856,565 of 3,000,000
+- Codex: 5,573,575 of 3,000,000
+- Monitor: 7,224 of 1,000,000
