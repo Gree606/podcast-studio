@@ -132,6 +132,7 @@ async function renderHome() {
   drop.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadSource({file: f}); });
   file.onchange = () => { if (file.files[0]) loadSource({file: file.files[0]}); };
   $("#pasteGo").onclick = () => loadSource({text: $("#pasteText").value, title: $("#pasteTitle").value});
+  setupPhotos();
 
   const mine = myEpisodes();
   if (mine.length) {
@@ -140,13 +141,43 @@ async function renderHome() {
   }
 }
 
+// ------------------------------------------------------------------ photos of pages (OCR, one page per photo)
+const MAX_PHOTOS = 6;
+let PHOTOS = [];
+function setupPhotos() {
+  PHOTOS = [];
+  const add = files => {
+    for (const f of files) {
+      if (!f.type.startsWith("image/")) continue;
+      if (PHOTOS.length >= MAX_PHOTOS) { showErr($("#srcStatus"), `At most ${MAX_PHOTOS} pages at a time.`); break; }
+      PHOTOS.push({file: f, url: URL.createObjectURL(f)});
+    }
+    drawPhotos();
+  };
+  ["#photoCamera", "#photoGallery"].forEach(id => { const inp = $(id); inp.onchange = () => { add([...inp.files]); inp.value = ""; }; });
+  $("#photoGo").onclick = () => loadSource({images: PHOTOS.map(p => p.file), title: $("#photoTitle").value});
+  drawPhotos();
+}
+function drawPhotos() {
+  $("#photoList").innerHTML = PHOTOS.map((p, i) => `<li><img src="${p.url}" alt="Page ${i + 1}"><span>Page ${i + 1}</span>
+    <button type="button" class="chip" data-rm="${i}" aria-label="Remove page ${i + 1}">✕</button></li>`).join("");
+  $$("[data-rm]", $("#photoList")).forEach(b => b.onclick = () => { URL.revokeObjectURL(PHOTOS[+b.dataset.rm].url); PHOTOS.splice(+b.dataset.rm, 1); drawPhotos(); });
+  const n = PHOTOS.length;
+  $("#photoGo").disabled = n === 0;
+  $("#photoGo").textContent = n ? `📖 Read ${n === 1 ? "this page" : `these ${n} pages`}` : "📖 Read these pages";
+  $("#photoHint").textContent = n ? `${n} of ${MAX_PHOTOS} pages. Add more with the buttons above, or press Read.` : "Tip: lay the page flat, use good light, and fit the whole page in the frame.";
+}
+
 async function loadSource(input) {
   const st = $("#srcStatus");
   if (input.text != null && input.text.trim().split(/\s+/).length < 80) { showErr(st, "Please paste a bit more: at least a few paragraphs (80+ words)."); return; }
-  st.innerHTML = `<p class="row small"><span class="spinner" role="img" aria-label="Loading"></span> ${input.file ? "Reading your PDF… scanned pages take a little longer 📄" : "Opening the chapter… 📖"}</p>`;
+  const what = input.images ? `Reading ${input.images.length} page${input.images.length === 1 ? "" : "s"} from your photo${input.images.length === 1 ? "" : "s"}… about 5 seconds a page 📷`
+    : input.file ? "Reading your PDF… scanned pages take a little longer 📄" : "Opening the chapter… 📖";
+  st.innerHTML = `<p class="row small"><span class="spinner" role="img" aria-label="Loading"></span> ${what}</p>`;
   const fd = new FormData();
   if (input.sample_id) fd.append("sample_id", input.sample_id);
   if (input.file) fd.append("file", input.file);
+  if (input.images) input.images.forEach(f => fd.append("images", f, f.name || "page.jpg"));
   if (input.text != null) fd.append("text", input.text);
   if (input.title) fd.append("title", input.title);
   const view = viewId;
@@ -168,6 +199,9 @@ function showConfigure() {
   $("#srcTitle").textContent = SOURCE.title;
   $("#srcMeta").textContent = `${SOURCE.word_count.toLocaleString()} words · ${SOURCE.sections.length} part${SOURCE.sections.length === 1 ? "" : "s"}`;
   $("#srcNotes").innerHTML = SOURCE.notes.map(n => `<div class="notice info small">ℹ️ ${esc(n)}</div>`).join("");
+  const pages = SOURCE.page_texts || [];
+  $("#ocrPreview").classList.toggle("hidden", !pages.length);
+  $("#ocrPreviewBody").innerHTML = pages.map((t, i) => `<h4>Page ${i + 1}</h4><pre>${esc(t)}</pre>`).join("");
   $("#sections").innerHTML = SOURCE.sections.map(s => `<label><input type="checkbox" value="${esc(s.id)}" checked> ${esc(s.title)}</label>`).join("");
   const P = CONFIG.presets || DEFAULT_PRESETS, L = CONFIG.lengths || {};
   presetGroup($("#lengthChoices"), "length", P.length, "medium");

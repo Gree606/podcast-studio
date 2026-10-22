@@ -38,17 +38,17 @@ def ocr_available() -> bool:
     return s.mock_mode or (s.llm_ready() and s.llm_vision)
 
 
-def bodhan_request(png: bytes) -> dict:
-    """The Indic-OCR request body: one user message, one image, nothing else."""
+def bodhan_request(png: bytes, mime: str = "image/png") -> dict:
+    """The Indic-OCR request body: one user message, one image (one page), nothing else."""
     b64 = base64.b64encode(png).decode()
     return {"model": get_settings().ocr_model, "table_format": "markdown", "max_tokens": 4096,
-            "messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}]}]}
+            "messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}]}]}
 
 
-async def bodhan_ocr(png: bytes) -> str:
+async def bodhan_ocr(png: bytes, mime: str = "image/png") -> str:
     s = get_settings()
     url = (s.ocr_base_url or BODHAN_BASE).rstrip("/") + "/v1/chat/completions"
-    resp = await request_with_retry("OCR service", "POST", url, json=bodhan_request(png),
+    resp = await request_with_retry("OCR service", "POST", url, json=bodhan_request(png, mime),
                                     headers={"Authorization": f"Bearer {s.ocr_api_key}"}, timeout=s.ocr_timeout_s)
     try:
         return resp.json()["choices"][0]["message"]["content"] or ""
@@ -56,18 +56,19 @@ async def bodhan_ocr(png: bytes) -> str:
         raise ServiceError("OCR service", "returned an unexpected response", str(e)) from e
 
 
-async def ocr_page(png: bytes) -> str:
+async def ocr_page(png: bytes, mime: str = "image/png") -> str:
+    """Text of ONE page image (Bodhan's OCR takes exactly one page per request)."""
     s = get_settings()
     if s.ocr_mode == "bodhan" and s.ocr_ready() and not s.mock_mode:
-        return await bodhan_ocr(png)
+        return await bodhan_ocr(png, mime)
     if s.ocr_mode == "http":
         headers = {"Authorization": f"Bearer {s.ocr_api_key}"} if s.ocr_api_key else {}
-        resp = await request_with_retry("OCR service", "POST", s.ocr_base_url, files={"file": ("page.png", png, "image/png")},
+        resp = await request_with_retry("OCR service", "POST", s.ocr_base_url, files={"file": ("page", png, mime)},
                                         headers=headers, timeout=120)
         return resp.json().get("text", "")
     b64 = base64.b64encode(png).decode()
     messages = [{"role": "user", "content": [
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
         {"type": "text", "text": OCR_PROMPT},
     ]}]
     return await chat(messages, task="ocr", temperature=0.0, max_tokens=3000)

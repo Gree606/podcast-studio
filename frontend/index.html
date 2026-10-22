@@ -128,6 +128,7 @@
     <h2 id="pickTitle"><span class="step-badge">1</span> Pick a chapter</h2>
     <div class="tabs" role="tablist" aria-label="Where the chapter comes from">
       <button class="tab" role="tab" type="button" aria-selected="true" data-tab="samples">📚 Ready-made chapters</button>
+      <button class="tab" role="tab" type="button" aria-selected="false" data-tab="photo">📷 Snap a page</button>
       <button class="tab" role="tab" type="button" aria-selected="false" data-tab="upload">📄 Upload a PDF</button>
       <button class="tab" role="tab" type="button" aria-selected="false" data-tab="paste">✏️ Paste text</button>
     </div>
@@ -141,6 +142,18 @@
         <b>Drop your chapter PDF into the magic box</b>
         <span class="muted small">or tap to choose a file · one chapter, up to 25 MB · scanned pages work too</span>
       </label>
+    </div>
+    <div data-pane="photo" role="tabpanel" class="hidden">
+      <p class="small muted">Take a photo of a textbook page (or choose one from your gallery). Each photo is one page. Add up to 6 pages, in reading order.</p>
+      <div class="row photo-pick">
+        <label class="btn" for="photoCamera">📷 Take a photo<input type="file" id="photoCamera" accept="image/*" capture="environment" class="sr" aria-label="Take a photo of a page"></label>
+        <label class="btn" for="photoGallery">🖼️ Choose photos<input type="file" id="photoGallery" accept="image/jpeg,image/png,image/webp,image/*" multiple class="sr" aria-label="Choose photos of pages"></label>
+      </div>
+      <ol class="thumbs" id="photoList" aria-label="Pages to read"></ol>
+      <p class="small muted" id="photoHint">Tip: lay the page flat, use good light, and fit the whole page in the frame.</p>
+      <label for="photoTitle" class="small">Title (optional)</label>
+      <input type="text" id="photoTitle" placeholder="e.g. Chapter 7: Control and Coordination">
+      <div class="row"><button class="btn primary" id="photoGo" type="button" disabled>📖 Read these pages</button></div>
     </div>
     <div data-pane="paste" role="tabpanel" class="hidden">
       <label for="pasteTitle" class="small">Title (optional)</label>
@@ -158,6 +171,7 @@
       <div><b class="chosen-title" id="srcTitle"></b><span class="muted small" id="srcMeta"></span></div>
     </div>
     <div id="srcNotes"></div>
+        <details id="ocrPreview" class="ocr-preview hidden"><summary>📝 What we read from your photos (check it looks right)</summary><div id="ocrPreviewBody"></div></details>
     <div class="config-grid">
       <div>
         <div class="row between"><h3>Which parts?</h3><span class="small"><button class="link" id="selAll" type="button">all</button> · <button class="link" id="selNone" type="button">none</button></span></div>

@@ -226,7 +226,7 @@ def _sections_from_text(text: str) -> tuple[str, list[RawSection]]:
             heading = md.group(1).strip()
         elif NUMBERED_HEADING.match(first) or (len(first.split()) <= 10 and first.isupper() and len(first) > 3):
             heading = first
-        elif len(lines) == 1 and len(first.split()) <= 8 and not first.endswith((".", "?", "!", ":", ",")):
+        elif len(lines) == 1 and len(first.split()) <= 8 and (first[:1].isupper() or first[:1].isdigit()) and not first.endswith((".", "?", "!", ":", ",")):
             heading = first
         if heading is not None:
             if not title and not sections[-1].paras and len(sections) == 1:

@@ -39,12 +39,13 @@ class Section(BaseModel):
 class Source(BaseModel):
     id: str
     title: str
-    origin: Literal["upload", "paste", "sample"]
+    origin: Literal["upload", "paste", "sample", "photo"]
     sections: list[Section]
     chunks: list[Chunk]
     word_count: int
     ocr_pages: list[int] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    page_texts: list[str] = Field(default_factory=list)  # photo uploads: what OCR read on each page, for the user to check
 
 
 class EpisodeSettings(BaseModel):

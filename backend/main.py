@@ -21,6 +21,7 @@ from .agent.orchestrator import regenerate_segment, run_episode, switch_version
 from .clients.base import close_http_client
 from .config import ROOT, get_settings, secrets_path
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
+from .photos import MAX_PAGES, MAX_PHOTO_BYTES, ingest_photos
 from .agent.context import LENGTHS
 from .prompts import PROMPT_VERSION
 from .quiz import build_quiz
@@ -125,13 +126,14 @@ async def samples():
 # --- sources -----------------------------------------------------------------------
 def source_summary(src) -> dict:
     return {"id": src.id, "title": src.title, "origin": src.origin, "word_count": src.word_count, "notes": src.notes,
-            "ocr_pages": src.ocr_pages,
+            "ocr_pages": src.ocr_pages, "page_texts": getattr(src, "page_texts", []),
             "sections": [{"id": x.id, "title": x.title, "word_count": x.word_count} for x in src.sections]}
 
 
 @app.post("/api/sources")
 async def create_source(request: Request, file: UploadFile | None = File(None), text: str | None = Form(None),
-                        sample_id: str | None = Form(None), title: str | None = Form(None)):
+                        sample_id: str | None = Form(None), title: str | None = Form(None),
+                        images: list[UploadFile] | None = File(None)):
     s = get_settings()
     rate_limit(request, "upload", 40)
     try:
@@ -149,6 +151,10 @@ async def create_source(request: Request, file: UploadFile | None = File(None), 
                 src = ingest_text(path.read_text(encoding="utf-8"), s.max_input_words, origin="sample", title=meta["title"])
             src.id = f"sample_{sample_id}"
             src.title = meta["title"]
+        elif images:
+            # Photos of textbook pages: one page per photo, OCR'd in the order given.
+            photos = [(im.filename or "", await im.read(MAX_PHOTO_BYTES + 1)) for im in images[: MAX_PAGES + 1]]
+            src = await ingest_photos(photos, s.max_input_words, title=(title or "").strip() or None)
         elif file is not None:
             data = await file.read(MAX_UPLOAD + 1)
             if len(data) > MAX_UPLOAD:
@@ -161,7 +167,7 @@ async def create_source(request: Request, file: UploadFile | None = File(None), 
         elif text:
             src = ingest_text(text, s.max_input_words, title=title)
         else:
-            raise HTTPException(400, "Upload a PDF, paste some text, or pick a sample chapter.")
+            raise HTTPException(400, "Upload a PDF, snap a photo of a page, paste some text, or pick a sample chapter.")
     except IngestError as e:
         raise HTTPException(422, str(e)) from None
     store.save_source(src)
