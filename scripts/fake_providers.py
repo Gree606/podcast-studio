@@ -7,6 +7,7 @@ client code without spending credits:
 * Gemini  POST /v1beta/models/{model}:generateContent  (X-goog-api-key)
 * Sarvam  POST /text-to-speech                         (api-subscription-key)
 * Bodhan  POST /v1/audio/transcriptions                (Authorization: <key>, model=indic-transcribe)
+* Bodhan  POST /v1/audio/speech                        (Authorization: <key>, model=indic-speak, TTS)
 
 Content comes from backend/clients/mock.py, so outputs are placeholder-quality.
 Special keys trigger failure modes: "BADKEY" returns 401, and the first call with
@@ -22,7 +23,7 @@ import threading
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, File, Form, Header, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from backend.clients import mock
 
@@ -113,6 +114,30 @@ async def sarvam(request: Request, api_subscription_key: str | None = Header(Non
     sf.write(buf, audio, in_sr if sr == in_sr else in_sr, format="WAV")
     LOG.append({"api": "sarvam", "speaker": body["speaker"], "model": body["model"], "chars": len(body["text"])})
     return {"request_id": "fake", "audios": [base64.b64encode(buf.getvalue()).decode()]}
+
+
+@app.post("/v1/audio/speech")
+async def bodhan_tts(request: Request, authorization: str | None = Header(None)):
+    if not authorization or authorization.startswith("Bearer ") or authorization == "BADKEY":
+        return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+    body = await request.json()
+    for field in ("model", "input", "voice", "instructions"):
+        if not body.get(field):
+            return JSONResponse(status_code=422, content={"detail": f"missing {field}"})
+    if body["model"] != "indic-speak":
+        return JSONResponse(status_code=422, content={"detail": f"unknown model {body['model']}"})
+    try:
+        lang = json.loads(body["instructions"]).get("lang")  # a JSON *string*, as in the docs example
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"detail": "instructions must be a JSON string"})
+    if not lang:
+        return JSONResponse(status_code=422, content={"detail": "instructions.lang missing"})
+    wav = await mock.mock_tts(body["input"], "host" if body["voice"] != "Amit" else "expert")
+    audio, in_sr = sf.read(io.BytesIO(wav), dtype="float32")
+    with _lock:
+        _tts_durations.append((len(audio) / in_sr, body["input"]))
+    LOG.append({"api": "bodhan-tts", "speaker": body["voice"], "model": body["model"], "lang": lang, "chars": len(body["input"])})
+    return Response(content=wav, media_type="audio/mpeg")  # the real service labels its audio audio/mpeg
 
 
 @app.post("/v1/audio/transcriptions")

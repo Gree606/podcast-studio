@@ -119,6 +119,17 @@ def main() -> None:
     check("photosynthesis" in text and fake_providers.LOG[-1]["api"] == "bodhan-ocr", "Bodhan Indic-OCR wire format (scanned pages)")
     fake_providers.reset()
 
+    # Bodhan indic-speak TTS (alternative voice provider): wire format, both voices, pacing hook
+    s.tts_api_style, s.tts_model, s.tts_api_key = "bodhan", "indic-speak", "test-bodhan-key"
+    s.tts_voice_host, s.tts_voice_expert = "Deepika", "Amit"
+    wavs = [asyncio.run(tts.synthesize("Plants make their own food.", sp)) for sp in ("host", "expert")]
+    calls = [r for r in fake_providers.LOG if r["api"] == "bodhan-tts"]
+    check(len(calls) == 2 and {c["speaker"] for c in calls} == {"Deepika", "Amit"} and all(c["lang"] == "en" for c in calls)
+          and all(len(w) > 1000 for w in wavs), "Bodhan indic-speak TTS wire format (raw key, JSON-string instructions, two voices)")
+    s.tts_api_style, s.tts_model, s.tts_api_key = "sarvam", "bulbul:v4-flash", "test-sarvam-key"
+    s.tts_voice_host, s.tts_voice_expert = "simran_en_conversation", "dev_en_conversational"
+    fake_providers.reset()
+
     print("end-to-end (Gemini + Sarvam + Bodhan wire formats):")
     with TestClient(app) as c:
         check(c.get("/api/health").json()["mock"] is False, "/api/health reports mock=false")

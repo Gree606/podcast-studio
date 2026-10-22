@@ -133,3 +133,26 @@ def test_exhausted_daily_quota_is_skipped_and_reported(monkeypatch):
     assert tried == ["lite"]  # the exhausted model is not even tried again
     with pytest.raises(ServiceError, match="free daily quota"):
         asyncio.run(llm._call_with_fallback(fake_call, [], models=["capped-a", "capped-b"], **kw))
+
+
+def test_bodhan_tts_body_and_readiness():
+    """Bodhan indic-speak wants instructions as a JSON *string* with the language, and needs a real key."""
+    import json as _json
+
+    from backend.clients import tts
+    from backend.config import Settings
+
+    s = Settings(_env_file=None, tts_api_style="bodhan", tts_model="indic-speak", tts_voice_host="Deepika",
+                 tts_voice_expert="Amit", tts_language="en-IN", tts_api_key="DUMMY_REPLACE_ME")
+    import backend.clients.tts as tts_mod
+    orig = tts_mod.get_settings
+    tts_mod.get_settings = lambda: s
+    try:
+        body = tts.bodhan_body("Hello there.", "expert")
+    finally:
+        tts_mod.get_settings = orig
+    assert body["model"] == "indic-speak" and body["voice"] == "Amit" and body["input"] == "Hello there."
+    assert isinstance(body["instructions"], str) and _json.loads(body["instructions"]) == {"lang": "en"}
+    assert s.tts_ready() is False  # placeholder key -> not ready
+    s.tts_api_key = "real-looking-key"
+    assert s.tts_ready() is True

@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     tts_timeout_s: float = 90.0
     tts_max_concurrency: int = 4
     tts_max_chars: int = 900  # longer turns are split at sentence boundaries
+    # Bodhan indic-speak returns HTTP 429 after a short burst (~7 quick calls, measured 2026-10-23),
+    # so the client paces itself; 0 = no pacing (Sarvam doesn't need it).
+    tts_requests_per_minute: int = 0
+    tts_auth_prefix: str = ""  # bodhan: Authorization header = prefix + key (no "Bearer")
 
     # --- ASR (self-check of our own audio) -----------------------------------
     # OpenAI-style multipart POST {base}/v1/audio/transcriptions -> {"text": ...}
@@ -125,7 +129,7 @@ class Settings(BaseSettings):
         return bool(self.llm_base_url) and (is_set(self.llm_api_key) or self.llm_provider == "openai")
 
     def tts_ready(self) -> bool:
-        return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style != "sarvam")
+        return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style not in ("sarvam", "bodhan"))
 
     def asr_language_code(self) -> str:
         """Language sent to the ASR. Without it, short English lines ("No way!") came back in

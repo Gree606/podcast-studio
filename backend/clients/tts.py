@@ -4,6 +4,9 @@
   Body {text, language_code, speaker, model, pace, speech_sample_rate} returns
   {"audios": [<base64 WAV>]}. Shape taken from the official ``sarvamai`` SDK v0.1.37.
   Note the field is ``language_code``, not ``target_language_code``.
+* ``bodhan``: Bodhan indic-speak, POST {base}/v1/audio/speech with ``Authorization: <key>`` (no
+  "Bearer") and body {model: "indic-speak", input, voice, instructions: '{"lang": "en"}'};
+  returns raw audio bytes (24 kHz). Rate-limited, so calls are paced (TTS_REQUESTS_PER_MINUTE).
 * ``openai``: POST {base}/v1/audio/speech {model, input, voice, response_format} returns raw audio.
 * ``json``: POST {base}/synthesize {text, speaker, language} returns {"audio": base64} or raw audio.
 
@@ -14,7 +17,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import re
+import time
+from collections import deque
 
 import numpy as np
 
@@ -30,6 +36,31 @@ def _semaphore() -> asyncio.Semaphore:
     if _sem is None:
         _sem = asyncio.Semaphore(get_settings().tts_max_concurrency)
     return _sem
+
+
+_sent: deque[float] = deque()  # times of recent paced TTS calls (sliding 60 s window)
+_pace_lock: asyncio.Lock | None = None
+_pace_loop: asyncio.AbstractEventLoop | None = None
+
+
+async def _pace() -> None:
+    """Wait until another call fits in the provider's per-minute budget (0 = unlimited)."""
+    global _pace_lock, _pace_loop
+    limit = get_settings().tts_requests_per_minute
+    if limit <= 0:
+        return
+    loop = asyncio.get_running_loop()
+    if _pace_lock is None or _pace_loop is not loop:
+        _pace_lock, _pace_loop = asyncio.Lock(), loop
+    async with _pace_lock:
+        while True:
+            now = time.monotonic()
+            while _sent and now - _sent[0] >= 60:
+                _sent.popleft()
+            if len(_sent) < limit:
+                _sent.append(now)
+                return
+            await asyncio.sleep(60 - (now - _sent[0]) + 0.05)
 
 
 def voice_for(speaker: str) -> str:
@@ -81,6 +112,25 @@ async def _sarvam(text: str, speaker: str) -> bytes:
         raise ServiceError("Voice service", "returned an unexpected response", str(e)) from e
 
 
+def bodhan_body(text: str, speaker: str) -> dict:
+    s = get_settings()
+    lang = s.tts_language.split("-")[0].lower() or "en"
+    return {"model": s.tts_model, "input": text, "voice": voice_for(speaker), "instructions": json.dumps({"lang": lang})}
+
+
+async def _bodhan(text: str, speaker: str) -> bytes:
+    s = get_settings()
+    await _pace()
+    resp = await request_with_retry(
+        "Voice service", "POST", s.tts_base_url.rstrip("/") + "/v1/audio/speech", json=bodhan_body(text, speaker),
+        headers={"Authorization": f"{s.tts_auth_prefix}{s.tts_api_key}", "Content-Type": "application/json"},
+        timeout=s.tts_timeout_s, attempts=5, semaphore=_semaphore(),
+    )
+    if not resp.content or resp.headers.get("content-type", "").startswith("application/json"):
+        raise ServiceError("Voice service", "returned no audio", resp.text[:200])
+    return resp.content
+
+
 async def _openai(text: str, speaker: str) -> bytes:
     s = get_settings()
     headers = {"Authorization": f"Bearer {s.tts_api_key}"} if s.tts_api_key else {}
@@ -129,6 +179,8 @@ async def synthesize(text: str, speaker: str, *, style: str | None = None) -> by
     pieces = split_text(text, s.tts_max_chars)
     if s.tts_api_style == "sarvam":
         outs = await asyncio.gather(*(_sarvam(p, speaker) for p in pieces))
+    elif s.tts_api_style == "bodhan":
+        outs = await asyncio.gather(*(_bodhan(p, speaker) for p in pieces))
     elif s.tts_api_style == "openai":
         outs = await asyncio.gather(*(_openai(p, speaker) for p in pieces))
     else:
