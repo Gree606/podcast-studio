@@ -115,7 +115,7 @@ class Settings(BaseSettings):
     accept_score: float = 4.2  # early-stop threshold on the 1-5 rubric
     wer_threshold: float = 0.25  # ASR self-check: re-synthesise a turn above this WER
     max_tts_retries: int = 2
-    planner_max_steps: int = 12
+    planner_max_steps: int = 8  # each real-model step can take seconds to a minute; a TA won't wait for 14
 
     @property
     def episodes_dir(self) -> Path:

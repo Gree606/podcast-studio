@@ -114,3 +114,10 @@ def test_parse_turns_accepts_real_model_variants(data):
     turns = parse_turns(data, "Riya", "Arjun")
     assert [t.speaker for t in turns] == ["host", "expert", "host", "expert"]
     assert turns[0].text == "Hi there!"
+
+
+def test_read_tool_batches_passages(ctx):
+    ids = [c.id for c in ctx.source.chunks[:2]]
+    out = tool_read(ctx, {"chunk_ids": ids + ["c999"]})
+    assert all(f"[{i}]" in out for i in ids) and "not found: c999" in out
+    assert tool_read(ctx, {"chunk_id": ids[0]}).startswith(f"[{ids[0]}]")  # single-id form still works

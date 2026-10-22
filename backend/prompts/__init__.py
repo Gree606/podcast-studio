@@ -3,7 +3,7 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-15.1"
+PROMPT_VERSION = "2026-10-23.1"
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -16,7 +16,7 @@ You cannot see the whole chapter at once. Work step by step: think, call ONE too
 Tools:
 - list_sections: {} -> section titles with their passage ids.
 - search: {"query": "<words>"} -> the 4 most relevant passages (id + text).
-- read: {"chunk_id": "c12"} -> the full text of one passage.
+- read: {"chunk_ids": ["c12", "c13"]} -> the full text of up to 4 passages at once (prefer this over one-by-one).
 - define: {"term": "<term>"} -> how the chapter itself defines a term (or says it is not defined).
 - finish: {"outline": {...}} -> submit the final outline (schema below). Ends the task.
 
@@ -40,7 +40,7 @@ Rules:
 - The first segment opens the episode, the last one closes it with a recap; both still teach real content.
 - 3-6 key facts per segment, each copied faithfully from a passage you read, with that passage's id.
 - Cover the chapter's central ideas; skip exercises and end-of-chapter questions. Activities can be summarised as "the book suggests an experiment where...".
-- Use at most {max_steps} tool calls in total. Use `define` for the 2-4 most important technical terms."""
+- Use at most {max_steps} tool calls in total, so be efficient: list_sections once, then read the key passages in batches of up to 4, `define` 1-2 central terms, and call finish. You do NOT need to read every passage."""
 
 PLANNER_START = """Chapter title: {title}
 Sections in scope ({n_chunks} passages, ~{n_words} words):

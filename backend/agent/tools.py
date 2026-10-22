@@ -42,11 +42,24 @@ def tool_search(ctx: AgentContext, inp: dict) -> str:
 
 
 def tool_read(ctx: AgentContext, inp: dict) -> str:
-    cid = str(inp.get("chunk_id") or inp.get("id") or "").strip()
-    c = ctx.by_id.get(cid)
-    if not c:
-        return f"Error: no passage '{cid}'. Passage ids look like c12; use search or list_sections."
-    return f"[{c.id}] ({c.section}) {c.text}"[:OBS_CHARS]
+    """Read one passage or several at once ({"chunk_ids": ["c4", "c5"]}). Batching matters with a
+    real model: reading a chapter one passage per step took 14+ slow steps."""
+    ids = inp.get("chunk_ids") or inp.get("ids")
+    if not isinstance(ids, list):
+        ids = [inp.get("chunk_id") or inp.get("id") or ""]
+    ids = [str(i).strip() for i in ids][:4]
+    out, missing, budget = [], [], OBS_CHARS * 2
+    for cid in ids:
+        c = ctx.by_id.get(cid)
+        if not c:
+            missing.append(cid)
+            continue
+        out.append(f"[{c.id}] ({c.section}) {c.text}"[: budget // max(1, len(ids))])
+    if missing and not out:
+        return f"Error: no passage {', '.join(repr(m) for m in missing)}. Passage ids look like c12; use search or list_sections."
+    if missing:
+        out.append(f"(not found: {', '.join(missing)})")
+    return "\n\n".join(out)
 
 
 _DEF_PATTERNS = [
