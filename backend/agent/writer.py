@@ -69,7 +69,7 @@ def _speaker_and_text(r) -> tuple[str, str]:
     return sp, text
 
 
-def parse_turns(data, host_name: str, expert_name: str) -> list[Turn]:
+def parse_turns(data, host_name: str, expert_name: str, min_turns: int = 4) -> list[Turn]:
     raw = _find_turn_list(data)
     if not isinstance(raw, list):
         raise WriterError("no 'turns' list")
@@ -78,6 +78,10 @@ def parse_turns(data, host_name: str, expert_name: str) -> list[Turn]:
         sp, text = _speaker_and_text(r)
         sp, text = sp.strip().lower(), text.strip()
         text = re.sub(r"\[[^\]]{1,30}\]|\*[^*]{1,30}\*", "", text).strip()  # stage directions
+        # "2. Arjun: You got it!" - a numbered and/or name-prefixed line inside the text (seen from real Gemini)
+        m = re.match(rf"^(?:\d+[.)]\s*)?({re.escape(host_name)}|{re.escape(expert_name)}|host|expert)\s*:\s*", text, re.I)
+        if m:
+            sp, text = m.group(1).lower(), text[m.end():].strip()
         if not text:
             continue
         if sp in ("host", host_name.lower()) or sp.startswith(host_name.lower()):
@@ -90,7 +94,7 @@ def parse_turns(data, host_name: str, expert_name: str) -> list[Turn]:
             turns[-1] = Turn(speaker=speaker, text=turns[-1].text + " " + text)
         else:
             turns.append(Turn(speaker=speaker, text=text))
-    if len(turns) < 4:
+    if len(turns) < min_turns:
         raise WriterError(f"only {len(turns)} usable turns")
     return turns
 

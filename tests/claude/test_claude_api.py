@@ -110,6 +110,7 @@ def test_failed_episode_shows_friendly_message_and_resume_finishes_it(client, mo
         raise RuntimeError("internal detail xyzzy\nTraceback (most recent call last): boom")
 
     monkeypatch.setattr("backend.agent.orchestrator.plan", broken_plan)
+    monkeypatch.setattr("backend.agent.fast.write_episode", broken_plan)  # the default 2-call pipeline
     eid = new_episode(client)
     ep = wait(client, eid, finished)
     assert ep["status"] == "failed"

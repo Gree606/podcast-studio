@@ -24,8 +24,9 @@ from ..clients.usage import current_metrics
 from ..config import get_settings
 from ..ingest import select_chunks
 from ..prompts import PROMPT_VERSION
-from ..schemas import Episode, Segment, SegmentVersion
+from ..schemas import Claim, Episode, Segment, SegmentVersion
 from ..store import store
+from . import fast
 from .allocation import initial_allocation, reallocate
 from .claims import verify_and_fix
 from .context import AgentContext
@@ -64,6 +65,11 @@ async def _finalize_segment(ctx: AgentContext, seg: Segment, segments: list[Segm
     turns, claims = await verify_and_fix(ctx, seg, segments, [t.model_copy() for t in best.turns])
     ver = SegmentVersion(version=(max((v.version for v in seg.versions), default=0) + 1), instruction=instruction,
                          turns=turns, scores=best.scores, claims=claims)
+    await _record(ctx, seg, ver)
+
+
+async def _record(ctx: AgentContext, seg: Segment, ver: SegmentVersion) -> None:
+    """Synthesise a checked script (TTS + ASR listen-back) and make it the segment's active version."""
     seg.status = "synthesizing"
     ctx.on_change()
     path = store.episode_dir(ctx.episode.id) / f"{seg.id}_v{ver.version}.wav"
@@ -162,6 +168,20 @@ async def write_segments(ctx: AgentContext, segments: list[Segment], need_write:
         x.budget += sp
 
 
+def fast_mode() -> bool:
+    return get_settings().pipeline_mode != "agent"
+
+
+async def _run_fast(ctx: AgentContext) -> None:
+    """FAST pipeline, LLM call 1: write the whole episode (skipped when resuming with a script)."""
+    ep = ctx.episode
+    if ep.segments:
+        return
+    with _Timer(ep, "write"):
+        ep.segments = await fast.write_episode(ctx)
+    store.save_episode(ep)
+
+
 async def run_episode(eid: str) -> None:
     ep = store.get_episode(eid)
     if ep is None:
@@ -174,8 +194,10 @@ async def run_episode(eid: str) -> None:
             ctx.emit("start", "info", f"Agent started (prompts {PROMPT_VERSION}, policy {ep.settings.policy}, "
                      f"{len(ctx.chunks)} passages in scope).")
 
+            if fast_mode():
+                await _run_fast(ctx)
             # ---- Perceive + Plan ---------------------------------------------------
-            if not ep.segments:
+            elif not ep.segments:
                 ctx.status("plan", "Reading the chapter and planning the episode", 0.02)
                 with _Timer(ep, "plan"):
                     ep.segments = await plan(ctx)
@@ -185,20 +207,28 @@ async def run_episode(eid: str) -> None:
             todo = [x for x in segments if not (x.status == "done" and x.current)]
 
             # ---- Act + Observe: write with compute-optimal allocation ----------------
-            need_write = [x for x in todo if best_candidate(x) is None]
+            need_write = [] if fast_mode() else [x for x in todo if best_candidate(x) is None]
             if need_write:
                 with _Timer(ep, "write"):
                     await write_segments(ctx, segments, need_write)
                 store.save_episode(ep)
 
             # ---- Verify claims + synthesise + ASR self-check -----------------------
-            ctx.status("voice", "Fact-checking and recording the hosts", 0.62)
+            claims: dict[str, list[Claim]] = {}
+            if fast_mode() and todo:
+                with _Timer(ep, "verify"):
+                    claims = await fast.verify_segments(ctx, segments, only=todo)
+                store.save_episode(ep)
+            ctx.status("voice", "Fact-checking and recording the hosts" if not fast_mode() else "Recording the hosts", 0.62)
             finished = 0
             with _Timer(ep, "voice"):
                 async def finish(seg: Segment) -> None:
                     nonlocal finished
                     try:
-                        await _finalize_segment(ctx, seg, segments)
+                        if fast_mode():
+                            await _record(ctx, seg, fast.new_version(seg, claims.get(seg.id, [])))
+                        else:
+                            await _finalize_segment(ctx, seg, segments)
                     except Exception as e:  # isolate failures per segment
                         seg.status = "failed"
                         seg.error = getattr(e, "user_message", None) or "Something went wrong while making this segment."
@@ -247,6 +277,12 @@ async def regenerate_segment(eid: str, seg_id: str, instruction: str | None) -> 
             seg.status, seg.error = "writing", None
             label = f' with instruction "{instruction}"' if instruction else ""
             ctx.emit("regenerate", "info", f"Regenerating '{seg.title}'{label}.", seg.id)
+            if fast_mode():  # 2 LLM calls: rewrite this part, then fact-check it
+                claims = await fast.rewrite_part(ctx, seg, ep.segments, instruction)
+                await _record(ctx, seg, fast.new_version(seg, claims, instruction or "regenerate"))
+                await assemble(ctx)
+                ctx.emit("regenerate", "info", f"'{seg.title}' is now version {seg.active_version}; episode re-stitched.", seg.id)
+                return
             current = seg.current.turns if seg.current else None
             seg.candidates = []  # fresh search; memory (reflections) is kept across versions
             budget = 2 if ep.settings.policy in ("adaptive", "uniform") else 1

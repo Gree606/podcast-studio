@@ -92,12 +92,68 @@ def _critic(messages: list[dict]) -> str:
                        "feedback": "1. Add a quick reaction after turn 2. 2. Use one more everyday example."})
 
 
+def _passages(text: str) -> list[tuple[str, str]]:
+    return re.findall(r"^\[(c\d+)\] \([^)]*\) (.+)$", text, re.M)
+
+
+def _episode(messages: list[dict]) -> str:
+    """FAST pipeline call 1: the whole episode as 3 parts."""
+    user = _text_of(messages[-1])
+    ps = _passages(user) or [("c0", "the main idea of the chapter")]
+    title = (re.search(r"^Chapter: (.+)$", user, re.M) or re.search(r"(.+)", user)).group(1)
+    names = ["Opening", "The core idea", "Wrapping up"]
+    parts = []
+    for i in range(3):
+        mine = ps[i::3] or ps[:1]
+        turns = [{"speaker": "host", "text": f"Welcome to Chapter Chat! Today: {title}. So what's first?" if i == 0
+                  else "Okay, so what comes next?"}]
+        for cid, txt in mine[:2]:
+            turns.append({"speaker": "expert", "text": f"Think of it like this: {_first_sentence(txt).rstrip('.')}. It's like making chai."})
+            turns.append({"speaker": "host", "text": "Oh, that's neat."})
+        if i == 2:
+            turns.append({"speaker": "expert", "text": "Quick recap: three ideas, step by step. See you next time!"})
+        parts.append({"title": names[i], "chunk_ids": [c for c, _ in mine[:2]], "turns": turns})
+    return json.dumps({"title": f"{title}: the big ideas", "learn_line": "the big ideas of this chapter, step by step",
+                       "parts": parts})
+
+
+def _verify_episode(messages: list[dict]) -> str:
+    """FAST pipeline call 2: all claims supported, except one flagged (and fixed) in part 2 to exercise the fix path."""
+    user = _text_of(messages[-1])
+    src = _passages(user)
+
+    def evidence(claim: str) -> str:
+        return next((cid for cid, txt in src if claim[:40] in txt), src[0][0] if src else "c1")
+
+    out = []
+    for m in re.finditer(r"^PART (\d+): .+$", user, re.M):
+        n = int(m.group(1))
+        body = user[m.end():].split("\nPART ")[0]
+        claims = [{"claim": c, "supported": True, "evidence": evidence(c), "note": ""}
+                  for c in re.findall(r"Think of it like this: (.+?)\. It's", body)[:4]]
+        fixed = None
+        if n == 2 and claims:
+            claims[0]["supported"] = False
+            fixed = [{"speaker": "host", "text": "Okay, so what comes next?"},
+                     {"speaker": "expert", "text": "Think of it like this: the book explains it step by step. It's like making chai."},
+                     {"speaker": "host", "text": "Oh, that's neat."}]
+        out.append({"part": n, "claims": claims, "fixed_turns": fixed})
+    return json.dumps({"parts": out})
+
+
 async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> str:
     await asyncio.sleep(0.01)
     if "capital of India" in _text_of(messages[-1]):  # scripts/check_apis.py
         return json.dumps({"answer": "New Delhi"})
     if task == "planner_step":
         return _planner(messages)
+    if task == "write_episode":
+        return _episode(messages)
+    if task == "verify_episode":
+        return _verify_episode(messages)
+    if task == "rewrite_part":
+        return json.dumps({"title": "Rewritten part", "chunk_ids": [c for c, _ in _passages(_text_of(messages[-1]))[:2]],
+                           "turns": json.loads(_writer(messages, "revise", 0.7))["turns"]})
     if task in ("write", "revise", "claim_fix"):
         return _writer(messages, task, temperature)
     if task == "critic":

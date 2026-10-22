@@ -121,3 +121,8 @@ def test_read_tool_batches_passages(ctx):
     out = tool_read(ctx, {"chunk_ids": ids + ["c999"]})
     assert all(f"[{i}]" in out for i in ids) and "not found: c999" in out
     assert tool_read(ctx, {"chunk_id": ids[0]}).startswith(f"[{ids[0]}]")  # single-id form still works
+
+
+def test_parse_turns_strips_numbered_name_prefixes():
+    turns = parse_turns({"turns": ["1. Riya: Quick recap?", "2. Arjun: You got it!", "3. Riya: Bye!"]}, "Riya", "Arjun", min_turns=2)
+    assert [(t.speaker, t.text) for t in turns] == [("host", "Quick recap?"), ("expert", "You got it!"), ("host", "Bye!")]

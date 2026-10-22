@@ -34,6 +34,9 @@ _lock = threading.Lock()
 _ratelimited: set[str] = set()
 
 TASK_MARKERS = [
+    ("Write a complete episode of", "write_episode"),
+    ("strict fact-checker for an educational podcast", "verify_episode"),
+    ("podcast episode.\nThe listener asked", "rewrite_part"),
     ("planning agent of a podcast studio", "planner_step"),
     ("checking a podcast outline", "fact_verify"),
     ("NOT supported by the textbook passages", "claim_fix"),

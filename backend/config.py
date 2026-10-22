@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     # Measured 2026-10-21: popular models regularly return 503 "high demand" for minutes at a time.
     llm_fallback_models: str = "gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite,gemini-flash-lite-latest"
     llm_attempts_per_model: int = 2  # retries on one model before moving to the next
-    llm_timeout_s: float = 120.0
+    llm_timeout_s: float = 75.0  # per request; a hung model (seen: 128 s then 503) should fail over to the next one sooner
     llm_max_concurrency: int = 4
     llm_attempts: int = 5  # retries cover 429 rate limits (we honour the server's retry delay)
     # Gemini "thinking" tokens count against maxOutputTokens; this much headroom is added
@@ -116,6 +116,8 @@ class Settings(BaseSettings):
     wer_threshold: float = 0.25  # ASR self-check: re-synthesise a turn above this WER
     max_tts_retries: int = 2
     planner_max_steps: int = 8  # each real-model step can take seconds to a minute; a TA won't wait for 14
+    # "fast": 2 LLM calls per episode (write all, then verify+fix); "agent": planner + best-of-N + critic loop
+    pipeline_mode: str = "fast"
 
     @property
     def episodes_dir(self) -> Path:

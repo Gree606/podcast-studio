@@ -17,12 +17,13 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from . import jobs
+from .agent import fast
+from .agent.context import LENGTHS
 from .agent.orchestrator import regenerate_segment, run_episode, switch_version
 from .clients.base import close_http_client
 from .config import ROOT, get_settings, secrets_path
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
 from .photos import MAX_PAGES, MAX_PHOTO_BYTES, ingest_photos
-from .agent.context import LENGTHS
 from .prompts import PROMPT_VERSION
 from .quiz import build_quiz
 from .schemas import Episode, EpisodeSettings, new_id
@@ -83,6 +84,9 @@ async def health():
 
 
 def estimate_minutes(length: str, words: int) -> dict:
+    if get_settings().pipeline_mode != "agent":  # 2 LLM calls, then recording; episodes are capped at ~2 minutes
+        audio = fast.WORDS[length] / fast.WPM
+        return {"audio_minutes": round(audio, 1), "wait_minutes": round(1.5 + 0.5 * audio, 1)}
     n_seg, wps = LENGTHS[length]
     audio = n_seg * wps / 150 + 0.3
     wait = 1.0 + n_seg * 0.6

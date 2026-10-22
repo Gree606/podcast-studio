@@ -3,7 +3,7 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-23.1"
+PROMPT_VERSION = "2026-10-23.2"
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -183,3 +183,69 @@ Rate 1-5:
 - pedagogy: does it build understanding step by step, with correct terminology?
 
 Reply with ONLY JSON: {{"faithfulness": n, "naturalness": n, "engagement": n, "pedagogy": n, "comment": "<one sentence>"}}"""
+
+# ---------------------------------------------------------------------------
+# FAST pipeline (default): exactly 2 LLM calls per episode.
+#   1. FAST_WRITE  - the whole ~2-minute episode in one go (model thinks internally)
+#   2. FAST_VERIFY - check every claim against the cited passages; return fixed turns
+#                    for any part that has an unsupported claim (same call)
+# Regenerating one part = FAST_REWRITE + FAST_VERIFY on that part (2 calls).
+# ---------------------------------------------------------------------------
+FAST_WRITE = """Write a complete episode of "{show}", a podcast where two friends explain an NCERT chapter to Indian students.
+
+Hosts:
+- {host} (speaker "host"): curious, warm, quick; asks what a student would ask, reacts naturally ("Wait, so...", "Oh, that's neat").
+- {expert} (speaker "expert"): the explainer; clear, friendly, uses everyday Indian examples (chai, cricket, monsoon, kitchen), then states the textbook idea precisely.
+
+Length: about {words} words in total (~{minutes} minutes spoken); never more than {words} + 20 words. Tone: {tone}.
+Structure: exactly 3 parts.
+  Part 1 - hook (a surprising question or everyday situation), welcome to "{show}" (say the show name once), one line on what we'll learn, then start the main idea.
+  Part 2 - the core idea(s) of the chapter, explained step by step.
+  Part 3 - finish the explanation, then {host} asks for a quick recap and {expert} gives exactly three crisp takeaways; warm one-line sign-off.
+
+Rules:
+- Every fact must come from the passages below; analogies are fine, but no new facts, numbers, dates or names. Use the chapter's exact terms.
+- Spoken English: contractions, short sentences, varied turns; no turn longer than 60 words; mix in short reactions.
+- Do not read activities or exercises aloud. Plain text only: no markdown, emojis or stage directions.
+- For each part, list the passage ids you used.
+
+Chapter: {title}
+Passages:
+{passages}
+{extra}
+Reply with ONLY JSON:
+{{"title": "<episode title>", "learn_line": "<one sentence: what the listener will learn>",
+  "parts": [{{"title": "<short part title>", "chunk_ids": ["c3"], "turns": [{{"speaker": "host", "text": "..."}}, {{"speaker": "expert", "text": "..."}}]}}]}}"""
+
+FAST_VERIFY = """You are a strict fact-checker for an educational podcast. Check the script against the textbook passages (the only source of truth).
+
+Passages:
+{passages}
+
+Script:
+{script}
+
+For each part: list its factual claims about the subject (ignore greetings, jokes and clearly-marked analogies) and mark each supported or not.
+"Supported" means a passage states it or it follows directly; any added specific (number, name, mechanism) not in the passages is NOT supported.
+If a part has any unsupported claim, also return "fixed_turns": the full corrected list of turns for that part as [{{"speaker": "host"|"expert", "text": "..."}}] (no names or numbers inside "text"), changing as little as possible (remove or correct only the unsupported statements; keep the voice and length). Otherwise set "fixed_turns" to null.
+
+Reply with ONLY JSON:
+{{"parts": [{{"part": 1, "claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixed_turns": null}}]}}"""
+
+FAST_REWRITE = """Rewrite part {index} of {total} ("{title}") of this "{show}" podcast episode.
+The listener asked: "{instruction}"
+
+Hosts: {host} (speaker "host", curious) and {expert} (speaker "expert", explainer). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one. Same rules: every fact from the passages only, no turn over 60 words, plain spoken text.
+
+Cover every topic the current version covers (introduce each before referring to it). {role}
+Do not repeat the previous part's last line: start right after it.
+Previous part ends with: {prev_last}
+Next part starts with: {next_first}
+
+Current version of this part:
+{current}
+
+Passages:
+{passages}
+
+Reply with ONLY JSON: {{"title": "<part title>", "chunk_ids": ["c3"], "turns": [{{"speaker": "host", "text": "..."}}]}}"""
