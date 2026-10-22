@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<title>Chapter Chat · turn your textbook chapter into a podcast</title>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070b1f">
+<title>Chapter Chat · a podcast from space, about your textbook chapter</title>
 <meta name="description" content="Pick an NCERT chapter and two friendly hosts turn it into a fact-checked podcast, with a quiz at the end.">
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="/app.css">
@@ -15,39 +16,58 @@
 <svg class="defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
   <title>Character drawings</title>
   <symbol id="av-host" viewBox="0 0 120 120">
-    <title>Riya, the curious host</title>
-    <circle cx="60" cy="60" r="58" fill="var(--host-bg, #ffe1ea)"/>
-    <path d="M92 52c10 6 14 22 6 34-3-10-8-17-14-20z" fill="#3b2418"/>
-    <circle cx="60" cy="66" r="30" fill="#f1bf98"/>
-    <path d="M29 62c-2-22 13-36 31-36s34 13 31 34c-9-3-17-10-21-18-7 9-24 17-41 20z" fill="#3b2418"/>
-    <circle cx="86" cy="40" r="6" fill="#ff6b8a"/>
-    <ellipse cx="49" cy="68" rx="3.4" ry="4.2" fill="#2b1a12"/>
-    <ellipse cx="71" cy="68" rx="3.4" ry="4.2" fill="#2b1a12"/>
-    <circle cx="50.4" cy="66.4" r="1.2" fill="#fff"/><circle cx="72.4" cy="66.4" r="1.2" fill="#fff"/>
-    <circle cx="42" cy="77" r="4.5" fill="#ff8fa3" opacity=".55"/><circle cx="78" cy="77" r="4.5" fill="#ff8fa3" opacity=".55"/>
-    <path class="mouth" d="M51 80q9 8 18 0" fill="none" stroke="#7a2e2e" stroke-width="3" stroke-linecap="round"/>
-    <path d="M24 66a36 36 0 0 1 72 0" fill="none" stroke="#ff6b8a" stroke-width="6" stroke-linecap="round"/>
-    <rect x="17" y="60" width="13" height="22" rx="6" fill="#ff6b8a"/><rect x="90" y="60" width="13" height="22" rx="6" fill="#ff6b8a"/>
-    <path d="M24 80q-2 16 16 18" fill="none" stroke="#ff6b8a" stroke-width="3"/><circle cx="42" cy="98" r="4" fill="#5a4bd6"/>
+    <title>The curious alien host</title>
+    <circle cx="60" cy="60" r="58" fill="var(--host-bg, #173a2c)"/>
+    <path d="M47 34l-7-12M73 34l7-12" stroke="#5fd38a" stroke-width="4" stroke-linecap="round"/>
+    <circle class="tip" cx="39" cy="20" r="6" fill="#ffd166"/><circle class="tip late" cx="81" cy="20" r="6" fill="#ff6b9d"/>
+    <path d="M60 30c21 0 33 15 33 33 0 21-15 37-33 37S27 84 27 63c0-18 12-33 33-33z" fill="#7be495"/>
+    <circle cx="41" cy="47" r="3" fill="#5fc47c"/><circle cx="80" cy="44" r="2.4" fill="#5fc47c"/><circle cx="74" cy="38" r="1.6" fill="#5fc47c"/>
+    <ellipse cx="46" cy="64" rx="10" ry="13" fill="#15122e" transform="rotate(-18 46 64)"/>
+    <ellipse cx="74" cy="64" rx="10" ry="13" fill="#15122e" transform="rotate(18 74 64)"/>
+    <circle cx="49" cy="58.5" r="3.4" fill="#fff"/><circle cx="77" cy="58.5" r="3.4" fill="#fff"/>
+    <circle cx="44" cy="69" r="1.4" fill="#fff" opacity=".7"/><circle cx="72" cy="69" r="1.4" fill="#fff" opacity=".7"/>
+    <circle cx="35" cy="81" r="4.5" fill="#ff8fb0" opacity=".5"/><circle cx="85" cy="81" r="4.5" fill="#ff8fb0" opacity=".5"/>
+    <path class="mouth" d="M52 86q8 7 16 0" fill="none" stroke="#1d5c34" stroke-width="3" stroke-linecap="round"/>
   </symbol>
   <symbol id="av-expert" viewBox="0 0 120 120">
-    <title>Arjun, the explainer</title>
-    <circle cx="60" cy="60" r="58" fill="var(--expert-bg, #dff4ff)"/>
-    <circle cx="60" cy="66" r="30" fill="#c98e63"/>
-    <path d="M30 60c-3-20 10-34 30-34 19 0 33 12 30 33-6-8-11-12-14-17-9 6-28 11-46 18z" fill="#1d1d2b"/>
-    <circle cx="48" cy="68" r="8" fill="none" stroke="#1d1d2b" stroke-width="2.6"/>
-    <circle cx="72" cy="68" r="8" fill="none" stroke="#1d1d2b" stroke-width="2.6"/>
-    <path d="M56 68h8" stroke="#1d1d2b" stroke-width="2.6"/>
-    <circle cx="48" cy="68" r="3" fill="#1d1d2b"/><circle cx="72" cy="68" r="3" fill="#1d1d2b"/>
-    <circle cx="49.2" cy="66.8" r="1" fill="#fff"/><circle cx="73.2" cy="66.8" r="1" fill="#fff"/>
-    <path class="mouth" d="M51 82q9 7 18 0" fill="none" stroke="#5b2a1a" stroke-width="3" stroke-linecap="round"/>
-    <path d="M24 66a36 36 0 0 1 72 0" fill="none" stroke="#14b8a6" stroke-width="6" stroke-linecap="round"/>
-    <rect x="17" y="60" width="13" height="22" rx="6" fill="#14b8a6"/><rect x="90" y="60" width="13" height="22" rx="6" fill="#14b8a6"/>
+    <title>The astronaut explainer</title>
+    <circle cx="60" cy="60" r="58" fill="var(--expert-bg, #1b2c55)"/>
+    <path d="M20 118c3-18 18-27 40-27s37 9 40 27z" fill="#e8edf7"/>
+    <rect x="66" y="99" width="16" height="9" rx="2" fill="#ff6b6b"/><rect x="38" y="99" width="12" height="9" rx="2" fill="#4cc9f0"/>
+    <path d="M86 29l9-14" stroke="#c9d2e6" stroke-width="3" stroke-linecap="round"/><circle class="tip" cx="95" cy="14" r="4" fill="#4cc9f0"/>
+    <circle cx="60" cy="58" r="38" fill="#f4f6fb" stroke="#c9d2e6" stroke-width="3"/>
+    <ellipse cx="60" cy="60" rx="28" ry="26" fill="#1a2550"/>
+    <circle cx="60" cy="65" r="20" fill="#c98e63"/>
+    <path d="M40 60c0-13 8-21 20-21s20 8 20 20c-5-5-9-8-11-11-7 5-17 9-29 12z" fill="#1d1d2b"/>
+    <circle cx="52" cy="66" r="6" fill="none" stroke="#1d1d2b" stroke-width="2.4"/><circle cx="68" cy="66" r="6" fill="none" stroke="#1d1d2b" stroke-width="2.4"/>
+    <path d="M58 66h4" stroke="#1d1d2b" stroke-width="2.4"/>
+    <circle cx="52" cy="66" r="2.3" fill="#1d1d2b"/><circle cx="68" cy="66" r="2.3" fill="#1d1d2b"/>
+    <path class="mouth" d="M53 77q7 5 14 0" fill="none" stroke="#5b2a1a" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M38 50a27 25 0 0 1 15-15" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+  </symbol>
+  <symbol id="ship-ufo" viewBox="0 0 200 150">
+    <title>Flying saucer</title>
+    <path class="beam" d="M72 116h56l26 34H46z" fill="#7be495" opacity=".16"/>
+    <ellipse cx="100" cy="100" rx="94" ry="25" fill="#5a4bc8"/>
+    <ellipse cx="100" cy="92" rx="80" ry="15" fill="#8b7bff"/>
+    <ellipse cx="100" cy="111" rx="58" ry="9" fill="#3f3496"/>
+    <circle class="blink" cx="28" cy="102" r="5" fill="#ffd166"/><circle class="blink b2" cx="62" cy="110" r="5" fill="#ff6b9d"/>
+    <circle class="blink" cx="100" cy="113" r="5" fill="#4cc9f0"/><circle class="blink b2" cx="138" cy="110" r="5" fill="#ffd166"/>
+    <circle class="blink" cx="172" cy="102" r="5" fill="#ff6b9d"/>
+  </symbol>
+  <symbol id="ship-rocket" viewBox="0 0 200 150">
+    <title>Rocket ship</title>
+    <path class="flame" d="M160 56l38 19-38 19z" fill="#ffd166"/><path class="flame" d="M160 64l24 11-24 11z" fill="#ff6b6b"/>
+    <path d="M150 42l40-28-10 40zM150 108l40 28-10-40z" fill="#ff6b6b"/>
+    <path d="M8 75C36 30 118 28 164 42v66C118 122 36 120 8 75z" fill="#e8edf7"/>
+    <path d="M8 75C14 66 22 58 30 53v44C22 92 14 84 8 75z" fill="#ff6b6b"/>
+    <rect x="132" y="38" width="10" height="74" rx="3" fill="#4cc9f0" opacity=".85"/>
+    <circle cx="90" cy="75" r="40" fill="#1a2550"/>
   </symbol>
 </svg>
 
 <a class="skip" href="#app">Skip to content</a>
-<div class="sky" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+<div class="sky" aria-hidden="true"><span class="stars s1"></span><span class="stars s2"></span><span class="stars s3"></span><span class="planet"></span><span class="moon"></span><span class="shooting"></span></div>
 
 <div class="wrap">
   <header class="top">
@@ -61,7 +81,7 @@
         <circle cx="28.5" cy="24" r="2" fill="#7b5cff"/><circle cx="35.5" cy="24" r="2" fill="#7b5cff"/>
         <path d="M28 30q4 4 8 0" fill="none" stroke="#7b5cff" stroke-width="2" stroke-linecap="round"/>
       </svg>
-      <span><b>Chapter Chat</b><small>Your textbook, as a podcast</small></span>
+      <span><b>Chapter Chat</b><small>📡 Broadcasting from Space Station CC-1</small></span>
     </a>
     <nav class="topnav" aria-label="Main">
       <button class="btn ghost sm" id="howBtn" type="button">❓ How it works</button>
@@ -102,9 +122,9 @@
 <dialog id="how" aria-labelledby="howTitle">
   <h2 id="howTitle">How Chapter Chat works</h2>
   <div class="how-grid">
-    <div><span class="big-emoji">📖</span><b>1. Read &amp; plan</b><p>An AI agent explores the chapter with tools (search, read, define) and plans the episode. Every key fact must point to a passage in the book, and is checked twice.</p></div>
-    <div><span class="big-emoji">✍️</span><b>2. Write &amp; polish</b><p>It writes each part as a chat between Riya and Arjun. A strict critic scores the draft on 5 things; the writer learns from the feedback and tries again. Harder parts get more tries.</p></div>
-    <div><span class="big-emoji">🔎</span><b>3. Fact-check &amp; record</b><p>Every claim in the script is checked against the book. Each line is spoken, then listened to by speech recognition; mumbled lines are re-recorded.</p></div>
+    <div><span class="big-emoji">📖</span><b>1. Read</b><p>The agent picks the passages of your chapter to cover, spread across its beginning, middle and end.</p></div>
+    <div><span class="big-emoji">✍️</span><b>2. Write</b><p>One AI call writes the whole ~2-minute episode in 3 parts: Arjun the astronaut explains, Riya the alien asks what any student would ask. Each part cites its passages.</p></div>
+    <div><span class="big-emoji">🔎</span><b>3. Fact-check &amp; record</b><p>A second AI call checks every claim against the book and fixes any that aren't there. Each line is then spoken and listened back to by speech recognition; mumbled lines are re-recorded.</p></div>
     <div><span class="big-emoji">🎧</span><b>4. Listen &amp; play</b><p>Tap any line to jump there. Want a part simpler or more fun? One tap rewrites just that part. Then try the quiz!</p></div>
   </div>
   <p class="small muted">Grown-ups and teachers: press <b>🎓 Teacher view</b> to see the agent's full reasoning trace, quality scores, compute budget, claim check, sources and every version.</p>
@@ -115,12 +135,16 @@
 <template id="tpl-home">
   <section class="hero">
     <div class="hero-text">
-      <h1>Turn any chapter into a <span class="hl">podcast</span> 🎙️</h1>
-      <p>Riya and Arjun read your textbook chapter, chat about it like friends, and check every fact against the book. Then you get a quiz!</p>
+      <h1>Your chapter, broadcast <span class="hl">from space</span> 🚀</h1>
+      <p>Arjun the astronaut beams your textbook chapter across the galaxy to Riya, a curious alien who has never been to an Earth school. Every fact is checked against your book, and there's a quiz when they land!</p>
     </div>
     <div class="hero-crew" aria-hidden="true">
-      <svg class="avatar bob" viewBox="0 0 120 120" role="img" aria-label="Riya"><title>Riya</title><use href="#av-host"/></svg>
-      <svg class="avatar bob late" viewBox="0 0 120 120" role="img" aria-label="Arjun"><title>Arjun</title><use href="#av-expert"/></svg>
+      <svg class="ship bob" viewBox="0 0 200 150" role="img" aria-label="Riya the alien in a flying saucer"><title>Riya's saucer</title>
+        <ellipse cx="100" cy="66" rx="48" ry="46" fill="#bfe9ff" fill-opacity=".12" stroke="#bfe9ff" stroke-opacity=".55" stroke-width="3"/>
+        <use href="#av-host" x="58" y="22" width="84" height="84"/><use href="#ship-ufo" width="200" height="150"/></svg>
+      <svg class="ship bob late" viewBox="0 0 200 150" role="img" aria-label="Arjun the astronaut in a rocket"><title>Arjun's rocket</title>
+        <use href="#ship-rocket" width="200" height="150"/><use href="#av-expert" x="56" y="41" width="68" height="68"/>
+        <circle cx="90" cy="75" r="40" fill="none" stroke="#9aa7c7" stroke-width="7"/></svg>
     </div>
   </section>
 
@@ -245,14 +269,19 @@
         <button class="btn sm" id="share" type="button">🔗 Copy link</button>
       </div>
     </div>
-    <div class="stage">
-      <figure class="stage-member" id="stageHost">
-        <svg class="avatar" viewBox="0 0 120 120" role="img" aria-label="Host"><title>Host</title><use href="#av-host"/></svg>
+    <div class="stage" id="stage">
+      <div class="transmission" id="transmission" aria-hidden="true">📡 Incoming transmission · Space Station CC-1</div>
+      <figure class="stage-member host" id="stageHost">
+        <svg class="ship" viewBox="0 0 200 150" role="img" aria-label="The alien host's flying saucer"><title>Alien host's saucer</title>
+          <ellipse cx="100" cy="66" rx="48" ry="46" fill="#bfe9ff" fill-opacity=".12" stroke="#bfe9ff" stroke-opacity=".55" stroke-width="3"/>
+          <use href="#av-host" x="58" y="22" width="84" height="84"/><use href="#ship-ufo" width="200" height="150"/></svg>
         <figcaption id="nameHost">Riya</figcaption>
       </figure>
-      <div class="caption" id="nowLine" aria-live="off">Press play and follow along! 👇</div>
-      <figure class="stage-member" id="stageExpert">
-        <svg class="avatar" viewBox="0 0 120 120" role="img" aria-label="Explainer"><title>Explainer</title><use href="#av-expert"/></svg>
+      <div class="caption" id="nowLine" aria-live="off">Press play to open the channel! 📻</div>
+      <figure class="stage-member expert" id="stageExpert">
+        <svg class="ship" viewBox="0 0 200 150" role="img" aria-label="The astronaut explainer's rocket"><title>Astronaut's rocket</title>
+          <use href="#ship-rocket" width="200" height="150"/><use href="#av-expert" x="56" y="41" width="68" height="68"/>
+          <circle cx="90" cy="75" r="40" fill="none" stroke="#9aa7c7" stroke-width="7"/></svg>
         <figcaption id="nameExpert">Arjun</figcaption>
       </figure>
     </div>
@@ -265,7 +294,7 @@
   </section>
 
   <section class="card" id="scriptCard" aria-labelledby="scriptTitle">
-    <h2 id="scriptTitle">💬 The conversation</h2>
+    <h2 id="scriptTitle">📡 Transmission log</h2>
     <p class="muted small" id="scriptHint">Parts appear here as they are written. Tap any line to hear it.</p>
     <div id="segments"></div>
   </section>

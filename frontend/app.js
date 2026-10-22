@@ -28,6 +28,7 @@ const STATIONS = ["plan", "write", "voice", "assemble"];
 let CONFIG = {lengths: {}, presets: DEFAULT_PRESETS};
 let SOURCE = null, epState = null, pollTimer = null, traceLen = 0, traceEvents = [];
 let sourcesCache = null, currentAudioFile = null, lineIndex = [], quiz = null, quizLoadedFor = null, viewId = 0;
+let seenLines = new Set(), launched = false;  // bubbles already popped in; ships already flown in
 
 // ------------------------------------------------------------------ helpers
 async function api(path, opts = {}) {
@@ -239,11 +240,12 @@ const currentVersion = s => s.versions.find(v => v.version === s.active_version)
 async function renderEpisode(id) {
   stopPoll(); viewId += 1;
   epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
+  seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null;
   const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   journey("make");
   const a = $("#audio");
   a.addEventListener("timeupdate", onTime);
-  a.addEventListener("play", () => { $("#playBtn").textContent = "⏸"; $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
+  a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#playBtn").textContent = "⏸"; $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#playBtn").textContent = "▶"; $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
   a.addEventListener("ended", () => { if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Ready for the quiz?"); $("#quizCard").scrollIntoView({behavior: reducedMotion() ? "auto" : "smooth"}); } });
   $("#playBtn").onclick = () => { if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
@@ -355,6 +357,7 @@ function setAudio(ep) {
     if (wasPlaying) a.play().catch(() => {});
   }, {once: true});
   $("#player").classList.remove("hidden");
+  if (!launched) { launched = true; launch(); }
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
   $("#plTitle").textContent = `🎧 ${ep.title}${ep.duration ? ` · ${fmtT(ep.duration)}` : ""}`;
@@ -386,6 +389,7 @@ function renderSegments(ep) {
     return;
   }
   $("#scriptHint").textContent = ep.status === "done" ? "Tap any line to hear it. Want a part different? Use the buttons under it." : "Parts appear here as they are written. Tap any line to hear it.";
+  let freshN = 0;  // new lines pop in one after another, like comic panels
   box.innerHTML = ep.segments.map((s, si) => {
     const v = currentVersion(s);
     const busy = ["writing", "synthesizing", "checking"].includes(s.status) && (ep.busy || ep.status === "running");
@@ -395,9 +399,11 @@ function renderSegments(ep) {
     const score = v && v.scores ? `<span class="pill teacher-only ${v.scores.overall >= 4 ? "ok" : v.scores.overall >= 3.3 ? "" : "warn"}" title="Critic score (1-5)">★ ${v.scores.overall.toFixed(1)}</span>` : "";
     const facts = v && v.claims.length ? `<span class="pill teacher-only ${bad.length ? "warn" : "ok"}">✓ ${v.claims.length - bad.length}/${v.claims.length} claims</span>` : "";
     const diff = `<span class="pill teacher-only" title="Difficulty predicted by the planner">difficulty ${s.difficulty}/5</span>`;
-    const lines = v ? v.turns.map(t => {
+    const lines = v ? v.turns.map((t, ti) => {
       lineIndex.push({start: t.start, end: t.end, speaker: t.speaker, text: t.text, seg: s.id});
-      return `<div class="line ${t.speaker}" role="button" tabindex="0" data-start="${t.start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
+      const key = `${s.id}:${v.version}:${ti}`, fresh = !seenLines.has(key);
+      if (fresh) seenLines.add(key);
+      return `<div class="line ${t.speaker}${fresh ? " fresh" : ""}" style="--i:${Math.min(fresh ? freshN++ : 0, 14)}" role="button" tabindex="0" data-start="${t.start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
         <svg class="mini" viewBox="0 0 120 120" aria-hidden="true"><use href="#av-${t.speaker}"/></svg>
         <div class="bubble"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${esc(t.text)}</div></div>`;
     }).join("") : s.error ? `<div class="notice err">😕 ${esc(s.error)}</div>` : `<p class="muted small">${s.status === "pending" ? "⏳ Waiting for its turn…" : "✍️ Being written…"}</p>`;
@@ -477,6 +483,13 @@ async function fillSources(segId) {
   catch (e) { box.textContent = e.message; }
 }
 
+// "Incoming transmission": the two ships fly in and the banner flashes
+function launch() {
+  const st = $("#stage"); if (!st || reducedMotion()) return;
+  st.classList.remove("launch"); void st.offsetWidth; st.classList.add("launch");
+  clearTimeout(launch.t); launch.t = setTimeout(() => st.classList.remove("launch"), 3200);
+}
+
 // karaoke: highlight the line being spoken and make that host "talk"
 function setSpeaking(speaker) {
   $("#stageHost").classList.toggle("speaking", speaker === "host");
@@ -490,11 +503,20 @@ function onTime() {
   let curEl = null;
   els.forEach(el => { const on = !!cur && el.dataset.start !== "" && +el.dataset.start === cur.start; el.classList.toggle("now", on); if (on) curEl = el; });
   setSpeaking(cur && !a.paused ? cur.speaker : null);
-  if (cur && epState) { const n = names(epState); $("#nowLine").innerHTML = `<span><b>${esc(n[cur.speaker])}:</b> ${esc(cur.text)}</span>`; }
-  if (curEl && curEl !== onTime.last && !a.paused) {
+  const key = cur ? `${cur.seg}:${cur.start}` : null;
+  if (cur && epState && key !== onTime.lastKey) {  // a new line: pop a fresh comic bubble pointing at the speaker
+    onTime.lastKey = key;
+    const n = names(epState), cap = $("#nowLine");
+    cap.innerHTML = `<span><b>${esc(n[cur.speaker])}:</b> ${esc(cur.text)}</span>`;
+    cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth;
+    cap.classList.add(`from-${cur.speaker}`, "pop-in");
+  }
+  if (curEl && curEl !== onTime.last && !a.paused) {  // keep the spoken line in view inside the scrollable log, not the page
     onTime.last = curEl;
-    const r = curEl.getBoundingClientRect();
-    if (r.top < 80 || r.bottom > innerHeight) curEl.scrollIntoView({block: "center", behavior: reducedMotion() ? "auto" : "smooth"});
+    const box = $("#segments"), r = curEl.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top + 10 || r.bottom > b.bottom - 10) {
+      box.scrollTo({top: box.scrollTop + (r.top - b.top) - (b.height - r.height) / 2, behavior: reducedMotion() ? "auto" : "smooth"});
+    }
   }
 }
 
