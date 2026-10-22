@@ -199,8 +199,8 @@ async def create_episode(body: CreateEpisode, request: Request):
         raise HTTPException(404, "Chapter not found. Please upload it again.")
     rate_limit(request, "episode", 12)
     st = body.settings
-    st.host_name = (st.host_name or "Riya").strip()[:20] or "Riya"
-    st.expert_name = (st.expert_name or "Arjun").strip()[:20] or "Arjun"
+    st.host_name = (st.host_name or "Error606").strip()[:20] or "Error606"
+    st.expert_name = (st.expert_name or "Gree").strip()[:20] or "Gree"
     valid = {x.id for x in src.sections}
     st.section_ids = [x for x in st.section_ids if x in valid]
     _, titles = select_chunks(src, st.section_ids, get_settings().max_input_words)

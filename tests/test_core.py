@@ -182,3 +182,9 @@ def test_extract_json_lines_of_objects():
     text = '{"speaker": "host", "text": "Hi"}\n{"speaker": "expert", "text": "Hello"}'
     assert extract_json(text) == [{"speaker": "host", "text": "Hi"}, {"speaker": "expert", "text": "Hello"}]
     assert extract_json('{"a": 1}') == {"a": 1}
+
+
+def test_tts_reads_names_with_digits_digit_by_digit_and_keeps_commas():
+    from backend.textnorm import normalize_for_tts
+    assert normalize_for_tts("Hi Error606, I'm Gree.") == "Hi Error six oh six, I'm Gree."
+    assert normalize_for_tts("It has 1,200 cells, see?") == "It has one thousand two hundred cells, see?"

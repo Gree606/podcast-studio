@@ -100,6 +100,9 @@ _SYMBOLS = [
 ]
 
 
+_DIGITS = ["oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+
+
 def normalize_for_tts(text: str) -> str:
     t = text
     t = re.sub(r"[*_#`]+", "", t)  # stray markdown
@@ -122,6 +125,9 @@ def normalize_for_tts(text: str) -> str:
     for pat, rep in _SYMBOLS:
         t = re.sub(pat, rep, t)
     t = re.sub(r"(\d)\s*-\s*(\d)", r"\1 to \2", t)  # ranges "5-10"
-    t = re.sub(r"\d[\d,]*(?:\.\d+)?", lambda m: number_to_words(m.group(0)), t)
+    # digits glued to a word are a name/code, read digit by digit: "Error606" -> "Error six oh six"
+    t = re.sub(r"(?<=[A-Za-z])\d{1,4}\b", lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)
+    # (the number must end in a digit, so "606," keeps its comma)
+    t = re.sub(r"\d(?:[\d,]*\d)?(?:\.\d+)?", lambda m: number_to_words(m.group(0)), t)
     t = re.sub(r"\s+", " ", t).strip()
     return t

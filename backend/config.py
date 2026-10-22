@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     tts_base_url: str = "https://api.sarvam.ai"
     tts_api_key: str = ""
     tts_model: str = "bulbul:v4-flash"
-    tts_voice_host: str = "simran_en_conversation"  # curious host (Riya)
-    tts_voice_expert: str = "dev_en_conversational"  # explainer (Arjun)
+    tts_voice_host: str = "dev_en_conversational"  # curious host (Error606, the alien)
+    tts_voice_expert: str = "simran_en_conversation"  # explainer (Gree, the astronaut)
     tts_language: str = "en-IN"
     tts_pace: float = 1.05
     tts_timeout_s: float = 90.0

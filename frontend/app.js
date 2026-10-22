@@ -234,7 +234,7 @@ async function createEpisode() {
 
 // ------------------------------------------------------------------ episode
 function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
-const names = ep => ({host: ep.settings.host_name || "Riya", expert: ep.settings.expert_name || "Arjun"});
+const names = ep => ({host: ep.settings.host_name || "Error606", expert: ep.settings.expert_name || "Gree"});
 const currentVersion = s => s.versions.find(v => v.version === s.active_version);
 
 async function renderEpisode(id) {

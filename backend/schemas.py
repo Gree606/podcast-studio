@@ -54,8 +54,8 @@ class EpisodeSettings(BaseModel):
     # Which compute allocation policy to use; "adaptive" is the default and the
     # others exist for the ablation in eval/.
     policy: Literal["adaptive", "uniform", "single", "no_critic"] = "adaptive"
-    host_name: str = "Riya"
-    expert_name: str = "Arjun"
+    host_name: str = "Error606"  # the curious alien
+    expert_name: str = "Gree"  # the astronaut who explains
     section_ids: list[str] = Field(default_factory=list)  # empty = whole chapter
 
 
