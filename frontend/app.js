@@ -19,11 +19,12 @@ const FIXES = [
   {label: "✂️ Shorter", instruction: "Make it shorter and punchier."},
 ];
 const STAGE_TEXT = {
-  queued: "⏳ Waiting for a free studio…", start: "🎬 Warming up the studio…", plan: "📖 Reading the chapter and planning the show…",
-  write: "✍️ Writing the script, then polishing it…", voice: "🔎 Checking every fact and recording the voices…",
-  assemble: "🎧 Mixing the final episode…", done: "🎉 Your podcast is ready!",
+  queued: "⏳ Waiting for a free studio", start: "🛰️ Opening the channel", plan: "📖 Reading your chapter",
+  write: "✍️ Writing the script", verify: "🔎 Checking every fact against the book", voice: "🎙️ Recording the voices",
+  assemble: "🎧 Mixing the episode", done: "🎉 Ready!",
 };
 const STATIONS = ["plan", "write", "voice", "assemble"];
+const STATION_OF = {queued: "plan", start: "plan", plan: "plan", write: "write", verify: "voice", voice: "voice", assemble: "assemble"};
 
 let CONFIG = {lengths: {}, presets: DEFAULT_PRESETS};
 let SOURCE = null, epState = null, pollTimer = null, traceLen = 0, traceEvents = [];
@@ -67,6 +68,24 @@ function tabs(root) {
     });
   });
 }
+// menu drawer (global) and the episode's slide-up sheet (script, quiz, agent, save)
+function openDrawer(open) {
+  const d = $("#drawer"); d.classList.toggle("open", open); d.setAttribute("aria-hidden", String(!open));
+  $("#menuBtn").setAttribute("aria-expanded", String(open));
+}
+const SHEET_TITLES = {script: "Script", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
+function openSheet(name) {
+  const sh = $("#sheet"); if (!sh) return;
+  if (!name) { sh.classList.remove("open"); sh.setAttribute("aria-hidden", "true"); $$(".dock-btn").forEach(b => b.classList.remove("on")); return; }
+  if (name === "agent" && !document.body.classList.contains("teacher")) setTeacher(true);
+  $$("[data-pane-sheet]", sh).forEach(p => p.classList.toggle("on", p.dataset.paneSheet === name));
+  $$(".dock-btn").forEach(b => b.classList.toggle("on", b.dataset.sheet === name));
+  $("#sheetTitle").textContent = SHEET_TITLES[name] || "";
+  sh.classList.add("open"); sh.setAttribute("aria-hidden", "false");
+  if (name === "quiz") $("#quizBtn").classList.remove("nudge");
+  if (name === "script") { const now = $("#segments .line.now"); if (now) now.scrollIntoView({block: "center"}); }
+}
+
 function journey(step) {
   const order = ["pick", "choose", "make", "listen"], idx = order.indexOf(step);
   $$("#journey li").forEach((li, i) => {
@@ -140,7 +159,8 @@ async function renderHome() {
   const mine = myEpisodes();
   if (mine.length) {
     $("#recentCard").classList.remove("hidden");
-    $("#recent").innerHTML = mine.map(x => `<a href="#/episode/${esc(x.id)}">🎧 ${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>`).join("");
+    $("#recent").innerHTML = mine.map(x => `<a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>`).join("");
+    $$("#recent a").forEach(a => { a.onclick = () => openDrawer(false); });
   }
 }
 
@@ -193,7 +213,7 @@ async function loadSource(input) {
 
 function presetGroup(box, name, items, checked) {
   box.innerHTML = items.map(p => `<input type="radio" name="${name}" id="${name}-${esc(p.value)}" value="${esc(p.value)}" ${p.value === checked ? "checked" : ""}>
-    <label for="${name}-${esc(p.value)}" title="${esc(p.hint)}"><span class="e" aria-hidden="true">${esc(p.emoji)}</span><b>${esc(p.label)}</b><span class="small muted" data-hint="${esc(p.value)}">${esc(p.hint)}</span></label>`).join("");
+    <label for="${name}-${esc(p.value)}" title="${esc(p.hint)}"><span class="e" aria-hidden="true">${esc(p.emoji)}</span><b>${esc(p.label)}</b><span class="small" data-hint="${esc(p.value)}">${esc(p.hint)}</span></label>`).join("");
 }
 
 function showConfigure() {
@@ -213,7 +233,7 @@ function showConfigure() {
   const upd = () => {
     const k = $("input[name=length]:checked").value, sel = $$("#sections input:checked").length, est = L[k];
     $("#estimate").innerHTML = sel === 0 ? `<span class="pill warn">👆 Pick at least one part of the chapter</span>`
-      : est ? `🎧 About <b>${Math.max(1, Math.round(est.audio_minutes))} minutes</b> of listening. Making it takes roughly ${Math.ceil(est.wait_minutes)}–${Math.ceil(est.wait_minutes * 1.8)} minutes, and you can watch the hosts work meanwhile.` : "";
+      : est ? `≈ ${Math.max(1, Math.round(est.audio_minutes))} min episode · starts playing in about a minute` : "";
     $("#generate").disabled = sel === 0;
   };
   $$("#configure input").forEach(i => i.addEventListener("change", upd)); upd();
@@ -224,14 +244,14 @@ function showConfigure() {
 }
 
 async function createEpisode() {
-  const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner" role="img" aria-label="Starting"></span> Starting the studio…`;
+  const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner" role="img" aria-label="Starting"></span> Launching…`;
   const all = $$("#sections input"), sel = all.filter(i => i.checked).map(i => i.value);
   const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value,
     host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
   try {
     const r = await postJSON("/api/episodes", {source_id: SOURCE.id, settings});
     rememberEpisode(r.id, SOURCE.title); location.hash = `#/episode/${r.id}`;
-  } catch (e) { btn.disabled = false; btn.textContent = "🎙️ Make my podcast!"; showErr($("#estimate"), e.message); }
+  } catch (e) { btn.disabled = false; btn.textContent = "🚀 Launch"; showErr($("#estimate"), e.message); }
 }
 
 // ------------------------------------------------------------------ episode
@@ -246,10 +266,16 @@ async function renderEpisode(id) {
   const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   journey("make");
   const a = $("#audio");
+  $("#playBtn").classList.add("waiting");
+  $$(".dock-btn").forEach(b => { b.onclick = () => openSheet(b.dataset.sheet); });
+  $$("[data-close-sheet]").forEach(b => { b.onclick = () => openSheet(null); });
+  const seek = $("#seek");
+  seek.oninput = () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; };
   a.addEventListener("timeupdate", onTime);
-  a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#playBtn").textContent = "⏸"; $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
-  a.addEventListener("pause", () => { $("#playBtn").textContent = "▶"; $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
-  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Ready for the quiz?"); $("#quizCard").scrollIntoView({behavior: reducedMotion() ? "auto" : "smooth"}); } });
+  a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); $("#playBtn").classList.remove("waiting"); });
+  a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
+  a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
+  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz."); $("#quizBtn").classList.add("nudge"); } });
   $("#playBtn").onclick = () => { if (live.on && !a.src) { playLivePart(0); return; } if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
   $("#speedBtn").onclick = () => {
     const speeds = [1, 1.25, 1.5, 0.75], next = speeds[(speeds.indexOf(a.playbackRate) + 1) % speeds.length] || 1;
@@ -326,7 +352,7 @@ function renderMake(ep) {
   const badge = {queued: ["", "⏳ In line"], running: ["", "🛠️ Working"], done: ["ok", "✅ Ready"], failed: ["bad", "😕 Stopped"], interrupted: ["warn", "⏸️ Paused"]}[ep.status] || ["", ep.status];
   $("#epStatus").innerHTML = `<span class="pill ${badge[0]}">${ep.busy && ep.status === "done" ? `<span class="spinner" role="img" aria-label="Updating"></span> Updating` : badge[1]}</span>`;
 
-  const idx = ep.status === "done" ? STATIONS.length : Math.max(0, STATIONS.indexOf(ep.stage));
+  const idx = ep.status === "done" ? STATIONS.length : Math.max(0, STATIONS.indexOf(STATION_OF[ep.stage] || ep.stage));
   $$("#track .station").forEach((s, i) => { s.classList.toggle("done", i < idx); s.classList.toggle("active", i === idx && working); });
   const pct = Math.round((ep.status === "done" ? 1 : ep.progress) * 100);
   $("#bar").style.width = `${Math.max(2, pct)}%`; $("#rocket").style.left = `${Math.min(97, Math.max(2, pct))}%`;
@@ -334,6 +360,18 @@ function renderMake(ep) {
 
   const latest = [...traceEvents].reverse().map(friendly).find(Boolean);
   $("#thought").textContent = working && latest ? latest : "";
+  $("#stage").classList.toggle("busy", working);
+  if (!currentAudioFile && !live.on) {  // nothing to play yet: the speech bubble narrates the work
+    const say = ep.status === "failed" ? "😕 Lost the signal. Press Try again below."
+      : ep.status === "interrupted" ? "⏸️ The station restarted. Press Try again below."
+      : (STAGE_TEXT[ep.stage] || "🛠️ Working…");
+    const cap = $("#nowLine");
+    if (cap.dataset.say !== say) {
+      cap.dataset.say = say; cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth; cap.classList.add("pop-in");
+      cap.innerHTML = `<span>${esc(say)}${working ? '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' : ""}</span>`;
+    }
+    $("#plTitle").textContent = ep.title;
+  }
 
   let msg;
   if (ep.queue_position) msg = `⏳ You're number ${ep.queue_position} in line. Other people are making podcasts right now; yours starts automatically.`;
@@ -346,7 +384,9 @@ function renderMake(ep) {
 
   const est = CONFIG.lengths && CONFIG.lengths[ep.settings.length];
   const elapsed = Math.max(0, Date.now() / 1000 - ep.created_at);
-  $("#epWait").textContent = working && est ? `Usually ready in about ${Math.ceil(est.wait_minutes)}–${Math.ceil(est.wait_minutes * 1.8)} minutes · ⏱️ ${fmtT(elapsed)} so far` : "";
+  $("#epWait").textContent = working ? `${fmtT(elapsed)} elapsed${est ? ` · usually about ${Math.ceil(est.wait_minutes)} min` : ""}` : "";
+  // the speech bubble already says what the crew is doing; repeat it here only when something needs attention
+  $("#makeCard").classList.toggle("quiet", working && !ep.queue_position);
   $("#resumeBtn").classList.toggle("hidden", !(["failed", "interrupted"].includes(ep.status) && !ep.busy));
   $("#makeCard").classList.toggle("hidden", ep.status === "done");
   journey(ep.status === "done" ? "listen" : "make");
@@ -372,9 +412,13 @@ function setAudio(ep) {
   }, {once: true});
   $("#player").classList.remove("hidden");
   if (!launched) { launched = true; launch(); }
+  if (!wasPlaying) {
+    $("#playBtn").classList.add("ready"); const cap = $("#nowLine"); cap.dataset.say = "";
+    cap.classList.remove("from-host", "from-expert"); cap.innerHTML = "<span>🎧 Ready. Press play!</span>";
+  }
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
-  $("#plTitle").textContent = `🎧 ${ep.title}${ep.duration ? ` · ${fmtT(ep.duration)}` : ""}`;
+  $("#plTitle").textContent = ep.title;
   $("#dlMp3").href = `/api/episodes/${ep.id}/audio?download=true`;
   $("#dlTxt").href = `/api/episodes/${ep.id}/transcript`;
 }
@@ -510,13 +554,14 @@ function startLive(ep) {
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
   $("#nowLine").classList.remove("from-host", "from-expert");
-  $("#nowLine").innerHTML = "<span>📡 Part 1 has landed! Press play: the next parts are recorded while you listen.</span>";
+  $("#nowLine").innerHTML = "<span>📡 Part 1 has landed. Press play!</span>"; $("#nowLine").dataset.say = "";
+  $("#playBtn").classList.remove("waiting"); $("#playBtn").classList.add("ready");
   liveTitle(ep);
   toast("🎧 Part 1 is ready. Start listening now!");
 }
 function liveTitle(ep) {
   const total = ep.segments.length, ready = ep.segments.filter((_, k) => partReady(ep, k)).length;
-  $("#plTitle").textContent = `🎧 ${ep.title} · part ${live.k + 1} of ${total} · 📡 ${ready}/${total} recorded`;
+  $("#plTitle").textContent = `Part ${live.k + 1} of ${total} · ${ready < total ? `${ready}/${total} recorded` : "all recorded"}`;
 }
 function playLivePart(k, at = 0) {
   const ep = epState, s = ep.segments[k], v = s && currentVersion(s), a = $("#audio");
@@ -553,6 +598,11 @@ function setSpeaking(speaker) {
 function onTime() {
   const a = $("#audio"); if (!a) return;
   const t = a.currentTime;
+  if (a.duration) {
+    const p = t / a.duration;
+    $("#seek").value = String(Math.round(p * 1000)); $("#seek").style.setProperty("--p", `${(p * 100).toFixed(1)}%`);
+    $("#tCur").textContent = fmtT(t);
+  }
   const cur = live.on
     ? lineIndex.find(l => l.si === live.k && l.ss != null && t >= l.ss && t < (l.se ?? l.ss) + 0.25)
     : lineIndex.find(l => l.start != null && t >= l.start && t < (l.end ?? l.start) + 0.25);
@@ -588,9 +638,9 @@ async function loadQuiz(ep) {
   try {
     const qs = await api(`/api/episodes/${ep.id}/quiz`);
     if (view !== viewId) return;
-    if (!qs.length) { $("#quizCard").classList.add("hidden"); return; }
+    if (!qs.length) { $("#quizCard").classList.add("hidden"); $("#quizBtn").classList.add("hidden"); return; }
     quiz = {questions: qs, i: 0, results: [], answered: false};
-    $("#quizCard").classList.remove("hidden");
+    $("#quizCard").classList.remove("hidden"); $("#quizBtn").classList.remove("hidden");
     renderQuiz();
   } catch { quizLoadedFor = null; }
 }
@@ -729,11 +779,15 @@ function renderVersions(ep) {
 // ------------------------------------------------------------------ router + boot
 function route() {
   const m = location.hash.match(/^#\/episode\/([\w-]+)/);
+  openDrawer(false);
   if (m) renderEpisode(m[1]); else renderHome();
   window.scrollTo(0, 0);
 }
 (async () => {
-  $("#howBtn").onclick = () => $("#how").showModal();
+  $("#howBtn").onclick = () => { openDrawer(false); $("#how").showModal(); };
+  $("#menuBtn").onclick = () => openDrawer(!$("#drawer").classList.contains("open"));
+  $$("[data-close-drawer]").forEach(b => { b.onclick = () => openDrawer(false); });
+  addEventListener("keydown", e => { if (e.key === "Escape") { openDrawer(false); openSheet(null); } });
   $("#teacherToggle").onclick = () => setTeacher(!document.body.classList.contains("teacher"));
   let teacher = false; try { teacher = localStorage.getItem("teacherView") === "1"; } catch { /* ignore */ }
   setTeacher(teacher);
