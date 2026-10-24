@@ -83,3 +83,47 @@ def test_verify_matches_a_renumbered_lone_part(monkeypatch):
     monkeypatch.setattr(fast, "chat_json", renumbered)
     claims = asyncio.run(fast.verify_segments(ctx, segs, only=[segs[2]]))
     assert [c.claim for c in claims[segs[2].id]] == ["x"]
+
+
+def test_lines_recorded_during_the_fact_check_are_reused_not_recorded_twice(tmp_path):
+    from backend.agent.voice import prefetch, synthesize_version
+    from backend.schemas import Turn
+
+    ctx, m = _ctx(), Metrics()
+
+    async def run():
+        segs = await fast.write_episode(ctx)
+        seg = segs[0]
+        prefetch(ctx, seg, seg.candidates[-1].turns)
+        changed = [t.model_copy() for t in seg.candidates[-1].turns]
+        changed[0] = Turn(speaker=changed[0].speaker, text="A brand new opening line about reactions, rewritten by the fact-check.")
+        v = fast.new_version(seg, [])
+        v.turns = changed
+        await synthesize_version(ctx, seg, v, tmp_path / "x.wav")
+        return len(changed)
+
+    token = current_metrics.set(m)
+    try:
+        n = asyncio.run(run())
+    finally:
+        current_metrics.reset(token)
+    # every original line recorded once (early), plus only the one line the check changed
+    assert m.tts_calls == n + 1
+    assert not ctx.tts_cache or all(t.done() for t in ctx.tts_cache.values())
+
+
+def test_a_timed_out_model_falls_back_to_the_next_one(monkeypatch):
+    from backend.clients import llm
+    from backend.clients.base import ServiceError
+
+    tried = []
+
+    async def call(messages, *, model, attempts=None, **kw):
+        tried.append(model)
+        if model == "slow":
+            raise ServiceError("Language model", "timed out", "read timeout", status=504)
+        return "ok", {"prompt_tokens": 1, "completion_tokens": 1}
+
+    text, _, used = asyncio.run(llm._call_with_fallback(call, [], models=["slow", "fast"], temperature=0, max_tokens=10,
+                                                         json_mode=False, base_url="", api_key=""))
+    assert (text, used, tried) == ("ok", "fast", ["slow", "fast"])

@@ -21,6 +21,7 @@ import logging
 
 from ..clients.base import ServiceError
 from ..clients.llm import chat_json
+from ..config import get_settings
 from ..prompts import FAST_REWRITE, FAST_VERIFY, FAST_WRITE
 from ..schemas import Candidate, Claim, KeyFact, Segment, SegmentVersion, Turn, new_id
 from .context import AgentContext
@@ -74,7 +75,7 @@ async def write_episode(ctx: AgentContext) -> list[Segment]:
                                passages=ctx.passages_text(pids, limit_words=PASSAGE_WORDS + 200), extra="")
     ctx.status(STAGE_WRITE, "Writing the whole episode (1 model call)", 0.15)
     data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
-                           temperature=0.8, max_tokens=3500)
+                           temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
     parts = data.get("parts") if isinstance(data, dict) else None
     if not isinstance(parts, list) or not parts:
         raise ServiceError("Language model", "did not return the episode in the expected format")
@@ -117,7 +118,7 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
     ctx.status(STAGE_VERIFY, "Fact-checking against the chapter (1 model call)", 0.4)
     try:
         data = await chat_json([{"role": "user", "content": prompt}], task="verify_episode", expect=dict,
-                               temperature=0.0, max_tokens=4000)
+                               temperature=0.0, max_tokens=4000, thinking=get_settings().llm_check_thinking or None)
     except ServiceError as e:
         ctx.emit(STAGE_VERIFY, "warning", f"Fact-check unavailable ({e.user_message}); the script is kept as written.")
         return {s.id: [] for s in targets}
@@ -184,7 +185,7 @@ async def rewrite_part(ctx: AgentContext, seg: Segment, segments: list[Segment],
               if nxt is None else ""),
         current=script_text(cur, names), passages=ctx.passages_text(seg.chunk_ids or [c.id for c in ctx.chunks[:4]]))
     data = await chat_json([{"role": "user", "content": prompt}], task="rewrite_part", expect=dict,
-                           temperature=0.7, max_tokens=2000)
+                           temperature=0.7, max_tokens=2000, thinking=get_settings().llm_write_thinking or None)
     turns = _part_turns(data, names)
     seg.candidates = [Candidate(index=0, round=0, turns=turns)]
     seg.chunk_ids = [c for c in (data.get("chunk_ids") or []) if c in ctx.by_id] or seg.chunk_ids

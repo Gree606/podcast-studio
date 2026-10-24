@@ -32,7 +32,7 @@ from .claims import verify_and_fix
 from .context import AgentContext
 from .planner import plan
 from .search import best_candidate, run_search
-from .voice import synthesize_version
+from .voice import prefetch, synthesize_version
 
 log = logging.getLogger("podcast.orchestrator")
 
@@ -78,6 +78,8 @@ async def _record(ctx: AgentContext, seg: Segment, ver: SegmentVersion) -> None:
     seg.active_version = ver.version
     seg.status = "done"
     seg.error = None
+    if ctx.episode.status == "running":  # listeners can start on this part while the rest is still recording
+        ctx.emit("voice", "info", f"Part {seg.index + 1} is recorded and ready to play.", seg.id)
 
 
 async def assemble(ctx: AgentContext) -> None:
@@ -216,6 +218,13 @@ async def run_episode(eid: str) -> None:
             # ---- Verify claims + synthesise + ASR self-check -----------------------
             claims: dict[str, list[Claim]] = {}
             if fast_mode() and todo:
+                # Record while the fact-check runs (part 1 first). Nothing is released to listeners until
+                # the check is done; any line it changes misses the cache and is recorded again.
+                for x in todo:
+                    if x.candidates:
+                        prefetch(ctx, x, x.candidates[-1].turns)
+                ctx.emit("voice", "info", "Started recording the lines while the fact-check runs; "
+                         "any line the check changes is re-recorded.")
                 with _Timer(ep, "verify"):
                     claims = await fast.verify_segments(ctx, segments, only=todo)
                 store.save_episode(ep)

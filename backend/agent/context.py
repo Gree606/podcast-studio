@@ -27,6 +27,8 @@ class AgentContext:
     on_change: Callable[[], None] = lambda: None
     index: BM25Index = field(init=False)
     full_index: BM25Index = field(init=False)
+    # (speaker, spoken text) -> task recording that line; lets recording start before the fact-check ends
+    tts_cache: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.index = BM25Index(self.chunks)

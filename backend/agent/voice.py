@@ -38,7 +38,34 @@ def script_mismatch(expected: str, heard: str) -> bool:
     return non_latin > 0.5 and exp_latin > 0.8
 
 
+def prefetch(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> None:
+    """Start recording (TTS + listen-back) these lines now, in the background. A later
+    synthesize_version reuses a finished take for any line whose text is unchanged; lines the
+    fact-check rewrote simply miss the cache and are recorded fresh."""
+    for i, t in enumerate(turns):
+        key = (t.speaker, normalize_for_tts(t.text))
+        if key not in ctx.tts_cache:
+            task = asyncio.create_task(_record_line(ctx, seg, i, t.model_copy()))
+            task.add_done_callback(lambda tk: tk.cancelled() or tk.exception())  # failures are retried later, not logged twice
+            ctx.tts_cache[key] = task
+
+
 async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np.ndarray:
+    key = (turn.speaker, normalize_for_tts(turn.text))
+    task = getattr(ctx, "tts_cache", {}).pop(key, None)  # (test doubles may not carry a cache)
+    if task is not None:
+        try:
+            clip, done = await task
+            turn.tts_text, turn.tts_attempts = done.tts_text, done.tts_attempts
+            turn.wer, turn.first_wer, turn.asr_text = done.wer, done.first_wer, done.asr_text
+            return clip
+        except Exception:  # noqa: BLE001 - a failed early take is just recorded again below
+            pass
+    clip, _ = await _record_line(ctx, seg, i, turn)
+    return clip
+
+
+async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> tuple[np.ndarray, Turn]:
     s = get_settings()
     sr = s.sample_rate
     turn.tts_text = normalize_for_tts(turn.text)
@@ -52,16 +79,16 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
             ctx.emit(STAGE, "warning", f"Turn {i + 1}: voice service returned (near) silent audio; retrying.", seg.id)
             continue
         if not check:
-            return clip
+            return clip, turn
         try:
             heard = await asr.transcribe(to_wav_bytes(resample(clip, sr, 16000), 16000))
         except ServiceError as e:
             ctx.emit(STAGE, "warning", f"Self-check skipped for turn {i + 1}: speech recogniser {e.user_message}.", seg.id)
-            return clip
+            return clip, turn
         if script_mismatch(turn.tts_text, heard):
             ctx.emit(STAGE, "warning", f"Turn {i + 1}: the speech recogniser answered in a different script "
                      f"(\"{heard[:40]}\"), so WER is meaningless; keeping this take. Set ASR_LANGUAGE to fix.", seg.id)
-            return clip
+            return clip, turn
         err = wer(turn.tts_text, heard)
         if attempt == 1:
             turn.first_wer = round(err, 3)
@@ -74,7 +101,7 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
     if best is None:
         raise ServiceError("Voice service", "returned no usable audio")
     turn.wer, turn.asr_text = round(best[0], 3), best[2]
-    return best[1]
+    return best[1], turn
 
 
 async def synthesize_version(ctx: AgentContext, seg: Segment, version: SegmentVersion, out_path) -> None:

@@ -28,7 +28,9 @@ const STATIONS = ["plan", "write", "voice", "assemble"];
 let CONFIG = {lengths: {}, presets: DEFAULT_PRESETS};
 let SOURCE = null, epState = null, pollTimer = null, traceLen = 0, traceEvents = [];
 let sourcesCache = null, currentAudioFile = null, lineIndex = [], quiz = null, quizLoadedFor = null, viewId = 0;
-let seenLines = new Set(), launched = false;  // bubbles already popped in; ships already flown in
+let seenLines = new Set(), launched = false;
+// Live mode: play part by part while later parts are still being recorded (k = part playing, waiting = part k+1 not ready yet)
+let live = {on: false, k: 0, waiting: false};  // bubbles already popped in; ships already flown in
 
 // ------------------------------------------------------------------ helpers
 async function api(path, opts = {}) {
@@ -240,15 +242,15 @@ const currentVersion = s => s.versions.find(v => v.version === s.active_version)
 async function renderEpisode(id) {
   stopPoll(); viewId += 1;
   epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
-  seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null;
+  seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
   const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   journey("make");
   const a = $("#audio");
   a.addEventListener("timeupdate", onTime);
   a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#playBtn").textContent = "⏸"; $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#playBtn").textContent = "▶"; $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
-  a.addEventListener("ended", () => { if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Ready for the quiz?"); $("#quizCard").scrollIntoView({behavior: reducedMotion() ? "auto" : "smooth"}); } });
-  $("#playBtn").onclick = () => { if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
+  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Ready for the quiz?"); $("#quizCard").scrollIntoView({behavior: reducedMotion() ? "auto" : "smooth"}); } });
+  $("#playBtn").onclick = () => { if (live.on && !a.src) { playLivePart(0); return; } if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
   $("#speedBtn").onclick = () => {
     const speeds = [1, 1.25, 1.5, 0.75], next = speeds[(speeds.indexOf(a.playbackRate) + 1) % speeds.length] || 1;
     a.playbackRate = next; $("#speedBtn").textContent = `${next}×`;
@@ -287,6 +289,9 @@ async function poll(id, view = viewId) {
   const sig = e => JSON.stringify(e.segments.map(s => [s.status, s.active_version, s.versions.length, s.error])) + e.busy + e.status;
   if (!prev || sig(prev) !== sig(ep)) renderSegments(ep);
   if (ep.audio_file && ep.audio_file !== currentAudioFile) setAudio(ep);
+  else if (!ep.audio_file && !live.on && partReady(ep, 0)) startLive(ep);
+  if (live.on && live.waiting && partReady(ep, live.k + 1)) { live.waiting = false; playLivePart(live.k + 1); }
+  if (live.on) liveTitle(ep);
   renderTrust(ep);
   if (document.body.classList.contains("teacher")) renderTeacher(ep, ep.trace);
   if (ep.status === "done" && quizLoadedFor !== ep.id) loadQuiz(ep);
@@ -349,7 +354,16 @@ function renderMake(ep) {
 
 function setAudio(ep) {
   currentAudioFile = ep.audio_file;
-  const a = $("#audio"), t = a.currentTime, wasPlaying = !a.paused, rate = a.playbackRate;
+  const a = $("#audio"), rate = a.playbackRate;
+  let t = a.currentTime, wasPlaying = !a.paused;
+  if (live.on) {  // same spot in the full mix: where part k starts in the episode, plus how far into it we are
+    const seg = ep.segments[live.k], v = seg && currentVersion(seg), first = v && v.turns.find(x => x.start != null && x.seg_start != null);
+    const off = first ? first.start - first.seg_start : 0;
+    if (live.waiting) { const nx = ep.segments[live.k + 1], nv = nx && currentVersion(nx), f2 = nv && nv.turns.find(x => x.start != null); t = f2 ? f2.start : off + (a.duration || 0); wasPlaying = true; }
+    else t = off + t;
+    live = {on: false, k: 0, waiting: false};
+    if (wasPlaying) toast("🎧 The whole episode is ready, carrying on from the same spot.");
+  }
   a.src = `/api/episodes/${ep.id}/audio?f=${encodeURIComponent(ep.audio_file)}`;
   a.addEventListener("loadedmetadata", () => {
     a.playbackRate = rate;
@@ -400,10 +414,10 @@ function renderSegments(ep) {
     const facts = v && v.claims.length ? `<span class="pill teacher-only ${bad.length ? "warn" : "ok"}">✓ ${v.claims.length - bad.length}/${v.claims.length} claims</span>` : "";
     const diff = `<span class="pill teacher-only" title="Difficulty predicted by the planner">difficulty ${s.difficulty}/5</span>`;
     const lines = v ? v.turns.map((t, ti) => {
-      lineIndex.push({start: t.start, end: t.end, speaker: t.speaker, text: t.text, seg: s.id});
+      lineIndex.push({start: t.start, end: t.end, ss: t.seg_start, se: t.seg_end, speaker: t.speaker, text: t.text, seg: s.id, si});
       const key = `${s.id}:${v.version}:${ti}`, fresh = !seenLines.has(key);
       if (fresh) seenLines.add(key);
-      return `<div class="line ${t.speaker}${fresh ? " fresh" : ""}" style="--i:${Math.min(fresh ? freshN++ : 0, 14)}" role="button" tabindex="0" data-start="${t.start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
+      return `<div class="line ${t.speaker}${fresh ? " fresh" : ""}" style="--i:${Math.min(fresh ? freshN++ : 0, 14)}" role="button" tabindex="0" data-start="${t.start ?? ""}" data-si="${si}" data-ss="${t.seg_start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
         <svg class="mini" viewBox="0 0 120 120" aria-hidden="true"><use href="#av-${t.speaker}"/></svg>
         <div class="bubble"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${esc(t.text)}</div></div>`;
     }).join("") : s.error ? `<div class="notice err">😕 ${esc(s.error)}</div>` : `<p class="muted small">${s.status === "pending" ? "⏳ Waiting for its turn…" : "✍️ Being written…"}</p>`;
@@ -429,6 +443,10 @@ function renderSegments(ep) {
   $$(".line", box).forEach(el => {
     const go = () => {
       const a = $("#audio");
+      if (live.on) {
+        if (el.dataset.ss === "" || !partReady(epState, +el.dataset.si)) { toast("🎙️ This part is still being recorded. It'll play in a moment!"); return; }
+        playLivePart(+el.dataset.si, +el.dataset.ss); return;
+      }
       if (el.dataset.start === "" || !a.src) { toast("🎙️ This line isn't recorded yet."); return; }
       a.currentTime = +el.dataset.start; a.play().catch(() => {});
     };
@@ -483,6 +501,43 @@ async function fillSources(segId) {
   catch (e) { box.textContent = e.message; }
 }
 
+// ------------------------------------------------------------------ live listening (part by part)
+const partReady = (ep, k) => { const s = ep && ep.segments[k], v = s && currentVersion(s); return !!(v && v.audio_file && s.status === "done"); };
+function startLive(ep) {
+  live = {on: true, k: 0, waiting: false};
+  $("#player").classList.remove("hidden");
+  if (!launched) { launched = true; launch(); }
+  const n = names(ep);
+  $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
+  $("#nowLine").classList.remove("from-host", "from-expert");
+  $("#nowLine").innerHTML = "<span>📡 Part 1 has landed! Press play: the next parts are recorded while you listen.</span>";
+  liveTitle(ep);
+  toast("🎧 Part 1 is ready. Start listening now!");
+}
+function liveTitle(ep) {
+  const total = ep.segments.length, ready = ep.segments.filter((_, k) => partReady(ep, k)).length;
+  $("#plTitle").textContent = `🎧 ${ep.title} · part ${live.k + 1} of ${total} · 📡 ${ready}/${total} recorded`;
+}
+function playLivePart(k, at = 0) {
+  const ep = epState, s = ep.segments[k], v = s && currentVersion(s), a = $("#audio");
+  if (!v) return;
+  live.k = k; live.waiting = false; onTime.lastKey = null;
+  a.src = `/api/episodes/${ep.id}/segments/${s.id}/audio?version=${v.version}`;
+  a.addEventListener("loadedmetadata", () => { if (at) a.currentTime = at; a.play().catch(() => toast("Tap play to start the audio.")); }, {once: true});
+  liveTitle(ep);
+}
+function nextLivePart() {
+  const ep = epState, k = live.k + 1;
+  if (k >= ep.segments.length) {  // heard every part before the final mix landed: start the full episode from the top
+    live = {on: false, k: 0, waiting: false}; const a = $("#audio"); a.removeAttribute("src"); a.load();
+    $("#nowLine").innerHTML = "<span>🎉 That's the whole transmission! The full episode is being mixed for downloading.</span>"; return;
+  }
+  if (partReady(ep, k)) { playLivePart(k); return; }
+  live.waiting = true; setSpeaking(null);
+  const cap = $("#nowLine"); cap.classList.remove("from-host", "from-expert");
+  cap.innerHTML = `<span>📡 Receiving part ${k + 1}… it plays by itself the moment it lands.</span>`;
+}
+
 // "Incoming transmission": the two ships fly in and the banner flashes
 function launch() {
   const st = $("#stage"); if (!st || reducedMotion()) return;
@@ -498,12 +553,18 @@ function setSpeaking(speaker) {
 function onTime() {
   const a = $("#audio"); if (!a) return;
   const t = a.currentTime;
-  const cur = lineIndex.find(l => l.start != null && t >= l.start && t < (l.end ?? l.start) + 0.25);
+  const cur = live.on
+    ? lineIndex.find(l => l.si === live.k && l.ss != null && t >= l.ss && t < (l.se ?? l.ss) + 0.25)
+    : lineIndex.find(l => l.start != null && t >= l.start && t < (l.end ?? l.start) + 0.25);
   const els = $$("#segments .line");
   let curEl = null;
-  els.forEach(el => { const on = !!cur && el.dataset.start !== "" && +el.dataset.start === cur.start; el.classList.toggle("now", on); if (on) curEl = el; });
+  els.forEach(el => {
+    const on = !!cur && (live.on ? +el.dataset.si === cur.si && el.dataset.ss !== "" && +el.dataset.ss === cur.ss
+                                 : el.dataset.start !== "" && +el.dataset.start === cur.start);
+    el.classList.toggle("now", on); if (on) curEl = el;
+  });
   setSpeaking(cur && !a.paused ? cur.speaker : null);
-  const key = cur ? `${cur.seg}:${cur.start}` : null;
+  const key = cur ? `${cur.seg}:${cur.ss}` : null;
   if (cur && epState && key !== onTime.lastKey) {  // a new line: pop a fresh comic bubble pointing at the speaker
     onTime.lastKey = key;
     const n = names(epState), cap = $("#nowLine");

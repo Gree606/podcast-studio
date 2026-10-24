@@ -81,6 +81,7 @@ async def request_with_retry(
     timeout: float,
     attempts: int = 3,
     semaphore: asyncio.Semaphore | None = None,
+    retry_timeouts: bool = True,
     **kwargs: Any,
 ) -> httpx.Response:
     last: Exception | None = None
@@ -94,6 +95,8 @@ async def request_with_retry(
                 resp = await http_client().request(method, url, timeout=timeout, **kwargs)
         except httpx.TimeoutException as e:
             last = e
+            if not retry_timeouts:  # the caller has a faster plan B (another model) than waiting again
+                break
         except httpx.HTTPError as e:
             last = e
         else:
@@ -119,7 +122,7 @@ async def request_with_retry(
         log.warning("%s attempt %d/%d failed (%s); retrying in %.1fs", service, attempt, attempts, last, wait)
         await asyncio.sleep(wait)
     if isinstance(last, httpx.TimeoutException):
-        raise ServiceError(service, "timed out", str(last))
+        raise ServiceError(service, "timed out", str(last), status=504)  # 504 = gateway timeout: lets callers fall back
     if isinstance(last, ServiceError):
         raise last
     raise ServiceError(service, "is unreachable", str(last))

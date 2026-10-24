@@ -97,19 +97,21 @@ def from_gemini(data: dict) -> tuple[str, dict]:
     return text, usage
 
 
-async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None) -> tuple[str, dict]:
+async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None, thinking=None) -> tuple[str, dict]:
     s = get_settings()
     system, contents = to_gemini(messages)
     gen: dict[str, Any] = {"temperature": temperature, "maxOutputTokens": max_tokens + s.llm_thinking_headroom}
     if json_mode:
         gen["responseMimeType"] = "application/json"
+    if thinking:  # "low" for checking tasks: much faster, and checking doesn't need long deliberation
+        gen["thinkingConfig"] = {"thinkingLevel": thinking}
     body: dict[str, Any] = {"contents": contents, "generationConfig": gen}
     if system:
         body["systemInstruction"] = system
     resp = await request_with_retry(
         "Language model", "POST", f"{base_url.rstrip('/')}/v1beta/models/{model}:generateContent",
         json=body, headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
-        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(),
+        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(), retry_timeouts=False,
     )
     try:
         data = resp.json()
@@ -118,7 +120,7 @@ async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url
     return from_gemini(data)
 
 
-async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None) -> tuple[str, dict]:
+async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None, thinking=None) -> tuple[str, dict]:
     s = get_settings()
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -126,7 +128,7 @@ async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url
     body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
     resp = await request_with_retry(
         "Language model", "POST", base_url.rstrip("/") + "/v1/chat/completions", json=body, headers=headers,
-        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(),
+        timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(), retry_timeouts=False,
     )
     try:
         data = resp.json()
@@ -145,6 +147,7 @@ async def chat(
     max_tokens: int = 1500,
     json_mode: bool = False,
     endpoint: tuple[str, str, str] | None = None,
+    thinking: str | None = None,
 ) -> str:
     """Return the assistant text. ``task`` labels the call for logs and the mock backend.
 
@@ -162,7 +165,7 @@ async def chat(
     call = _gemini_call if s.llm_provider == "gemini" else _openai_call
     t0 = time.time()
     text, usage, used = await _call_with_fallback(call, messages, temperature=temperature, max_tokens=max_tokens,
-                                                  json_mode=json_mode, base_url=base_url, api_key=api_key,
+                                                  json_mode=json_mode, base_url=base_url, api_key=api_key, thinking=thinking,
                                                   models=model_chain(model, explicit=endpoint is not None))
     record(llm_calls=1, **usage)
     log.info("llm task=%s model=%s %.1fs tokens=%s", task, used, time.time() - t0, usage)
@@ -228,6 +231,7 @@ async def chat_json(
     max_tokens: int = 1500,
     retries: int = 2,
     endpoint: tuple[str, str, str] | None = None,
+    thinking: str | None = None,
 ) -> Any:
     """Chat and parse JSON; on a parse failure, show the model its output and ask it to fix it."""
     msgs = list(messages)
@@ -235,7 +239,7 @@ async def chat_json(
     json_mode = True
     for _ in range(retries + 1):
         try:
-            text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode, endpoint=endpoint)
+            text = await chat(msgs, task=task, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode, endpoint=endpoint, thinking=thinking)
         except ServiceError as e:
             # Gemini sometimes fails *inside* its JSON mode (finishReason MALFORMED_RESPONSE). Plain
             # text plus our own JSON repair usually works, so retry once without it.
