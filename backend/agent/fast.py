@@ -180,7 +180,7 @@ async def rewrite_part(ctx: AgentContext, seg: Segment, segments: list[Segment],
         words=max(60, sum(len(t.text.split()) for t in cur) or target_words(ctx) // 3),
         prev_last=(prev.current.turns[-1].text[:200] if prev and prev.current else "(this is the opening)"),
         next_first=(nxt.current.turns[0].text[:200] if nxt and nxt.current else "(this is the last part)"),
-        role=("This is the opening: keep the hook and the welcome to the show." if seg.index == 0 else
+        role=("This is the opening: it still starts with the alien greeting the astronaut and asking what they will learn about Earth today, then the welcome to the show." if seg.index == 0 else
               "This is the last part: keep the recap with exactly three takeaways and the one-line sign-off."
               if nxt is None else ""),
         current=script_text(cur, names), passages=ctx.passages_text(seg.chunk_ids or [c.id for c in ctx.chunks[:4]]))

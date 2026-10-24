@@ -3,7 +3,7 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-23.2"
+PROMPT_VERSION = "2026-10-25.1"
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -191,15 +191,15 @@ Reply with ONLY JSON: {{"faithfulness": n, "naturalness": n, "engagement": n, "p
 #                    for any part that has an unsupported claim (same call)
 # Regenerating one part = FAST_REWRITE + FAST_VERIFY on that part (2 calls).
 # ---------------------------------------------------------------------------
-FAST_WRITE = """Write a complete episode of "{show}", a podcast where two friends explain an NCERT chapter to Indian students.
+FAST_WRITE = """Write a complete episode of "{show}", a podcast broadcast from a space station, in which an astronaut from Earth teaches a curious alien an NCERT chapter. Indian students are listening in.
 
 Hosts:
-- {host} (speaker "host"): curious, warm, quick; asks what a student would ask, reacts naturally ("Wait, so...", "Oh, that's neat").
-- {expert} (speaker "expert"): the explainer; clear, friendly, uses everyday Indian examples (chai, cricket, monsoon, kitchen), then states the textbook idea precisely.
+- {host} (speaker "host"): a friendly alien who is learning about Earth for the first time. Curious, warm, quick; asks exactly what a student would ask, reacts naturally ("Wait, so...", "Oh, that's neat!"). May now and then playfully compare with life on its own planet, but never states facts about the topic itself.
+- {expert} (speaker "expert"): an astronaut from India, the explainer; clear, friendly, uses everyday Indian examples (chai, cricket, monsoon, kitchen), then states the textbook idea precisely.
 
 Length: about {words} words in total (~{minutes} minutes spoken); never more than {words} + 20 words. Tone: {tone}.
 Structure: exactly 3 parts.
-  Part 1 - hook (a surprising question or everyday situation), welcome to "{show}" (say the show name once), one line on what we'll learn, then start the main idea.
+  Part 1 - the very first line is {host} greeting {expert} and asking what they'll learn about Earth today, e.g. "Hey {expert}! So, what new thing are we learning about Earth today?" (vary the wording). {expert} welcomes the listeners to "{show}" (say the show name once) and names today's topic; then {host} asks a first curious question about it, and the main idea begins.
   Part 2 - the core idea(s) of the chapter, explained step by step.
   Part 3 - finish the explanation, then {host} asks for a quick recap and {expert} gives exactly three crisp takeaways; warm one-line sign-off.
 
@@ -235,7 +235,7 @@ Reply with ONLY JSON:
 FAST_REWRITE = """Rewrite part {index} of {total} ("{title}") of this "{show}" podcast episode.
 The listener asked: "{instruction}"
 
-Hosts: {host} (speaker "host", curious) and {expert} (speaker "expert", explainer). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one. Same rules: every fact from the passages only, no turn over 60 words, plain spoken text.
+Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one. Same rules: every fact from the passages only, no turn over 60 words, plain spoken text.
 
 Cover every topic the current version covers (introduce each before referring to it). {role}
 Do not repeat the previous part's last line: start right after it.
