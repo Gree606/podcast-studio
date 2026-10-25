@@ -448,6 +448,35 @@ dialog::backdrop { background: rgba(3, 5, 16, .6); backdrop-filter: blur(2px); }
   .hero-scene { height: 230px; }
 }
 
+/* ---------------------------------------------------------------- monitors: use the width */
+@media (min-width: 1100px) {
+  .wrap { max-width: 1400px; padding-left: 40px; padding-right: 40px; padding-bottom: 40px; }
+
+  /* home: scene + headline on the left (stays put), picking + launch on the right */
+  #app.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: 56px; align-items: start;
+    min-height: calc(100vh - 110px); align-content: center; }
+  #app.home-layout > .hero { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 24px; padding-top: 0; text-align: left; align-self: center; }
+  #app.home-layout > .card { grid-column: 2; }
+  #app.home-layout .hero h1 { font-size: clamp(2.8rem, 4.2vw, 4.2rem); }
+  #app.home-layout .lede { font-size: 1.2rem; }
+  #app.home-layout .hero-scene { height: 300px; justify-content: flex-start; }
+  #app.home-layout .hero-scene .ship { width: min(44%, 260px); }
+  #app.home-layout .samples { grid-template-columns: repeat(3, 1fr); }
+
+  /* episode: stage + player on the left, the panel as a permanent sidebar on the right */
+  #app.ep-layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; column-gap: 28px; align-items: start; }
+  #app.ep-layout > .player, #app.ep-layout > .make, #app.ep-layout > .dock { grid-column: 1; }
+  #app.ep-layout > .sheet { grid-column: 2; grid-row: 1 / span 3; position: sticky; top: 16px; inset: auto; height: calc(100vh - 96px);
+    z-index: auto; pointer-events: auto; }
+  #app.ep-layout > .sheet .scrim, #app.ep-layout > .sheet [data-close-sheet], #app.ep-layout > .sheet .grabber { display: none; }
+  #app.ep-layout > .sheet .sheet-panel { position: static; transform: none; width: auto; height: 100%; max-height: none;
+    border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding: 16px; }
+  #app.ep-layout .stage { padding: 52px 24px 30px; min-height: clamp(340px, calc(100vh - 360px), 560px); align-content: center; grid-template-columns: minmax(0, 1fr) minmax(240px, 1.1fr) minmax(0, 1fr); }
+  #app.ep-layout .stage-member .ship { max-width: 340px; width: 100%; }
+  #app.ep-layout .caption { font-size: 1.12rem; }
+  #app.ep-layout > .dock { position: static; margin: 22px auto 0; width: max-content; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .confetti { display: none; }

@@ -74,8 +74,10 @@ function openDrawer(open) {
   $("#menuBtn").setAttribute("aria-expanded", String(open));
 }
 const SHEET_TITLES = {script: "Script", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
+const wide = () => matchMedia("(min-width: 1100px)").matches;
 function openSheet(name) {
   const sh = $("#sheet"); if (!sh) return;
+  if (!name && wide()) return;
   if (!name) { sh.classList.remove("open"); sh.setAttribute("aria-hidden", "true"); $$(".dock-btn").forEach(b => b.classList.remove("on")); return; }
   if (name === "agent" && !document.body.classList.contains("teacher")) setTeacher(true);
   $$("[data-pane-sheet]", sh).forEach(p => p.classList.toggle("on", p.dataset.paneSheet === name));
@@ -134,7 +136,7 @@ function renderSetup() {
 async function renderHome() {
   stopPoll(); journey("pick");
   const view = ++viewId;
-  const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-home").content.cloneNode(true)); tabs(app);
+  const app = $("#app"); app.className = "home-layout"; app.innerHTML = ""; app.append($("#tpl-home").content.cloneNode(true)); tabs(app);
   try {
     const samples = await api("/api/samples");
     if (view !== viewId) return; // the user already moved on
@@ -263,7 +265,8 @@ async function renderEpisode(id) {
   stopPoll(); viewId += 1;
   epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
   seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
-  const app = $("#app"); app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
+  const app = $("#app"); app.className = "ep-layout"; app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
+  if (wide()) openSheet("script");  // on monitors the panel is a permanent sidebar
   journey("make");
   const a = $("#audio");
   $("#playBtn").classList.add("waiting");
