@@ -130,7 +130,7 @@
       <b>Chapter Chat</b>
     </a>
     <nav class="topnav" aria-label="Main">
-      <a class="icon-btn" href="#/" id="newBtn" aria-label="New episode" title="New episode"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>New</title><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>
+      <a class="new-btn" href="#/" id="newBtn" aria-label="New podcast"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>New</title><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>New</span></a>
       <button class="icon-btn" id="menuBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="drawer"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Menu</title><path d="M5 8h14M5 16h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </nav>
   </header>
@@ -186,6 +186,7 @@
 <template id="tpl-home">
   <section class="hero">
     <div class="scene hero-scene" aria-hidden="true">
+      <div class="hero-say" aria-hidden="true">Psst… teach me something about Earth?</div>
       <span class="spark k1">✦</span><span class="spark k2">✦</span><span class="spark k3">✧</span><span class="spark k4">✦</span><span class="spark k5">✧</span>
       <div class="orbit"></div>
       <svg class="ship hero-ufo float" viewBox="0 0 200 150" role="img" aria-label="Error606 the alien in a flying saucer"><title>Error606's saucer</title>
@@ -288,7 +289,8 @@
       <button class="play" id="playBtn" type="button" aria-label="Play"><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Play</title><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.8l-10-6.5A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Pause</title><rect x="6" y="5" width="4.5" height="14" rx="1.5" fill="currentColor"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.5" fill="currentColor"/></svg></button>
       <div class="seekwrap">
         <h2 class="pl-title" id="plTitle"></h2>
-        <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Position in the episode">
+        <div class="wavebox"><canvas id="wave" aria-hidden="true"></canvas>
+          <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Position in the episode"></div>
         <div class="times small"><span id="tCur">0:00</span><span id="tDur"></span></div>
       </div>
       <button class="icon-btn speed" id="speedBtn" type="button" aria-label="Playback speed">1×</button>

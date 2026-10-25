@@ -142,7 +142,7 @@ async function renderHome() {
     if (view !== viewId) return; // the user already moved on
     $("#samples").innerHTML = samples.length ? samples.map((s, i) => `
       <button class="sample c${i % 6}" type="button" data-id="${esc(s.id)}">
-        <span class="emoji" aria-hidden="true">${chapterEmoji(s.title, s.subject, i)}</span>
+        <span class="book b${i % 6}" aria-hidden="true"><span class="emoji">${chapterEmoji(s.title, s.subject, i)}</span></span>
         <span class="tag">${esc(s.subject)} · Class ${esc(s.class)}</span>
         <b>${esc(s.title)}</b><span class="blurb">${esc(s.blurb || "")}</span>
       </button>`).join("") : `<p class="muted">No ready-made chapters here. Upload a PDF or paste some text instead!</p>`;
@@ -263,6 +263,7 @@ const names = ep => ({host: ep.settings.host_name || "Error606", expert: ep.sett
 const currentVersion = s => s.versions.find(v => v.version === s.active_version);
 
 async function renderEpisode(id) {
+  meter = null; drawWave.peaks = null;
   stopPoll(); viewId += 1;
   epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
   seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
@@ -276,7 +277,9 @@ async function renderEpisode(id) {
   const seek = $("#seek");
   seek.oninput = () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; };
   a.addEventListener("timeupdate", onTime);
-  a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); $("#playBtn").classList.remove("waiting"); });
+  a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); $("#playBtn").classList.remove("waiting"); drawWave.peaks = null; loadWave(a.getAttribute("src")); });
+  addEventListener("resize", () => drawWave());
+  a.addEventListener("play", startMeter);
   a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
   a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz."); $("#quizBtn").classList.add("nudge"); } });
@@ -427,20 +430,27 @@ function setAudio(ep) {
   $("#dlTxt").href = `/api/episodes/${ep.id}/transcript`;
 }
 
+const ICON_CHECK = '<svg class="ico-check" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".18"/><path d="M6 10.4l2.6 2.6L14.2 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function renderTrust(ep) {
   const done = ep.segments.filter(s => currentVersion(s));
   if (!done.length) { $("#trustBadge").innerHTML = ""; return; }
   const claims = done.flatMap(s => currentVersion(s).claims || []), bad = claims.filter(c => !c.supported).length;
   const failed = ep.segments.filter(s => s.status === "failed").length;
   const parts = [];
-  if (claims.length) parts.push(bad ? `<span class="badge warn">🔎 ${claims.length - bad} of ${claims.length} facts found in your chapter · ${bad} flagged below</span>`
-    : `<span class="badge">✅ Fact-checked from your chapter · ${claims.length}/${claims.length} facts found in the book</span>`);
+  if (claims.length) parts.push(bad ? `<span class="badge warn">${ICON_CHECK} ${claims.length - bad}/${claims.length} facts checked · ${bad} corrected</span>`
+    : `<span class="badge">${ICON_CHECK} ${claims.length}/${claims.length} facts checked against your chapter</span>`);
   parts.push(`<span class="badge plain">🧩 ${ep.segments.length} parts</span>`);
   if (ep.duration) parts.push(`<span class="badge plain">⏱️ ${fmtT(ep.duration)}</span>`);
   if (failed) parts.push(`<span class="badge warn">⚠️ ${failed} part${failed > 1 ? "s" : ""} didn't finish: tap a “Make this part…” button under ${failed > 1 ? "them" : "it"} to redo</span>`);
   $("#trustBadge").innerHTML = parts.join("");
 }
 
+const sentences = text => (text.match(/[^.!?]+[.!?]+["')]*|[^.!?]+$/g) || [text]).map(x => x.trim()).filter(Boolean);
+// a long explanation reads better as points than as a paragraph
+function fmtTurn(text) {
+  const ss = sentences(text);
+  return ss.length >= 3 && text.split(/\s+/).length > 26 ? `<ul class="pts">${ss.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : esc(text);
+}
 function renderSegments(ep) {
   const box = $("#segments"), n = names(ep);
   const drafts = Object.fromEntries($$("input[data-own]", box).map(i => [i.dataset.own, i.value]));
@@ -467,7 +477,7 @@ function renderSegments(ep) {
       if (fresh) seenLines.add(key);
       return `<div class="line ${t.speaker}${fresh ? " fresh" : ""}" style="--i:${Math.min(fresh ? freshN++ : 0, 14)}" role="button" tabindex="0" data-start="${t.start ?? ""}" data-si="${si}" data-ss="${t.seg_start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
         <svg class="mini" viewBox="0 0 120 120" aria-hidden="true"><use href="#av-${t.speaker}"/></svg>
-        <div class="bubble"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${esc(t.text)}</div></div>`;
+        <div class="bubble"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${fmtTurn(t.text)}</div></div>`;
     }).join("") : s.error ? `<div class="notice err">😕 ${esc(s.error)}</div>` : `<p class="muted small">${s.status === "pending" ? "⏳ Waiting for its turn…" : "✍️ Being written…"}</p>`;
     const versions = s.versions.length > 1 ? `<div class="versions small"><b>Versions:</b>${s.versions.map(x => `<button type="button" class="chip ${x.version === s.active_version ? "on" : ""}" data-act="ver" data-seg="${s.id}" data-v="${x.version}" aria-pressed="${x.version === s.active_version}" title="${esc(x.instruction || "first version")}" ${ep.busy ? "disabled" : ""}>v${x.version}${x.instruction && x.instruction !== "regenerate" ? ` · ${esc(FIXES.find(f => f.instruction === x.instruction)?.label || "✏️ yours")}` : ""}</button>`).join("")}
       <button type="button" class="chip" data-act="preview" data-seg="${s.id}">▶ Hear another version</button><audio class="hidden" data-prev="${s.id}" controls></audio></div>` : "";
@@ -601,9 +611,68 @@ function setSpeaking(speaker) {
   const st = $("#stage");  // signal dots fly from the speaker's ship to the listener's
   if (st) { st.classList.toggle("talk-host", speaker === "host"); st.classList.toggle("talk-expert", speaker === "expert"); }
 }
+// ------------------------------------------------------------------ waveform seek bar + live level
+const peaksCache = new Map();
+async function loadWave(src) {
+  if (!src) return;
+  if (!peaksCache.has(src)) {
+    peaksCache.set(src, (async () => {
+      const buf = await (await fetch(src)).arrayBuffer();
+      const Ctx = window.AudioContext || window.webkitAudioContext, ctx = new Ctx();
+      const audio = await ctx.decodeAudioData(buf); ctx.close();
+      const ch = audio.getChannelData(0), n = 96, step = Math.floor(ch.length / n), out = [];
+      for (let i = 0; i < n; i++) { let m = 0; for (let j = i * step; j < (i + 1) * step; j += 32) m = Math.max(m, Math.abs(ch[j])); out.push(m); }
+      const top = Math.max(...out, .01); return out.map(v => Math.max(.08, Math.pow(v / top, .7)));
+    })().catch(() => null));
+  }
+  const peaks = await peaksCache.get(src);
+  if ($("#audio") && $("#audio").currentSrc.endsWith(src.split("/api")[1] || src)) { drawWave.peaks = peaks; drawWave(); }
+}
+function drawWave() {
+  const c = $("#wave"), a = $("#audio"); if (!c || !a) return;
+  const w = c.clientWidth, h = c.clientHeight, dpr = devicePixelRatio || 1;
+  if (!w) return;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const peaks = drawWave.peaks || Array.from({length: 96}, (_, i) => .15 + .1 * Math.abs(Math.sin(i * .7)));
+  const n = peaks.length, gap = 2, bw = Math.max(1.5, (w - gap * (n - 1)) / n), p = a.duration ? a.currentTime / a.duration : 0;
+  const lvl = drawWave.level || 0;
+  for (let i = 0; i < n; i++) {
+    const x = i * (bw + gap), played = (i + .5) / n <= p, near = Math.abs((i + .5) / n - p) < 2.5 / n;
+    const bh = Math.max(3, peaks[i] * (h - 6) * (near && !a.paused ? 1 + lvl * .6 : 1));
+    g.fillStyle = played ? (near ? "#b9b0f2" : "#8c82d8") : "rgba(255,255,255,.18)";
+    g.beginPath(); g.roundRect ? g.roundRect(x, (h - bh) / 2, bw, bh, bw / 2) : g.rect(x, (h - bh) / 2, bw, bh); g.fill();
+  }
+}
+let meter = null;
+function startMeter() {  // live audio level: the play button and the bars near the playhead pulse with the voice
+  const a = $("#audio");
+  try {
+    if (!meter) {
+      const Ctx = window.AudioContext || window.webkitAudioContext, ctx = new Ctx();
+      const an = ctx.createAnalyser(); an.fftSize = 256;
+      ctx.createMediaElementSource(a).connect(an); an.connect(ctx.destination);
+      meter = {ctx, an, buf: new Uint8Array(an.frequencyBinCount), el: a};
+    }
+    if (meter.el !== a) return;  // a new page made a new <audio>; keep the plain player there
+    meter.ctx.resume();
+    const tick = () => {
+      if (!$("#audio") || $("#audio") !== meter.el) return;
+      meter.an.getByteFrequencyData(meter.buf);
+      let s = 0; for (let i = 2; i < 48; i++) s += meter.buf[i];
+      const lvl = Math.min(1, s / (46 * 160));
+      drawWave.level = lvl; $("#playBtn").style.setProperty("--lvl", lvl.toFixed(3));
+      if (!a.paused) drawWave();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  } catch { /* the plain player still works */ }
+}
+
 function onTime() {
   const a = $("#audio"); if (!a) return;
   const t = a.currentTime;
+  drawWave();
   if (a.duration) {
     const p = t / a.duration;
     $("#seek").value = String(Math.round(p * 1000)); $("#seek").style.setProperty("--p", `${(p * 100).toFixed(1)}%`);
@@ -621,12 +690,23 @@ function onTime() {
   });
   setSpeaking(cur && !a.paused ? cur.speaker : null);
   const key = cur ? `${cur.seg}:${cur.ss}` : null;
-  if (cur && epState && key !== onTime.lastKey) {  // a new line: pop a fresh comic bubble pointing at the speaker
-    onTime.lastKey = key;
+  if (cur && epState) {  // the bubble shows just the sentence being spoken (less text on screen)
+    const ss = sentences(cur.text), t0 = live.on ? cur.ss : cur.start, t1 = live.on ? (cur.se ?? cur.ss) : (cur.end ?? cur.start);
+    const frac = t1 > t0 ? Math.min(.999, Math.max(0, (t - t0) / (t1 - t0))) : 0, total = ss.reduce((n, x) => n + x.length, 0);
+    let acc = 0, si = 0;
+    for (; si < ss.length - 1; si++) { acc += ss[si].length; if (acc / total > frac) break; }
     const n = names(epState), cap = $("#nowLine");
-    cap.innerHTML = `<span><b>${esc(n[cur.speaker])}:</b> ${esc(cur.text)}</span>`;
-    cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth;
-    cap.classList.add(`from-${cur.speaker}`, "pop-in");
+    if (key !== onTime.lastKey) {  // a new line: pop a fresh comic bubble pointing at the speaker, and that ship hops
+      onTime.lastKey = key; onTime.lastSi = -1;
+      cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth;
+      cap.classList.add(`from-${cur.speaker}`, "pop-in");
+      const ship = $(cur.speaker === "host" ? "#stageHost" : "#stageExpert");
+      ship.classList.remove("hop"); void ship.offsetWidth; ship.classList.add("hop");
+    }
+    if (si !== onTime.lastSi) {
+      onTime.lastSi = si;
+      cap.innerHTML = `<span class="say"><b>${esc(n[cur.speaker])}</b>${esc(ss[si])}</span>`;
+    }
   }
   if (curEl && curEl !== onTime.last && !a.paused) {  // keep the spoken line in view inside the scrollable log, not the page
     onTime.last = curEl;

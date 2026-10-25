@@ -383,6 +383,14 @@ async def classic():
     return FileResponse(FRONTEND / "classic.html", media_type="text/html", headers=NO_CACHE)
 
 
+@app.get("/fonts/{name}")
+async def font(name: str):
+    p = FRONTEND / "fonts" / name
+    if not name.endswith(".woff2") or "/" in name or ".." in name or not p.is_file():
+        raise HTTPException(404, "Not found.")
+    return FileResponse(p, media_type="font/woff2", headers={"Cache-Control": "public, max-age=31536000"})
+
+
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse(FRONTEND / "favicon.svg", media_type="image/svg+xml")

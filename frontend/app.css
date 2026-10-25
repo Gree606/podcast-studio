@@ -2,10 +2,10 @@
    (script, agent trace, downloads) in a slide-up sheet. No external fonts or assets. */
 :root {
   color-scheme: dark;
-  --bg: #060918; --bg2: #0a1030;
+  --bg: #090a1c; --bg2: #10122c;
   --surface: rgba(255, 255, 255, .045); --surface-2: rgba(255, 255, 255, .08); --solid: #11163a;
   --line: rgba(255, 255, 255, .09); --ink: #eef0ff; --muted: #98a0c8;
-  --accent: #9d8bff; --accent-2: #5ee6d0; --sun: #ffd166; --pink: #ff6b9d;
+  --accent: #8c82d8; --accent-2: #5fcdb9; --sun: #ffd166; --pink: #ff6b9d;
   --host: #7be495; --expert: #7cc4ff; --host-bg: #173a2c; --expert-bg: #1b2c55;
   --ok: #57e0a0; --ok-soft: rgba(87, 224, 160, .12); --warn: #ffcc66; --warn-soft: rgba(255, 204, 102, .12); --bad: #ff8a8a; --bad-soft: rgba(255, 138, 138, .12);
   --comic-ink: #15122e; --bubble-host: #ecfff2; --bubble-expert: #eaf3ff; --bubble-now: #fff36b;
@@ -21,8 +21,8 @@ html, body { margin: 0; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   font: 16px/1.55 var(--font); color: var(--ink); min-height: 100vh; min-height: 100dvh; letter-spacing: -.005em;
-  background: radial-gradient(900px 520px at 85% -5%, rgba(123, 92, 255, .22), transparent 60%),
-              radial-gradient(700px 500px at -10% 75%, rgba(76, 201, 240, .10), transparent 60%),
+  background: radial-gradient(900px 520px at 85% -5%, rgba(104, 88, 200, .16), transparent 60%),
+              radial-gradient(700px 500px at -10% 75%, rgba(63, 141, 176, .08), transparent 60%),
               linear-gradient(180deg, var(--bg), var(--bg2));
   background-attachment: fixed;
 }
@@ -62,7 +62,9 @@ code { background: var(--surface-2); padding: 2px 8px; border-radius: 8px; font-
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 
 /* ---------------------------------------------------------------- layout + header */
-.wrap { max-width: 760px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) 18px 110px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) 18px 24px; }
+html, body { overflow-x: hidden; }
+#app.ep-layout { padding-bottom: 86px; }  /* room for the floating dock, only on the episode page */
 .top { display: flex; align-items: center; gap: 10px; padding: 6px 0 8px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; font-size: 1.05rem; }
 .logo { width: 34px; height: 34px; }
@@ -78,7 +80,7 @@ code { background: var(--surface-2); padding: 2px 8px; border-radius: 8px; font-
   transition: transform .15s, background .2s, box-shadow .2s; }
 .btn:hover { background: var(--surface-2); } .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
-.btn.primary { background: linear-gradient(135deg, #8b7bff, #5ec8f0); color: #070a1c; border: none; box-shadow: 0 10px 30px rgba(139, 123, 255, .35); }
+.btn.primary { background: linear-gradient(135deg, #6b60c9, #3f8db0); color: #fff; border: none; box-shadow: 0 10px 28px rgba(80, 70, 170, .32); }
 .btn.big { padding: 15px 26px; font-size: 1.08rem; min-height: 56px; }
 .btn.sm { padding: 6px 14px; font-size: .88rem; min-height: 36px; }
 .btn.wide { width: 100%; margin-top: 12px; }
@@ -95,7 +97,7 @@ textarea { min-height: 160px; resize: vertical; }
 /* ---------------------------------------------------------------- hero */
 .hero { text-align: center; padding: 4px 0 18px; }
 .hero h1 { font-size: clamp(2rem, 7vw, 3.1rem); font-weight: 800; letter-spacing: -.035em; margin-top: 4px; }
-.hl { background: linear-gradient(100deg, #b9a9ff, #5ee6d0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hl { background: linear-gradient(100deg, #a99ee8, #6cc9b8); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lede { color: var(--muted); margin: 10px 0 0; font-size: 1.05rem; }
 .scene { position: relative; }
 .hero-scene { height: 190px; display: flex; align-items: center; justify-content: center; gap: 4%; }
@@ -298,7 +300,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; paddi
 /* controls */
 .controls { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
 .play { width: 64px; height: 64px; border-radius: 50%; border: none; flex: none; cursor: pointer; font-size: 1.4rem; color: #070a1c;
-  background: linear-gradient(135deg, #8b7bff, #5ec8f0); box-shadow: 0 10px 30px rgba(139, 123, 255, .4); transition: transform .15s, opacity .2s; }
+  background: linear-gradient(135deg, #6b60c9, #3f8db0); color: #fff; box-shadow: 0 0 0 calc(var(--lvl, 0) * 14px) rgba(140, 130, 216, .22), 0 10px 28px rgba(80, 70, 170, .38);
+  transition: transform .15s, opacity .2s; }
 .play:active { transform: scale(.94); }
 .play svg { width: 26px; height: 26px; display: block; margin: auto; }
 .play .i-pause, .play.is-playing .i-play { display: none; }
@@ -450,7 +453,7 @@ dialog::backdrop { background: rgba(3, 5, 16, .6); backdrop-filter: blur(2px); }
 
 /* ================================================================ living sky: nebulae, drifting stars, a fleet */
 .nebula { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .45; mix-blend-mode: screen; animation: nebula 38s ease-in-out infinite alternate; }
-.nebula.n1 { width: 46vw; height: 46vw; left: -12vw; top: 8vh; background: radial-gradient(circle, rgba(139, 123, 255, .55), transparent 65%); }
+.nebula.n1 { width: 46vw; height: 46vw; left: -12vw; top: 8vh; background: radial-gradient(circle, rgba(110, 96, 210, .42), transparent 65%); }
 .nebula.n2 { width: 40vw; height: 40vw; right: -10vw; top: 40vh; background: radial-gradient(circle, rgba(94, 230, 208, .35), transparent 65%); animation-duration: 46s; animation-delay: -12s; }
 .nebula.n3 { width: 34vw; height: 34vw; left: 30vw; bottom: -14vw; background: radial-gradient(circle, rgba(255, 107, 157, .30), transparent 65%); animation-duration: 52s; animation-delay: -20s; }
 @keyframes nebula { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(4vw, -3vh) scale(1.15); } 100% { transform: translate(-3vw, 4vh) scale(.95); } }
@@ -544,9 +547,80 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
 .btn.primary::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 35%, rgba(255, 255, 255, .45) 50%, transparent 65%); transform: translateX(-120%); animation: shine 3.5s ease-in-out infinite; }
 @keyframes shine { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 
+/* ================================================================ friends' suggestions */
+@font-face { font-family: "Fredoka"; src: url("/fonts/fredoka-latin.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+:root { --comic: "Fredoka", "Comic Neue", ui-rounded, var(--font); }
+.new-btn { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 16px 0 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 600; font-size: .92rem; transition: background .2s; }
+.new-btn:hover { background: var(--surface-2); } .new-btn .ico { width: 18px; height: 18px; }
+.ico-check { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.badge { display: inline-flex; align-items: center; }
+
+/* bubbles: rounder type, more air, points instead of paragraphs */
+.caption { font: 500 1.08rem/1.5 var(--comic); padding: 16px 20px; letter-spacing: .005em; }
+.caption .say b { display: block; font: 600 .78rem/1.2 var(--comic); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 4px; }
+.caption.from-host .say b { color: #1f8a4c; } .caption.from-expert .say b { color: #2563c9; }
+.line .bubble { font: 500 .98rem/1.55 var(--comic); padding: 11px 15px; letter-spacing: .005em; }
+.line .who { font: 600 .74rem/1.2 var(--comic); letter-spacing: .1em; margin-bottom: 3px; }
+.turns { gap: 16px; }
+.pts { margin: 4px 0 0; padding-left: 1.1em; display: grid; gap: 5px; }
+.pts li::marker { color: currentColor; }
+.line.host .pts li::marker { color: #1f8a4c; } .line.expert .pts li::marker { color: #2563c9; }
+
+/* chapter cards as little books */
+.book { --bk: #5a50b8; position: relative; width: 44px; height: 56px; border-radius: 4px 9px 9px 4px; display: grid; place-items: center; margin-bottom: 4px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bk) 100%, #fff 18%), var(--bk) 60%, color-mix(in srgb, var(--bk) 70%, #000));
+  box-shadow: inset 6px 0 0 rgba(0, 0, 0, .28), inset 7px 0 0 rgba(255, 255, 255, .12), 3px 4px 0 rgba(0, 0, 0, .25); transition: transform .3s; transform: rotate(-4deg); }
+.book::after { content: ""; position: absolute; right: -4px; top: 3px; bottom: 3px; width: 4px; border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(180deg, #f3efe4 0 2px, #d9d3c4 2px 3px); }
+.book .emoji { font-size: 1.25rem; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .35)); }
+.book.b0 { --bk: #5a50b8; } .book.b1 { --bk: #b8506f; } .book.b2 { --bk: #2f8f7c; } .book.b3 { --bk: #b8862f; } .book.b4 { --bk: #3a6fb0; } .book.b5 { --bk: #7a4fb0; }
+.sample:hover .book { transform: rotate(3deg) translateY(-3px) scale(1.06); }
+.sample:hover .emoji { animation: none; }
+
+/* waveform seek bar */
+.wavebox { position: relative; height: 44px; }
+#wave { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wavebox #seek { position: absolute; inset: 0; height: 100%; opacity: 0; margin: 0; }
+
+/* hero: the alien says hello */
+.hero-say { position: absolute; left: 6%; top: -4px; z-index: 2; max-width: 220px; background: var(--bubble-host); color: var(--comic-ink); border: 2.5px solid var(--comic-ink);
+  border-radius: 18px; padding: 8px 13px; font: 600 .9rem/1.3 var(--comic); box-shadow: 3px 3px 0 var(--comic-ink); animation: say-pop 6s ease-in-out infinite; transform-origin: bottom left; }
+.hero-say::after { content: ""; position: absolute; left: 30px; bottom: -13px; border-width: 13px 9px 0 9px; border-style: solid; border-color: var(--comic-ink) transparent transparent transparent; }
+@keyframes say-pop { 0%, 8% { transform: scale(.4); opacity: 0; } 14%, 80% { transform: scale(1); opacity: 1; } 88%, 100% { transform: scale(.6); opacity: 0; } }
+.hero-scene { padding-top: 30px; }
+@media (max-width: 699px) {
+  .hero { min-height: 62vh; min-height: 62svh; display: flex; flex-direction: column; justify-content: center; }  /* the characters own the first screen */
+  .hero-scene { height: 250px; } .hero-scene .ship { width: min(46%, 220px); }
+}
+
+/* the centre ships actually fly: slow loops, lean in to talk, hop on each new line */
+.stage-member .ship { animation: flight-a 9s ease-in-out infinite; }
+.stage-member.expert .ship { animation: flight-b 10s ease-in-out infinite; }
+@keyframes flight-a { 0%, 100% { transform: translate(0, 0) rotate(-3deg); } 25% { transform: translate(12px, -14px) rotate(2deg); }
+  50% { transform: translate(22px, -2px) rotate(4deg); } 75% { transform: translate(6px, 10px) rotate(-1deg); } }
+@keyframes flight-b { 0%, 100% { transform: translate(0, 0) rotate(3deg); } 25% { transform: translate(-14px, 10px) rotate(-2deg); }
+  50% { transform: translate(-22px, -6px) rotate(-4deg); } 75% { transform: translate(-6px, -14px) rotate(1deg); } }
+.stage-member.hop .ship { animation: hop .5s cubic-bezier(.3, 1.6, .5, 1), flight-a 9s ease-in-out infinite .5s; }
+.stage-member.expert.hop .ship { animation: hop .5s cubic-bezier(.3, 1.6, .5, 1), flight-b 10s ease-in-out infinite .5s; }
+@keyframes hop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-18px) scale(1.05) rotate(-4deg); } 100% { transform: translateY(0) scale(1); } }
+.stage-member.speaking .ship .flame { animation-duration: .07s; }
+@media (max-width: 699px) {  /* phones: the ships share a narrow row, so they fly smaller loops, and the fleet stays faint behind text */
+  .stage-member .ship { animation-name: flight-a-s; } .stage-member.expert .ship { animation-name: flight-b-s; }
+  .stage-member.hop .ship { animation-name: hop, flight-a-s; } .stage-member.expert.hop .ship { animation-name: hop, flight-b-s; }
+  .stage-member.host.speaking { transform: translateX(2px) rotate(2deg); } .stage-member.expert.speaking { transform: translateX(-2px) rotate(-2deg); }
+  .stage { column-gap: 18px; }
+  .fleet { opacity: .5; }
+}
+@keyframes flight-a-s { 0%, 100% { transform: translate(0, 0) rotate(-3deg); } 25% { transform: translate(4px, -8px) rotate(2deg); }
+  50% { transform: translate(-3px, -2px) rotate(3deg); } 75% { transform: translate(2px, 5px) rotate(-1deg); } }
+@keyframes flight-b-s { 0%, 100% { transform: translate(0, 0) rotate(3deg); } 25% { transform: translate(-4px, 6px) rotate(-2deg); }
+  50% { transform: translate(3px, -5px) rotate(-3deg); } 75% { transform: translate(-2px, -8px) rotate(1deg); } }
+.stage-member.speaking .ship .beam { animation-duration: 1s; }
+
 /* ---------------------------------------------------------------- monitors: use the width */
 @media (min-width: 1100px) {
-  .wrap { max-width: 1400px; padding-left: 40px; padding-right: 40px; padding-bottom: 40px; }
+  .wrap { max-width: 1400px; padding-left: 40px; padding-right: 40px; padding-bottom: 16px; }
 
   /* home: scene + headline on the left (stays put), picking + launch on the right */
   #app.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: 56px; align-items: start;
@@ -560,9 +634,9 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
   #app.home-layout .samples { grid-template-columns: repeat(3, 1fr); }
 
   /* episode: stage + player on the left, the panel as a permanent sidebar on the right */
-  #app.ep-layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; column-gap: 28px; align-items: start; }
+  #app.ep-layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; column-gap: 28px; align-items: start; padding-bottom: 0; }
   #app.ep-layout > .player, #app.ep-layout > .make, #app.ep-layout > .dock { grid-column: 1; }
-  #app.ep-layout > .sheet { grid-column: 2; grid-row: 1 / span 3; position: sticky; top: 16px; inset: auto; height: calc(100vh - 96px);
+  #app.ep-layout > .sheet { grid-column: 2; grid-row: 1 / span 3; position: sticky; top: 16px; inset: auto; height: calc(100vh - 112px);
     z-index: auto; pointer-events: auto; }
   #app.ep-layout > .sheet .scrim, #app.ep-layout > .sheet [data-close-sheet], #app.ep-layout > .sheet .grabber { display: none; }
   #app.ep-layout > .sheet .sheet-panel { position: static; transform: none; width: auto; height: 100%; max-height: none;

@@ -131,13 +131,11 @@ def _verify_episode(messages: list[dict]) -> str:
         body = user[m.end():].split("\nPART ")[0]
         claims = [{"claim": c, "supported": True, "evidence": evidence(c), "note": ""}
                   for c in re.findall(r"Think of it like this: (.+?)\. It's", body)[:4]]
-        fixed = None
+        fixes = []
         if n == 2 and claims:
             claims[0]["supported"] = False
-            fixed = [{"speaker": "host", "text": "Okay, so what comes next?"},
-                     {"speaker": "expert", "text": "Think of it like this: the book explains it step by step. It's like making chai."},
-                     {"speaker": "host", "text": "Oh, that's neat."}]
-        out.append({"part": n, "claims": claims, "fixed_turns": fixed})
+            fixes = [{"line": 2, "text": "Think of it like this: the book explains it step by step. It's like making chai."}]
+        out.append({"part": n, "claims": claims, "fixes": fixes})
     return json.dumps({"parts": out})
 
 

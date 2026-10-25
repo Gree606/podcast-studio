@@ -3,7 +3,7 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-25.1"
+PROMPT_VERSION = "2026-10-25.3"
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -191,22 +191,27 @@ Reply with ONLY JSON: {{"faithfulness": n, "naturalness": n, "engagement": n, "p
 #                    for any part that has an unsupported claim (same call)
 # Regenerating one part = FAST_REWRITE + FAST_VERIFY on that part (2 calls).
 # ---------------------------------------------------------------------------
-FAST_WRITE = """Write a complete episode of "{show}", a podcast broadcast from a space station, in which an astronaut from Earth teaches a curious alien an NCERT chapter. Indian students are listening in.
+FAST_WRITE = """Write a complete episode of "{show}", a podcast broadcast from a space station, in which an astronaut from Earth explains an NCERT chapter to a curious alien. Indian school students are listening in.
 
-Hosts:
-- {host} (speaker "host"): a friendly alien who is learning about Earth for the first time. Curious, warm, quick; asks exactly what a student would ask, reacts naturally ("Wait, so...", "Oh, that's neat!"). May now and then playfully compare with life on its own planet, but never states facts about the topic itself.
-- {expert} (speaker "expert"): an astronaut from India, the explainer; clear, friendly, uses everyday Indian examples (chai, cricket, monsoon, kitchen), then states the textbook idea precisely.
+The two hosts:
+- {host} (speaker "host"): an alien visiting Earth for the first time. Curious and a bit goofy; takes things literally, gets mildly confused, guesses wrong and gets corrected, sometimes compares things to its home planet (made-up jokes about its planet are fine; facts about the topic are not). Asks what a real 14-year-old would ask, including "why?" and "but what if...?".
+- {expert} (speaker "expert"): an astronaut from India. Relaxed and warm, like an older cousin. Explains with everyday Indian things (a pressure cooker, a cricket ball, the monsoon, a steel tumbler, a scooter), then says the textbook idea in the chapter's own words.
 
-Length: about {words} words in total (~{minutes} minutes spoken); never more than {words} + 20 words. Tone: {tone}.
+Make it sound like two real people talking, not a script:
+- Turns vary a lot in length: some are 2-5 words, most are 10-25, a few up to 35. Never more than 35 words in one turn, never a lecture.
+- They react to the specific thing just said ("A pressure cooker? On a spaceship?"), interrupt or finish each other's sentences now and then, and the alien sometimes gets something half right before {expert} fixes it.
+- Use contractions and plain words. One idea per turn. No list-like sentences.
+- Never use these give-aways: "Great question", "Exactly!", "Absolutely", "That's right!", "Oh, that's neat", "fascinating", "delve", "dive in", "let's explore", "In conclusion", "To sum up", "Welcome back", "First,... Second,... Third,...", "You got it!", "isn't it amazing". Don't start two turns in a row the same way.
+
+Length: about {words} words in total (~{minutes} minutes spoken) and never more than {words} + 20: count as you go, and leave out minor details rather than run long. Tone: {tone}.
 Structure: exactly 3 parts.
-  Part 1 - the very first line is {host} greeting {expert} and asking what they'll learn about Earth today, e.g. "Hey {expert}! So, what new thing are we learning about Earth today?" (vary the wording). {expert} welcomes the listeners to "{show}" (say the show name once) and names today's topic; then {host} asks a first curious question about it, and the main idea begins.
-  Part 2 - the core idea(s) of the chapter, explained step by step.
-  Part 3 - finish the explanation, then {host} asks for a quick recap and {expert} gives exactly three crisp takeaways; warm one-line sign-off.
+  Part 1 - the very first line is {host} greeting {expert} and asking what they're learning about Earth today, in its own words (e.g. "Hey {expert}! What's today's Earth thing?"). {expert} says hi to the listeners, mentions "{show}" once, and names the topic; {host} reacts and asks a first question.
+  Part 2 - the core idea(s) of the chapter, built up one step at a time through the back-and-forth.
+  Part 3 - finish the explanation. To wrap up, {host} tries to say back what it learned in its own words (getting one small thing slightly off), and {expert} fixes it and adds the remaining key points in a short, casual way; a quick, natural goodbye.
 
 Rules:
 - Every fact must come from the passages below; analogies are fine, but no new facts, numbers, dates or names. Use the chapter's exact terms.
-- Spoken English: contractions, short sentences, varied turns; no turn longer than 60 words; mix in short reactions.
-- Do not read activities or exercises aloud. Plain text only: no markdown, emojis or stage directions.
+- Do not read activities or exercises aloud. Plain spoken text only: no markdown, bullet points, emojis or stage directions.
 - For each part, list the passage ids you used.
 
 Chapter: {title}
@@ -227,15 +232,15 @@ Script:
 
 For each part: list its factual claims about the subject (ignore greetings, jokes and clearly-marked analogies) and mark each supported or not.
 "Supported" means a passage states it or it follows directly; any added specific (number, name, mechanism) not in the passages is NOT supported.
-If a part has any unsupported claim, also return "fixed_turns": the full corrected list of turns for that part as [{{"speaker": "host"|"expert", "text": "..."}}] (no names or numbers inside "text"), changing as little as possible (remove or correct only the unsupported statements; keep the voice and length). Otherwise set "fixed_turns" to null.
+If a part has an unsupported claim, fix ONLY the lines that contain it: return "fixes", a list of {{"line": <the line number shown in that part>, "text": "<the corrected line>"}}. Keep the speaker, voice and length of the line; just remove or correct the unsupported statement (use "" to drop a line that is nothing but the unsupported claim). Never move, merge or add lines. If nothing needs fixing, "fixes" is [].
 
 Reply with ONLY JSON:
-{{"parts": [{{"part": 1, "claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixed_turns": null}}]}}"""
+{{"parts": [{{"part": 1, "claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixes": []}}]}}"""
 
 FAST_REWRITE = """Rewrite part {index} of {total} ("{title}") of this "{show}" podcast episode.
 The listener asked: "{instruction}"
 
-Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one. Same rules: every fact from the passages only, no turn over 60 words, plain spoken text.
+Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one: real reactions to what was just said, turns of very different lengths, none over 35 words, no clichés like \"Great question\" or \"Exactly!\". Every fact from the passages only; plain spoken text.
 
 Cover every topic the current version covers (introduce each before referring to it). {role}
 Do not repeat the previous part's last line: start right after it.

@@ -127,3 +127,12 @@ def test_a_timed_out_model_falls_back_to_the_next_one(monkeypatch):
     text, _, used = asyncio.run(llm._call_with_fallback(call, [], models=["slow", "fast"], temperature=0, max_tokens=10,
                                                          json_mode=False, base_url="", api_key=""))
     assert (text, used, tried) == ("ok", "fast", ["slow", "fast"])
+
+
+def test_line_fixes_change_only_the_named_lines():
+    from backend.schemas import Turn
+    turns = [Turn(speaker="host", text="Hi!"), Turn(speaker="expert", text="Plants use tiny muscles."), Turn(speaker="host", text="Cool.")]
+    out = fast.apply_line_fixes(turns, [{"line": 2, "text": "2. Gree: Plants move without muscles."}, {"line": 9, "text": "x"}])
+    assert [(t.speaker, t.text) for t in out] == [("host", "Hi!"), ("expert", "Plants move without muscles."), ("host", "Cool.")]
+    assert fast.apply_line_fixes(turns, [{"line": 3, "text": ""}])[-1].text == "Plants use tiny muscles."
+    assert fast.apply_line_fixes(turns, []) is None

@@ -18,6 +18,7 @@ available as PIPELINE_MODE=agent for comparison.
 from __future__ import annotations
 
 import logging
+import re
 
 from ..clients.base import ServiceError
 from ..clients.llm import chat_json
@@ -32,7 +33,7 @@ log = logging.getLogger("podcast.fast")
 STAGE_WRITE, STAGE_VERIFY = "write", "verify"
 PASSAGE_WORDS = 2400  # enough for a 2-minute episode; keeps the single prompt small and fast
 WPM = 120  # measured: the Bodhan voices speak ~120 words per minute (348 words -> 175 s)
-WORDS = {"short": 180, "medium": 240, "long": 240}  # capped at ~2 minutes
+WORDS = {"short": 160, "medium": 220, "long": 250}  # quick back-and-forth runs longer per word than monologue  # capped at ~2 minutes
 
 
 def target_words(ctx: AgentContext) -> int:
@@ -57,9 +58,16 @@ def select_passages(ctx: AgentContext, limit_words: int = PASSAGE_WORDS) -> list
     return keep
 
 
+def _tidy(turns: list[Turn]) -> list[Turn]:
+    """Every episode is the listener's first: Gemini still says "welcome back" despite the prompt."""
+    for x in turns:
+        x.text = re.sub(r"\b[Ww]elcome back\b", "Welcome", x.text)
+    return turns
+
+
 def _part_turns(raw: dict | list, names: tuple[str, str]) -> list[Turn]:
     # parts of a 2-minute episode are short; a 2-line exchange is still a usable part
-    return parse_turns(raw if isinstance(raw, dict) else {"turns": raw}, *names, min_turns=2)
+    return _tidy(parse_turns(raw if isinstance(raw, dict) else {"turns": raw}, *names, min_turns=2))
 
 
 # ---------------------------------------------------------------- call 1: write
@@ -141,10 +149,12 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
             claims.append(Claim(claim=str(c["claim"]), supported=bool(c.get("supported", True)),
                                 evidence_chunk_id=ev if ev in ctx.by_id else None, note=c.get("note") or None))
         bad = [c for c in claims if not c.supported]
-        fixed = p.get("fixed_turns")
+        fixed = apply_line_fixes(s.candidates[-1].turns, p.get("fixes")) if bad else None
+        if fixed is None and bad and p.get("fixed_turns"):  # older answer shape: a whole corrected part
+            fixed = p.get("fixed_turns")
         if bad and fixed:
             try:
-                turns = _part_turns(fixed, names)
+                turns = fixed if isinstance(fixed, list) and fixed and isinstance(fixed[0], Turn) else _part_turns(fixed, names)
                 s.candidates.append(Candidate(index=len(s.candidates), round=1, turns=turns))
                 ctx.emit(STAGE_VERIFY, "action", f"Part {s.index + 1}: corrected {len(bad)} unsupported claim(s): "
                          + " | ".join(c.claim[:80] for c in bad[:3]), s.id)
@@ -160,6 +170,28 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
     ctx.emit(STAGE_VERIFY, "observation", f"Fact-check (1 call): {sum(c.supported for c in every)}/{len(every)} "
              "claims supported by the chapter.", data={"unsupported": [c.claim for c in every if not c.supported]})
     return out
+
+
+def apply_line_fixes(turns: list[Turn], fixes) -> list[Turn] | None:
+    """Apply the fact-checker's per-line corrections ({"line": n, "text": ...}, 1-based) to a copy of the
+    part. Only those lines change; nothing can be reordered or pulled in from another part."""
+    if not isinstance(fixes, list) or not fixes:
+        return None
+    out: list[Turn | None] = [t.model_copy() for t in turns]
+    changed = False
+    for fx in fixes:
+        try:
+            i = int(fx.get("line")) - 1
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not 0 <= i < len(out) or out[i] is None:
+            continue
+        text = str(fx.get("text") or "").strip()
+        text = re.sub(r"^(?:\d+[.)]\s*)?[A-Za-z0-9 ]{1,20}:\s*", "", text) if re.match(r"^(?:\d+[.)]\s*)?[A-Za-z0-9 ]{1,20}:\s", text) else text
+        out[i] = Turn(speaker=out[i].speaker, text=text) if text else None
+        changed = True
+    kept = [t for t in out if t is not None]
+    return kept if changed and kept else None
 
 
 def new_version(seg: Segment, claims: list[Claim], instruction: str | None = None) -> SegmentVersion:
@@ -181,7 +213,7 @@ async def rewrite_part(ctx: AgentContext, seg: Segment, segments: list[Segment],
         prev_last=(prev.current.turns[-1].text[:200] if prev and prev.current else "(this is the opening)"),
         next_first=(nxt.current.turns[0].text[:200] if nxt and nxt.current else "(this is the last part)"),
         role=("This is the opening: it still starts with the alien greeting the astronaut and asking what they will learn about Earth today, then the welcome to the show." if seg.index == 0 else
-              "This is the last part: keep the recap with exactly three takeaways and the one-line sign-off."
+              "This is the last part: keep the wrap-up where the alien says back what it learned and the astronaut fixes and completes it, then the goodbye."
               if nxt is None else ""),
         current=script_text(cur, names), passages=ctx.passages_text(seg.chunk_ids or [c.id for c in ctx.chunks[:4]]))
     data = await chat_json([{"role": "user", "content": prompt}], task="rewrite_part", expect=dict,
