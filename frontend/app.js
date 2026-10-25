@@ -246,6 +246,7 @@ function showConfigure() {
 }
 
 async function createEpisode() {
+  if (!reducedMotion()) { document.body.classList.add("warp"); setTimeout(() => document.body.classList.remove("warp"), 1600); }
   const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner" role="img" aria-label="Starting"></span> Launching…`;
   const all = $$("#sections input"), sel = all.filter(i => i.checked).map(i => i.value);
   const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value,
@@ -597,6 +598,8 @@ function launch() {
 function setSpeaking(speaker) {
   $("#stageHost").classList.toggle("speaking", speaker === "host");
   $("#stageExpert").classList.toggle("speaking", speaker === "expert");
+  const st = $("#stage");  // signal dots fly from the speaker's ship to the listener's
+  if (st) { st.classList.toggle("talk-host", speaker === "host"); st.classList.toggle("talk-expert", speaker === "expert"); }
 }
 function onTime() {
   const a = $("#audio"); if (!a) return;

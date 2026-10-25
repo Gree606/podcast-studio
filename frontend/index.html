@@ -77,7 +77,46 @@
 </svg>
 
 <a class="skip" href="#app">Skip to content</a>
-<div class="sky" aria-hidden="true"><span class="stars s1"></span><span class="stars s2"></span><span class="stars s3"></span><span class="planet"></span><span class="moon"></span><span class="shooting"></span></div>
+<div class="sky" aria-hidden="true">
+  <span class="nebula n1"></span><span class="nebula n2"></span><span class="nebula n3"></span>
+  <span class="stars s1"></span><span class="stars s2"></span><span class="stars s3"></span>
+  <span class="planet"></span><span class="moon"></span><span class="shooting"></span><span class="shooting sh2"></span>
+  <div class="fleet">
+    <svg class="fl sat" viewBox="0 0 120 60"><title>Satellite</title>
+      <g class="spin"><rect x="0" y="22" width="40" height="16" rx="2" fill="#3f6fd8"/><path d="M10 22v16M20 22v16M30 22v16" stroke="#9cc2ff" stroke-width="1.2"/>
+      <rect x="80" y="22" width="40" height="16" rx="2" fill="#3f6fd8"/><path d="M90 22v16M100 22v16M110 22v16" stroke="#9cc2ff" stroke-width="1.2"/>
+      <path d="M40 30h40" stroke="#c9d2e6" stroke-width="3"/><rect x="48" y="18" width="24" height="24" rx="5" fill="#e8edf7"/>
+      <circle cx="60" cy="30" r="5" fill="#ffd166"/><path d="M60 18V6" stroke="#c9d2e6" stroke-width="2"/><circle class="lamp" cx="60" cy="5" r="3" fill="#ff6b9d"/></g></svg>
+    <svg class="fl ufo-s" viewBox="0 0 100 70"><title>Small saucer</title>
+      <path class="ray" d="M38 46h24l14 24H24z" fill="#5ee6d0"/>
+      <ellipse cx="50" cy="28" rx="18" ry="16" fill="#bfe9ff" fill-opacity=".35" stroke="#bfe9ff" stroke-width="2"/>
+      <circle cx="50" cy="28" r="7" fill="#7be495"/><circle cx="47" cy="26" r="1.6" fill="#15122e"/><circle cx="53" cy="26" r="1.6" fill="#15122e"/>
+      <ellipse cx="50" cy="42" rx="46" ry="11" fill="#ff6b9d"/><ellipse cx="50" cy="38" rx="36" ry="6" fill="#ff9cbd"/>
+      <circle class="lamp" cx="18" cy="44" r="3" fill="#ffd166"/><circle class="lamp l2" cx="50" cy="49" r="3" fill="#5ee6d0"/><circle class="lamp" cx="82" cy="44" r="3" fill="#ffd166"/></svg>
+    <svg class="fl rocket-s" viewBox="0 0 140 40"><title>Little rocket</title>
+      <path d="M0 20h60" stroke="url(#trail)" stroke-width="4" stroke-linecap="round"/>
+      <path class="fire" d="M58 12l-16 8 16 8z" fill="#ffd166"/>
+      <path d="M58 8h50c14 0 26 6 32 12-6 6-18 12-32 12H58z" fill="#e8edf7"/><path d="M62 8l-8-8h18l8 8zM62 32l-8 8h18l8-8z" fill="#ff6b6b"/>
+      <circle cx="104" cy="20" r="6" fill="#4cc9f0" stroke="#9aa7c7" stroke-width="2"/>
+      <defs><linearGradient id="trail" x1="0" x2="1"><stop offset="0" stop-color="#ffd166" stop-opacity="0"/><stop offset="1" stop-color="#ffd166"/></linearGradient></defs></svg>
+    <svg class="fl comet" viewBox="0 0 220 40"><title>Comet</title>
+      <defs><linearGradient id="tail" x1="0" x2="1"><stop offset="0" stop-color="#5ee6d0" stop-opacity="0"/><stop offset=".8" stop-color="#bff7ff" stop-opacity=".7"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
+      <path d="M0 20L196 12a8 8 0 0 1 0 16z" fill="url(#tail)"/><circle cx="200" cy="20" r="9" fill="#fff"/><circle cx="200" cy="20" r="15" fill="#bff7ff" opacity=".35"/></svg>
+    <svg class="fl station" viewBox="0 0 120 120"><title>Space station</title>
+      <g class="spin"><circle cx="60" cy="60" r="44" fill="none" stroke="#9aa7c7" stroke-width="9"/><circle cx="60" cy="60" r="44" fill="none" stroke="#c9d2e6" stroke-width="2" stroke-dasharray="6 9"/>
+      <path d="M60 16v88M16 60h88" stroke="#7d88aa" stroke-width="4"/><circle cx="60" cy="60" r="12" fill="#e8edf7"/><circle cx="60" cy="60" r="5" fill="#8b7bff"/>
+      <circle class="lamp" cx="60" cy="16" r="4" fill="#ffd166"/><circle class="lamp l2" cx="104" cy="60" r="4" fill="#5ee6d0"/></g></svg>
+    <svg class="fl astro" viewBox="0 0 80 90"><title>Floating astronaut</title>
+      <g class="tumble"><rect x="14" y="34" width="12" height="30" rx="5" fill="#c9d2e6"/>
+      <path d="M22 44c-8 2-14 8-16 14M58 44c8-6 12-14 12-22" stroke="#e8edf7" stroke-width="8" stroke-linecap="round" fill="none"/>
+      <rect x="22" y="36" width="36" height="34" rx="12" fill="#e8edf7"/><path d="M30 68l-4 18M50 68l4 18" stroke="#e8edf7" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="40" cy="24" r="18" fill="#f4f6fb"/><ellipse cx="42" cy="24" rx="12" ry="10" fill="#1a2550"/><path d="M36 19a8 6 0 0 1 8-3" stroke="#fff" stroke-width="2" fill="none" opacity=".6"/>
+      <rect x="34" y="46" width="12" height="7" rx="2" fill="#ff6b6b"/></g></svg>
+    <svg class="fl rock r1" viewBox="0 0 60 50"><title>Asteroid</title><path d="M8 18L22 4l20 2 14 14-4 18-18 10L6 38z" fill="#6b6f8a"/><circle cx="24" cy="20" r="5" fill="#575b75"/><circle cx="40" cy="30" r="3.5" fill="#575b75"/></svg>
+    <svg class="fl rock r2" viewBox="0 0 60 50"><title>Asteroid</title><path d="M4 22L18 6h22l16 16-6 18-24 6L6 36z" fill="#7a6a8a"/><circle cx="30" cy="22" r="6" fill="#66587a"/></svg>
+    <svg class="fl rock r3" viewBox="0 0 60 50"><title>Asteroid</title><path d="M10 14L30 4l22 10 2 22-20 12L8 40z" fill="#5f6b80"/><circle cx="22" cy="24" r="4" fill="#4e596c"/><circle cx="38" cy="18" r="3" fill="#4e596c"/></svg>
+  </div>
+</div>
 
 <div class="wrap">
   <header class="top">
@@ -147,6 +186,7 @@
 <template id="tpl-home">
   <section class="hero">
     <div class="scene hero-scene" aria-hidden="true">
+      <span class="spark k1">✦</span><span class="spark k2">✦</span><span class="spark k3">✧</span><span class="spark k4">✦</span><span class="spark k5">✧</span>
       <div class="orbit"></div>
       <svg class="ship hero-ufo float" viewBox="0 0 200 150" role="img" aria-label="Error606 the alien in a flying saucer"><title>Error606's saucer</title>
         <ellipse cx="100" cy="66" rx="48" ry="46" fill="#bfe9ff" fill-opacity=".12" stroke="#bfe9ff" stroke-opacity=".55" stroke-width="3"/>
@@ -226,6 +266,8 @@
 <template id="tpl-episode">
   <section class="player" id="player" aria-labelledby="plTitle">
     <div class="stage" id="stage">
+      <div class="cruise" aria-hidden="true"><span class="c1"></span><span class="c2"></span><span class="far-planet"></span></div>
+      <div class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       <div class="transmission" id="transmission" aria-hidden="true">● Live from Space Station CC-1</div>
       <figure class="stage-member host" id="stageHost">
         <svg class="ship" viewBox="0 0 200 150" role="img" aria-label="The alien's flying saucer"><title>Alien's saucer</title>
