@@ -231,6 +231,9 @@ function showConfigure() {
   const P = CONFIG.presets || DEFAULT_PRESETS, L = CONFIG.lengths || {};
   presetGroup($("#lengthChoices"), "length", P.length, "medium");
   presetGroup($("#toneChoices"), "tone", P.tone, "balanced");
+  const langs = CONFIG.languages || [{code: "en", native: "English", name: "English"}];
+  $("#langChoices").innerHTML = langs.map(l => `<input type="radio" name="language" id="lang-${esc(l.code)}" value="${esc(l.code)}" ${l.code === (CONFIG.lastLang || "en") ? "checked" : ""}>
+    <label for="lang-${esc(l.code)}" lang="${esc(l.html || l.code)}" title="${esc(l.name)}">${esc(l.native)}</label>`).join("");
   P.length.forEach(p => { const el = $(`[data-hint="${p.value}"]`, $("#lengthChoices")); if (el && L[p.value]) el.textContent = `~${Math.max(1, Math.round(L[p.value].audio_minutes))} min`; });
   const upd = () => {
     const k = $("input[name=length]:checked").value, sel = $$("#sections input:checked").length, est = L[k];
@@ -249,7 +252,8 @@ async function createEpisode() {
   if (!reducedMotion()) { document.body.classList.add("warp"); setTimeout(() => document.body.classList.remove("warp"), 1600); }
   const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner" role="img" aria-label="Starting"></span> Launching…`;
   const all = $$("#sections input"), sel = all.filter(i => i.checked).map(i => i.value);
-  const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value,
+  const language = ($("input[name=language]:checked") || {}).value || "en"; CONFIG.lastLang = language;
+  const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value, language,
     host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
   try {
     const r = await postJSON("/api/episodes", {source_id: SOURCE.id, settings});
@@ -259,6 +263,7 @@ async function createEpisode() {
 
 // ------------------------------------------------------------------ episode
 function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
+const htmlLang = ep => ((CONFIG.languages || []).find(l => l.code === (ep && ep.settings.language)) || {}).html || "en";
 const names = ep => ({host: ep.settings.host_name || "Error606", expert: ep.settings.expert_name || "Gree"});
 const currentVersion = s => s.versions.find(v => v.version === s.active_version);
 
@@ -445,7 +450,7 @@ function renderTrust(ep) {
   $("#trustBadge").innerHTML = parts.join("");
 }
 
-const sentences = text => (text.match(/[^.!?]+[.!?]+["')]*|[^.!?]+$/g) || [text]).map(x => x.trim()).filter(Boolean);
+const sentences = text => (text.match(/[^.!?\u0964\u0965]+[.!?\u0964\u0965]+["')]*|[^.!?\u0964\u0965]+$/g) || [text]).map(x => x.trim()).filter(Boolean);
 // a long explanation reads better as points than as a paragraph
 function fmtTurn(text) {
   const ss = sentences(text);
@@ -477,7 +482,7 @@ function renderSegments(ep) {
       if (fresh) seenLines.add(key);
       return `<div class="line ${t.speaker}${fresh ? " fresh" : ""}" style="--i:${Math.min(fresh ? freshN++ : 0, 14)}" role="button" tabindex="0" data-start="${t.start ?? ""}" data-si="${si}" data-ss="${t.seg_start ?? ""}" aria-label="${esc(n[t.speaker])}: ${esc(t.text)}">
         <svg class="mini" viewBox="0 0 120 120" aria-hidden="true"><use href="#av-${t.speaker}"/></svg>
-        <div class="bubble"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${fmtTurn(t.text)}</div></div>`;
+        <div class="bubble" lang="${htmlLang(ep)}"><span class="who">${esc(n[t.speaker])}<span class="ts">${fmtT(t.start)}</span></span>${fmtTurn(t.text)}</div></div>`;
     }).join("") : s.error ? `<div class="notice err">😕 ${esc(s.error)}</div>` : `<p class="muted small">${s.status === "pending" ? "⏳ Waiting for its turn…" : "✍️ Being written…"}</p>`;
     const versions = s.versions.length > 1 ? `<div class="versions small"><b>Versions:</b>${s.versions.map(x => `<button type="button" class="chip ${x.version === s.active_version ? "on" : ""}" data-act="ver" data-seg="${s.id}" data-v="${x.version}" aria-pressed="${x.version === s.active_version}" title="${esc(x.instruction || "first version")}" ${ep.busy ? "disabled" : ""}>v${x.version}${x.instruction && x.instruction !== "regenerate" ? ` · ${esc(FIXES.find(f => f.instruction === x.instruction)?.label || "✏️ yours")}` : ""}</button>`).join("")}
       <button type="button" class="chip" data-act="preview" data-seg="${s.id}">▶ Hear another version</button><audio class="hidden" data-prev="${s.id}" controls></audio></div>` : "";
@@ -705,7 +710,7 @@ function onTime() {
     }
     if (si !== onTime.lastSi) {
       onTime.lastSi = si;
-      cap.innerHTML = `<span class="say"><b>${esc(n[cur.speaker])}</b>${esc(ss[si])}</span>`;
+      cap.innerHTML = `<span class="say" lang="${htmlLang(epState)}"><b>${esc(n[cur.speaker])}</b>${esc(ss[si])}</span>`;
     }
   }
   if (curEl && curEl !== onTime.last && !a.paused) {  // keep the spoken line in view inside the scrollable log, not the page

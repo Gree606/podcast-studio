@@ -136,3 +136,35 @@ def test_line_fixes_change_only_the_named_lines():
     assert [(t.speaker, t.text) for t in out] == [("host", "Hi!"), ("expert", "Plants move without muscles."), ("host", "Cool.")]
     assert fast.apply_line_fixes(turns, [{"line": 3, "text": ""}])[-1].text == "Plants use tiny muscles."
     assert fast.apply_line_fixes(turns, []) is None
+
+
+def test_languages_reach_every_stage():
+    from backend import languages
+    from backend.audio.wer import wer
+    from backend.clients.tts import bodhan_body, split_text
+    from backend.textnorm import normalize_for_tts
+
+    assert languages.get("ta").tts == "ta-IN" and languages.get("nope").code == "en"
+    assert "Tamil" in languages.writing_rule("ta") and "Hinglish" in languages.writing_rule("hinglish")
+    assert bodhan_body("नमस्ते", "host", "hi-IN")["instructions"] == '{"lang": "hi"}'
+    assert split_text("पहला वाक्य। दूसरा वाक्य।", 12) == ["पहला वाक्य।", "दूसरा वाक्य।"]
+    # Indic: a misspelled name is a small miss (not 0% as before the fix, nor 100%); English words written in
+    # Devanagari by the recogniser don't count; a cut-off take does
+    assert 0 < wer("अरे ग्री आज हम धरती के बारे में", "अरे घ्री आज हम धरती के बारे में", "hi") < 0.1
+    assert wer("Earth पर chemical reaction का कैसे पता चलता है?", "अर्थ पर केमिकल रिएक्शन का कैसे पता चलता है", "hinglish") < 0.1
+    assert wer("नहीं! पौधे अपना भोजन खुद बनाते हैं जल और खनिजों से।", "नहीं पौधे", "hi") > 0.6
+    assert wer("What about burning a magnesium ribbon?", "वॉट अबाउट बर्निंग", "hinglish") is None
+    assert normalize_for_tts("Error606 और 1,200", "hi") == "Error six oh six और 1,200"
+
+
+def test_episode_in_hindi_end_to_end_in_mock_mode():
+    with TestClient(app) as client:
+        cfg = client.get("/api/config").json()
+        assert {"en", "hi", "ta", "hinglish"} <= {x["code"] for x in cfg["languages"]}
+        sample = client.get("/api/samples").json()[0]["id"]
+        src = client.post("/api/sources", data={"sample_id": sample}).json()
+        bad = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"language": "klingon"}})
+        assert bad.status_code == 400
+        eid = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"language": "hi"}}).json()["id"]
+        ep = _wait(client, eid, lambda e: e["status"] in ("done", "failed") and not e["busy"])
+        assert ep["status"] == "done" and ep["settings"]["language"] == "hi"

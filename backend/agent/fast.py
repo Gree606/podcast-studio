@@ -25,6 +25,7 @@ from ..clients.llm import chat_json
 from ..config import get_settings
 from ..prompts import FAST_REWRITE, FAST_VERIFY, FAST_WRITE
 from ..schemas import Candidate, Claim, KeyFact, Segment, SegmentVersion, Turn, new_id
+from .. import languages
 from .context import AgentContext
 from .writer import SHOW, TONES, WriterError, parse_turns, script_text
 
@@ -80,7 +81,8 @@ async def write_episode(ctx: AgentContext) -> list[Segment]:
     words = target_words(ctx)
     prompt = FAST_WRITE.format(show=SHOW, host=st.host_name, expert=st.expert_name, words=words,
                                minutes=round(words / WPM, 1), tone=TONES[st.tone], title=ctx.source.title,
-                               passages=ctx.passages_text(pids, limit_words=PASSAGE_WORDS + 200), extra="")
+                               passages=ctx.passages_text(pids, limit_words=PASSAGE_WORDS + 200), extra="",
+                               language_rule=languages.writing_rule(st.language))
     ctx.status(STAGE_WRITE, "Writing the whole episode (1 model call)", 0.15)
     data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
                            temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
@@ -215,6 +217,7 @@ async def rewrite_part(ctx: AgentContext, seg: Segment, segments: list[Segment],
         role=("This is the opening: it still starts with the alien greeting the astronaut and asking what they will learn about Earth today, then the welcome to the show." if seg.index == 0 else
               "This is the last part: keep the wrap-up where the alien says back what it learned and the astronaut fixes and completes it, then the goodbye."
               if nxt is None else ""),
+        language_rule=languages.writing_rule(st.language),
         current=script_text(cur, names), passages=ctx.passages_text(seg.chunk_ids or [c.id for c in ctx.chunks[:4]]))
     data = await chat_json([{"role": "user", "content": prompt}], task="rewrite_part", expect=dict,
                            temperature=0.7, max_tokens=2000, thinking=get_settings().llm_write_thinking or None)

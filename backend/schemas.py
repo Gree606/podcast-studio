@@ -57,6 +57,7 @@ class EpisodeSettings(BaseModel):
     host_name: str = "Error606"  # the curious alien
     expert_name: str = "Gree"  # the astronaut who explains
     section_ids: list[str] = Field(default_factory=list)  # empty = whole chapter
+    language: str = "en"  # a key of backend.languages.LANGUAGES: the episode's spoken language
 
 
 class Turn(BaseModel):

@@ -24,6 +24,7 @@ from collections import deque
 
 import numpy as np
 
+from .. import languages
 from ..config import get_settings
 from .base import ServiceError, request_with_retry
 from .usage import record
@@ -75,7 +76,7 @@ def split_text(text: str, max_chars: int) -> list[str]:
         return [text]
     pieces: list[str] = []
     cur = ""
-    for sent in re.split(r"(?<=[.!?])\s+", text):
+    for sent in re.split(r"(?<=[.!?\u0964\u0965])\s+", text):  # also the Devanagari full stops । ॥
         while len(sent) > max_chars:  # a single huge sentence: break at a comma or space
             cut = max(sent.rfind(", ", 0, max_chars), sent.rfind(" ", 0, max_chars))
             cut = cut if cut > 0 else max_chars
@@ -94,9 +95,9 @@ def split_text(text: str, max_chars: int) -> list[str]:
     return [p for p in pieces if p]
 
 
-async def _sarvam(text: str, speaker: str) -> bytes:
+async def _sarvam(text: str, speaker: str, lang: str | None = None) -> bytes:
     s = get_settings()
-    body = {"text": text, "language_code": s.tts_language, "speaker": voice_for(speaker), "model": s.tts_model,
+    body = {"text": text, "language_code": lang or s.tts_language, "speaker": voice_for(speaker), "model": s.tts_model,
             "pace": s.tts_pace, "speech_sample_rate": s.sample_rate}
     resp = await request_with_retry(
         "Voice service", "POST", s.tts_base_url.rstrip("/") + "/text-to-speech", json=body,
@@ -112,17 +113,17 @@ async def _sarvam(text: str, speaker: str) -> bytes:
         raise ServiceError("Voice service", "returned an unexpected response", str(e)) from e
 
 
-def bodhan_body(text: str, speaker: str) -> dict:
+def bodhan_body(text: str, speaker: str, lang_code: str | None = None) -> dict:
     s = get_settings()
-    lang = s.tts_language.split("-")[0].lower() or "en"
+    lang = (lang_code or s.tts_language).split("-")[0].lower() or "en"
     return {"model": s.tts_model, "input": text, "voice": voice_for(speaker), "instructions": json.dumps({"lang": lang})}
 
 
-async def _bodhan(text: str, speaker: str) -> bytes:
+async def _bodhan(text: str, speaker: str, lang: str | None = None) -> bytes:
     s = get_settings()
     await _pace()
     resp = await request_with_retry(
-        "Voice service", "POST", s.tts_base_url.rstrip("/") + "/v1/audio/speech", json=bodhan_body(text, speaker),
+        "Voice service", "POST", s.tts_base_url.rstrip("/") + "/v1/audio/speech", json=bodhan_body(text, speaker, lang),
         headers={"Authorization": f"{s.tts_auth_prefix}{s.tts_api_key}", "Content-Type": "application/json"},
         timeout=s.tts_timeout_s, attempts=5, semaphore=_semaphore(),
     )
@@ -140,10 +141,10 @@ async def _openai(text: str, speaker: str) -> bytes:
     return resp.content
 
 
-async def _json(text: str, speaker: str, style: str | None) -> bytes:
+async def _json(text: str, speaker: str, style: str | None, lang: str | None = None) -> bytes:
     s = get_settings()
     headers = {"Authorization": f"Bearer {s.tts_api_key}"} if s.tts_api_key else {}
-    body = {"text": text, "speaker": voice_for(speaker), "language": s.tts_language}
+    body = {"text": text, "speaker": voice_for(speaker), "language": lang or s.tts_language}
     if style:
         body["style"] = style
     resp = await request_with_retry("Voice service", "POST", s.tts_base_url.rstrip("/") + "/synthesize", json=body,
@@ -169,8 +170,10 @@ def _join_wavs(chunks: list[bytes]) -> bytes:
     return to_wav_bytes(np.concatenate(parts), sr)
 
 
-async def synthesize(text: str, speaker: str, *, style: str | None = None) -> bytes:
+async def synthesize(text: str, speaker: str, *, style: str | None = None, language: str | None = None) -> bytes:
+    """``language`` is an episode language code (backend.languages); None = the configured TTS_LANGUAGE."""
     s = get_settings()
+    lang = languages.get(language).tts if language else None
     record(tts_calls=1, tts_chars=len(text))
     if s.tts_mock():
         from . import mock
@@ -178,11 +181,11 @@ async def synthesize(text: str, speaker: str, *, style: str | None = None) -> by
         return await mock.mock_tts(text, speaker)
     pieces = split_text(text, s.tts_max_chars)
     if s.tts_api_style == "sarvam":
-        outs = await asyncio.gather(*(_sarvam(p, speaker) for p in pieces))
+        outs = await asyncio.gather(*(_sarvam(p, speaker, lang) for p in pieces))
     elif s.tts_api_style == "bodhan":
-        outs = await asyncio.gather(*(_bodhan(p, speaker) for p in pieces))
+        outs = await asyncio.gather(*(_bodhan(p, speaker, lang) for p in pieces))
     elif s.tts_api_style == "openai":
         outs = await asyncio.gather(*(_openai(p, speaker) for p in pieces))
     else:
-        outs = await asyncio.gather(*(_json(p, speaker, style) for p in pieces))
+        outs = await asyncio.gather(*(_json(p, speaker, style, lang) for p in pieces))
     return outs[0] if len(outs) == 1 else _join_wavs(list(outs))

@@ -38,12 +38,17 @@ def script_mismatch(expected: str, heard: str) -> bool:
     return non_latin > 0.5 and exp_latin > 0.8
 
 
+def _lang(ctx: AgentContext) -> str:
+    ep = getattr(ctx, "episode", None)
+    return getattr(getattr(ep, "settings", None), "language", None) or "en"
+
+
 def prefetch(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> None:
     """Start recording (TTS + listen-back) these lines now, in the background. A later
     synthesize_version reuses a finished take for any line whose text is unchanged; lines the
     fact-check rewrote simply miss the cache and are recorded fresh."""
     for i, t in enumerate(turns):
-        key = (t.speaker, normalize_for_tts(t.text))
+        key = (t.speaker, normalize_for_tts(t.text, _lang(ctx)))
         if key not in ctx.tts_cache:
             task = asyncio.create_task(_record_line(ctx, seg, i, t.model_copy()))
             task.add_done_callback(lambda tk: tk.cancelled() or tk.exception())  # failures are retried later, not logged twice
@@ -51,7 +56,7 @@ def prefetch(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> None:
 
 
 async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np.ndarray:
-    key = (turn.speaker, normalize_for_tts(turn.text))
+    key = (turn.speaker, normalize_for_tts(turn.text, _lang(ctx)))
     task = getattr(ctx, "tts_cache", {}).pop(key, None)  # (test doubles may not carry a cache)
     if task is not None:
         try:
@@ -68,12 +73,13 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
 async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> tuple[np.ndarray, Turn]:
     s = get_settings()
     sr = s.sample_rate
-    turn.tts_text = normalize_for_tts(turn.text)
+    lang = _lang(ctx)
+    turn.tts_text = normalize_for_tts(turn.text, lang)
     best: tuple[float, np.ndarray, str] | None = None
     check = asr.asr_available() and len(turn.tts_text.split()) >= s.asr_min_words
     for attempt in range(1, s.max_tts_retries + 2):
         turn.tts_attempts = attempt
-        raw = await tts.synthesize(turn.tts_text, turn.speaker, style=STYLE.get(turn.speaker))
+        raw = await tts.synthesize(turn.tts_text, turn.speaker, style=STYLE.get(turn.speaker), language=lang)
         clip = prepare_clip(raw, sr)
         if len(clip) < sr * 0.2:
             ctx.emit(STAGE, "warning", f"Turn {i + 1}: voice service returned (near) silent audio; retrying.", seg.id)
@@ -81,7 +87,7 @@ async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> t
         if not check:
             return clip, turn
         try:
-            heard = await asr.transcribe(to_wav_bytes(resample(clip, sr, 16000), 16000))
+            heard = await asr.transcribe(to_wav_bytes(resample(clip, sr, 16000), 16000), language=lang)
         except ServiceError as e:
             ctx.emit(STAGE, "warning", f"Self-check skipped for turn {i + 1}: speech recogniser {e.user_message}.", seg.id)
             return clip, turn
@@ -89,7 +95,9 @@ async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> t
             ctx.emit(STAGE, "warning", f"Turn {i + 1}: the speech recogniser answered in a different script "
                      f"(\"{heard[:40]}\"), so WER is meaningless; keeping this take. Set ASR_LANGUAGE to fix.", seg.id)
             return clip, turn
-        err = wer(turn.tts_text, heard)
+        err = wer(turn.tts_text, heard, lang)
+        if err is None:  # e.g. an all-English line in a Hinglish episode: nothing to compare in this script
+            return clip, turn
         if attempt == 1:
             turn.first_wer = round(err, 3)
         if best is None or err < best[0]:

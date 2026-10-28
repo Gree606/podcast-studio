@@ -3,7 +3,7 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-25.3"
+PROMPT_VERSION = "2026-10-28.1"
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -213,6 +213,7 @@ Rules:
 - Every fact must come from the passages below; analogies are fine, but no new facts, numbers, dates or names. Use the chapter's exact terms.
 - Do not read activities or exercises aloud. Plain spoken text only: no markdown, bullet points, emojis or stage directions.
 - For each part, list the passage ids you used.
+- {language_rule}
 
 Chapter: {title}
 Passages:
@@ -232,7 +233,7 @@ Script:
 
 For each part: list its factual claims about the subject (ignore greetings, jokes and clearly-marked analogies) and mark each supported or not.
 "Supported" means a passage states it or it follows directly; any added specific (number, name, mechanism) not in the passages is NOT supported.
-If a part has an unsupported claim, fix ONLY the lines that contain it: return "fixes", a list of {{"line": <the line number shown in that part>, "text": "<the corrected line>"}}. Keep the speaker, voice and length of the line; just remove or correct the unsupported statement (use "" to drop a line that is nothing but the unsupported claim). Never move, merge or add lines. If nothing needs fixing, "fixes" is [].
+If a part has an unsupported claim, fix ONLY the lines that contain it: return "fixes", a list of {{"line": <the line number shown in that part>, "text": "<the corrected line>"}}. Keep the speaker, voice and length of the line; just remove or correct the unsupported statement (use "" to drop a line that is nothing but the unsupported claim). Never move, merge or add lines. Write each corrected line in the same language as the script. If nothing needs fixing, "fixes" is [].
 
 Reply with ONLY JSON:
 {{"parts": [{{"part": 1, "claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixes": []}}]}}"""
@@ -240,7 +241,7 @@ Reply with ONLY JSON:
 FAST_REWRITE = """Rewrite part {index} of {total} ("{title}") of this "{show}" podcast episode.
 The listener asked: "{instruction}"
 
-Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one: real reactions to what was just said, turns of very different lengths, none over 35 words, no clichés like \"Great question\" or \"Exactly!\". Every fact from the passages only; plain spoken text.
+Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one: real reactions to what was just said, turns of very different lengths, none over 35 words, no clichés like \"Great question\" or \"Exactly!\". Every fact from the passages only; plain spoken text. {language_rule}
 
 Cover every topic the current version covers (introduce each before referring to it). {role}
 Do not repeat the previous part's last line: start right after it.

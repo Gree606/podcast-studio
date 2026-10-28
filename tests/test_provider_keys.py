@@ -178,7 +178,7 @@ def test_very_short_lines_skip_the_self_check(monkeypatch):
 
     calls = []
 
-    async def counting_transcribe(wav):
+    async def counting_transcribe(wav, language=None):
         calls.append(1)
         return "plants make their own food from sunlight"
 

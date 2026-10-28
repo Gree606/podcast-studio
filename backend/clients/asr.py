@@ -11,6 +11,7 @@ import asyncio
 import time
 from collections import deque
 
+from .. import languages
 from ..config import get_settings
 from .base import ServiceError, request_with_retry
 from .usage import record
@@ -53,8 +54,8 @@ def asr_available() -> bool:
     return s.asr_mock() or s.asr_ready()
 
 
-async def transcribe(wav_bytes: bytes) -> str:
-    """Transcribe 16 kHz mono WAV bytes."""
+async def transcribe(wav_bytes: bytes, language: str | None = None) -> str:
+    """Transcribe 16 kHz mono WAV bytes. ``language`` is an episode language code (backend.languages)."""
     s = get_settings()
     record(asr_calls=1)
     if s.asr_mock():
@@ -70,8 +71,9 @@ async def transcribe(wav_bytes: bytes) -> str:
     data = {}
     if s.asr_model:
         data["model"] = s.asr_model
-    if s.asr_language_code():
-        data["language"] = s.asr_language_code()
+    code = s.asr_language_code() if (language is None or s.asr_language == "auto") else languages.get(language).asr
+    if code:
+        data["language"] = code
     resp = await request_with_retry(
         "Speech recogniser", "POST", s.asr_base_url.rstrip("/") + "/v1/audio/transcriptions",
         files={"file": ("turn.wav", wav_bytes, "audio/wav")}, data=data, headers=headers,

@@ -103,8 +103,14 @@ _SYMBOLS = [
 _DIGITS = ["oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 
 
-def normalize_for_tts(text: str) -> str:
+def normalize_for_tts(text: str, language: str | None = None) -> str:
+    """Make text speakable. Number, unit and symbol reading is English; for other languages
+    the voice reads digits itself, so only markdown and names like "Error606" are handled."""
     t = text
+    if language not in (None, "en"):
+        t = re.sub(r"[*_#`]+", "", t)
+        t = re.sub(r"(?<=[A-Za-z])\d{1,4}\b", lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)
+        return re.sub(r"\s+", " ", t).strip()
     t = re.sub(r"[*_#`]+", "", t)  # stray markdown
     t = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", t)
     t = re.sub(r"\(\s*(?:see\s+)?(?:fig(?:ure)?|table|activity)\.?\s*[\d.]+\s*\)", "", t, flags=re.I)

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from . import jobs
 from .agent import fast
+from .languages import LANGUAGES
 from .agent.context import LENGTHS
 from .agent.orchestrator import regenerate_segment, run_episode, switch_version
 from .clients.base import close_http_client
@@ -113,7 +114,8 @@ async def config():
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
             "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS},
-            "presets": PRESETS, "secrets_path": str(secrets_path()), "configured": s.configured()}
+            "presets": PRESETS, "secrets_path": str(secrets_path()), "configured": s.configured(),
+            "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()]}
 
 
 # --- samples -----------------------------------------------------------------------
@@ -199,6 +201,8 @@ async def create_episode(body: CreateEpisode, request: Request):
         raise HTTPException(404, "Chapter not found. Please upload it again.")
     rate_limit(request, "episode", 12)
     st = body.settings
+    if st.language not in LANGUAGES:
+        raise HTTPException(400, "That language isn't supported yet.")
     st.host_name = (st.host_name or "Error606").strip()[:20] or "Error606"
     st.expert_name = (st.expert_name or "Gree").strip()[:20] or "Gree"
     valid = {x.id for x in src.sections}
