@@ -1,4 +1,4 @@
-"""Focused acceptance tests for GARGANTUA_PLAN.md criteria.
+"""Acceptance tests for the project requirements (presets, flow, failures, accessibility).
 Runs offline in mock mode, CPU only, without network dependencies.
 """
 from pathlib import Path
@@ -10,7 +10,7 @@ from backend.main import app
 from backend.quiz import build_quiz
 from backend.schemas import Episode, EpisodeSettings, KeyFact, Segment
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "samples"
 
 

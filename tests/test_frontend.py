@@ -7,7 +7,7 @@ from fastapi.routing import APIRoute
 
 from backend.main import app
 
-FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
+FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 HTML = (FRONTEND / "index.html").read_text(encoding="utf-8")
 JS = (FRONTEND / "app.js").read_text(encoding="utf-8")
 CSS = (FRONTEND / "app.css").read_text(encoding="utf-8")

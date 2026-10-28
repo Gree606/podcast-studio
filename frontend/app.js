@@ -1,6 +1,6 @@
 "use strict";
 // Chapter Chat frontend. Plain JS, no build step. Every element looked up by id here
-// exists in index.html (checked by tests/claude/test_claude_frontend.py).
+// exists in index.html (checked by tests/test_frontend.py).
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];

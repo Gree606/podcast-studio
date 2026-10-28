@@ -8,7 +8,7 @@ from backend.ingest import ingest_text
 from backend.quiz import build_quiz
 from backend.schemas import Chunk, Episode, EpisodeSettings, KeyFact, Section, Segment, Source
 
-SAMPLES = Path(__file__).resolve().parents[2] / "samples"
+SAMPLES = Path(__file__).resolve().parents[1] / "samples"
 
 
 def first_sentence(text: str) -> str:

@@ -1,4 +1,4 @@
-"""Focused acceptance tests added by Codex.
+"""Acceptance tests for edge cases.
 
 These tests use the existing mock-mode fixture from tests/conftest.py and make
 no network calls.
@@ -17,7 +17,7 @@ from backend.schemas import Chunk, Episode, EpisodeSettings, KeyFact, Section, S
 
 def test_config_never_exposes_runtime_key_values(monkeypatch):
     """Acceptance criterion 3: a loaded sentinel key is absent from API responses."""
-    sentinel = "codex-secret-value-must-not-leak-12345"
+    sentinel = "test-secret-value-must-not-leak-12345"
     monkeypatch.setenv("LLM_API_KEY", sentinel)
     monkeypatch.setenv("TTS_API_KEY", sentinel)
     monkeypatch.setenv("ASR_API_KEY", sentinel)

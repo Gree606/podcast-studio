@@ -29,27 +29,27 @@ def prepare_config(monkeypatch, tmp_path, *, secret_key: str) -> None:
 
 def test_ocr_key_load_order_and_environment_override(monkeypatch, tmp_path):
     # Acceptance criterion 2: secrets-file values override repo .env values; real environment overrides both.
-    prepare_config(monkeypatch, tmp_path, secret_key="codex-ocr-file-sentinel")
+    prepare_config(monkeypatch, tmp_path, secret_key="test-ocr-file-sentinel")
     try:
-        assert get_settings().ocr_api_key == "codex-ocr-file-sentinel"
+        assert get_settings().ocr_api_key == "test-ocr-file-sentinel"
 
-        monkeypatch.setenv("OCR_API_KEY", "codex-ocr-env-override")
+        monkeypatch.setenv("OCR_API_KEY", "test-ocr-env-override")
         get_settings.cache_clear()
-        assert get_settings().ocr_api_key == "codex-ocr-env-override"
+        assert get_settings().ocr_api_key == "test-ocr-env-override"
     finally:
         get_settings.cache_clear()
 
 
 def test_ocr_secret_is_not_returned_by_config_or_health(monkeypatch, tmp_path):
     # Acceptance criterion 3: a sentinel provider key is absent from API responses.
-    sentinel = "codex-ocr-response-sentinel"
+    sentinel = "test-ocr-response-sentinel"
     prepare_config(monkeypatch, tmp_path, secret_key=sentinel)
     try:
         with TestClient(app) as client:
             responses = [
                 client.get("/api/config"),
                 client.get("/api/health"),
-                client.get("/api/episodes/codex-missing-episode"),
+                client.get("/api/episodes/test-missing-episode"),
             ]
         assert all(response.status_code in (200, 404) for response in responses)
         assert sentinel not in "\n".join(response.text for response in responses)

@@ -13,7 +13,7 @@ from backend import config as config_mod
 from backend import main as main_mod
 from backend.config import get_settings
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 SENTINEL = "AIzaSySENTINEL0123456789abcdef"
 
 
