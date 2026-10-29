@@ -869,8 +869,8 @@ function renderVersions(ep) {
 }
 
 // ------------------------------------------------------------------ sound effects
-// Synthesised with Web Audio (no audio files): an 8-bit menu "blip" when the mouse moves onto a
-// control, and a mechanical-keyboard "thock" when you press one. Quiet, quieter still while an
+// Synthesised with Web Audio (no audio files): a soft, rounded 8-bit blip when the mouse moves
+// onto a control; a click sound can be switched on per SFX_STYLE below. Quiet, quieter still while an
 // episode plays, and switchable off in the menu (remembered). Browsers allow sound only after the
 // first tap or click, so the context is created then.
 const SFX_TARGETS = "button, a.btn, a.new-btn, a.icon-btn, a.drawer-item, a.save-item, .sample, .tab, .presets label, .langs label, .dock-btn, .chip, .q-opt, .line, label.btn, summary";
@@ -890,39 +890,81 @@ function sfxLevel() {
   const a = $("#audio");
   return a && !a.paused ? 0.45 : 1;  // stay under the hosts' voices
 }
-function sfxHover() {  // a two-step square-wave blip, like moving the cursor in a Nintendo menu
+// Soft voices for the two sounds. Each takes (ctx, start time, output node, level) so the same code
+// plays live and renders the preview files in scripts/render_sfx.py. SFX_STYLE picks the variant.
+// Chosen by blind listening test: hover "soft8bit" (5/5). No click sound until we have one that
+// feels right (the synthesised ones were all rejected); set SFX_STYLE.click to a voice name to enable.
+const SFX_STYLE = {hover: "soft8bit", click: null};
+function sfxEnv(ctx, t, peak, attack, decay) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  return g;
+}
+function sfxNoise(ctx, seconds, grains) {  // noise made of a few soft "grains": paper fibres rubbing, not a hiss
+  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds)), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  const at = Array.from({length: grains}, (_, i) => (i + Math.random() * 0.6) / grains);
+  for (let i = 0; i < len; i++) {
+    const x = i / len;
+    let env = 0;
+    for (const c of at) env += Math.exp(-Math.pow((x - c) * grains * 3.2, 2));
+    d[i] = (Math.random() * 2 - 1) * env * (1 - x * 0.6);
+  }
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  return src;
+}
+const SFX_VOICES = {
+  hover: {
+    bubble(ctx, t, out, lvl) {  // a soft sine "bip" gliding up, like a bubble
+      const o = ctx.createOscillator(), g = sfxEnv(ctx, t, 0.05 * lvl, 0.008, 0.09);
+      o.type = "sine"; o.frequency.setValueAtTime(560, t); o.frequency.exponentialRampToValueAtTime(840, t + 0.05);
+      o.connect(g).connect(out); o.start(t); o.stop(t + 0.12);
+    },
+    glass(ctx, t, out, lvl) {  // a tiny, very quiet glassy tick
+      for (const [f, a] of [[1568, 1], [3136, 0.25]]) {
+        const o = ctx.createOscillator(), g = sfxEnv(ctx, t, 0.022 * a * lvl, 0.003, 0.06);
+        o.type = "sine"; o.frequency.value = f; o.connect(g).connect(out); o.start(t); o.stop(t + 0.08);
+      }
+    },
+    soft8bit(ctx, t, out, lvl) {  // the game blip, rounded off: triangle wave, filtered, gentle envelope
+      const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = sfxEnv(ctx, t, 0.07 * lvl, 0.006, 0.1);
+      o.type = "triangle"; o.frequency.setValueAtTime(523, t); o.frequency.setValueAtTime(784, t + 0.04);
+      lp.type = "lowpass"; lp.frequency.value = 1800;
+      o.connect(lp).connect(g).connect(out); o.start(t); o.stop(t + 0.13);
+    },
+  },
+  click: {
+    paper(ctx, t, out, lvl) {  // a light paper "tk": three soft grains, warm band, no thump
+      const n = sfxNoise(ctx, 0.045, 3), bp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      bp.type = "bandpass"; bp.frequency.value = 1500 * (0.92 + Math.random() * 0.16); bp.Q.value = 0.8;
+      lp.type = "lowpass"; lp.frequency.value = 3800; g.gain.value = 0.5 * lvl;
+      n.connect(bp).connect(lp).connect(g).connect(out); n.start(t);
+    },
+    softkey(ctx, t, out, lvl) {  // a muted linear-switch key: a dull tick and a small round body
+      const n = sfxNoise(ctx, 0.018, 1), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      lp.type = "lowpass"; lp.frequency.value = 2200; g.gain.value = 0.32 * lvl;
+      n.connect(lp).connect(g).connect(out); n.start(t);
+      const o = ctx.createOscillator(), og = sfxEnv(ctx, t, 0.06 * lvl, 0.003, 0.035);
+      o.type = "sine"; o.frequency.setValueAtTime(330 * (0.95 + Math.random() * 0.1), t); o.frequency.exponentialRampToValueAtTime(220, t + 0.035);
+      o.connect(og).connect(out); o.start(t); o.stop(t + 0.05);
+    },
+    pencil(ctx, t, out, lvl) {  // a short grainy pencil-on-paper scratch
+      const n = sfxNoise(ctx, 0.075, 7), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      hp.type = "highpass"; hp.frequency.value = 900; lp.type = "lowpass"; lp.frequency.value = 4200; g.gain.value = 0.38 * lvl;
+      n.connect(hp).connect(lp).connect(g).connect(out); n.start(t);
+    },
+  },
+};
+function sfxHover() {
   const ctx = sfx.ctx && sfx.on ? sfx.ctx : null;
   if (!ctx || ctx.state !== "running") return;
-  const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = "square";
-  o.frequency.setValueAtTime(988, t);           // B5 ...
-  o.frequency.setValueAtTime(1319, t + 0.035);  // ... then E6
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.035 * sfxLevel(), t + 0.005);
-  g.gain.setValueAtTime(0.035 * sfxLevel(), t + 0.06);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-  o.connect(g).connect(ctx.destination);
-  o.start(t); o.stop(t + 0.1);
+  SFX_VOICES.hover[SFX_STYLE.hover](ctx, ctx.currentTime, ctx.destination, sfxLevel());
 }
-function sfxClick() {  // mechanical key: a bright click (filtered noise) on top of a short low thock
-  const ctx = sfxContext();
-  if (!ctx) return;
-  const t = ctx.currentTime, lvl = sfxLevel(), vary = 0.9 + Math.random() * 0.2;
-  const len = Math.floor(ctx.sampleRate * 0.03), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
-  const noise = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
-  noise.buffer = buf; bp.type = "bandpass"; bp.frequency.value = 3800 * vary; bp.Q.value = 1.2;
-  ng.gain.value = 0.32 * lvl;
-  noise.connect(bp).connect(ng).connect(ctx.destination);
-  const o = ctx.createOscillator(), og = ctx.createGain();
-  o.type = "triangle";
-  o.frequency.setValueAtTime(190 * vary, t);
-  o.frequency.exponentialRampToValueAtTime(70, t + 0.05);
-  og.gain.setValueAtTime(0.0001, t);
-  og.gain.exponentialRampToValueAtTime(0.22 * lvl, t + 0.004);
-  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-  o.connect(og).connect(ctx.destination);
-  noise.start(t); o.start(t); o.stop(t + 0.08);
+function sfxClick() {
+  const ctx = sfxContext();  // still unlocks audio for the hover sound
+  if (!ctx || !SFX_STYLE.click) return;
+  SFX_VOICES.click[SFX_STYLE.click](ctx, ctx.currentTime, ctx.destination, sfxLevel());
 }
 function setSfx(on) {
   sfx.on = on;
