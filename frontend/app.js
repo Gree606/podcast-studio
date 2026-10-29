@@ -640,13 +640,14 @@ function drawWave() {
   if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const peaks = drawWave.peaks || Array.from({length: 96}, (_, i) => .15 + .1 * Math.abs(Math.sin(i * .7)));
-  const n = peaks.length, gap = 2, bw = Math.max(1.5, (w - gap * (n - 1)) / n), p = a.duration ? a.currentTime / a.duration : 0;
+  const n = peaks.length, gap = 3, bw = Math.max(3, (w - gap * (n - 1)) / n), p = a.duration ? a.currentTime / a.duration : 0;
   const lvl = drawWave.level || 0;
   for (let i = 0; i < n; i++) {
     const x = i * (bw + gap), played = (i + .5) / n <= p, near = Math.abs((i + .5) / n - p) < 2.5 / n;
     const bh = Math.max(3, peaks[i] * (h - 6) * (near && !a.paused ? 1 + lvl * .6 : 1));
     g.fillStyle = played ? (near ? "#b9b0f2" : "#8c82d8") : "rgba(255,255,255,.18)";
-    g.beginPath(); g.roundRect ? g.roundRect(x, (h - bh) / 2, bw, bh, bw / 2) : g.rect(x, (h - bh) / 2, bw, bh); g.fill();
+    const px = 3, bx = Math.round(x), bwid = Math.max(px, Math.round(bw)), bhh = Math.max(px, Math.round(bh / px) * px);  // whole pixel blocks
+    g.fillRect(bx, Math.round((h - bhh) / 2 / px) * px, bwid, bhh);
   }
 }
 let meter = null;

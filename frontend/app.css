@@ -657,6 +657,211 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
   #app.ep-layout > .dock { position: static; margin: 22px auto 0; width: max-content; }
 }
 
+/* ================================================================ PIXEL THEME
+   8/16-bit game look: pixel fonts, square corners, notched pixel borders drawn with box-shadows,
+   speech bubbles with a stepped tail and a lavender bottom shade, sprites drawn with nearest-
+   neighbour scaling, and animation in steps. Sprites come from scripts/make_pixel_sprites.py. */
+@font-face { font-family: "Press Start 2P"; src: url("/fonts/press-start-2p-latin.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Pixelify Sans"; src: url("/fonts/pixelify-sans-latin.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+:root {
+  --pixel: "Press Start 2P", ui-monospace, monospace;
+  --font: "Pixelify Sans", ui-sans-serif, system-ui, sans-serif;
+  --comic: "Pixelify Sans", ui-sans-serif, system-ui, sans-serif;
+  --display: "Press Start 2P", ui-monospace, monospace;
+  --bg: #100d29; --bg2: #16123a;
+  --ink-px: #15122e;  /* sprite and bubble outline */
+  --panel: #1d1946; --panel-hi: #2b2663; --panel-edge: #8c82d8;
+  --bubble-host: #ecfff2; --bubble-expert: #ecf3ff; --bubble-now: #fff36b;
+  --shade-1: #dcdbf7; --shade-2: #b4b1ec;
+  --r: 0; --r-sm: 0;
+}
+* { border-radius: 0 !important; }
+body { background: var(--bg); background-attachment: fixed; font-size: 17px; }
+image, img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+svg { shape-rendering: crispEdges; }
+/* CRT scanlines, very faint */
+body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 80;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .07) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+
+/* notched pixel border: four offset shadows leave the corner pixels out */
+.card, .drawer-panel, .sheet-panel, .dock, .notice, .toast, .badge, dialog, .setup, .stage {
+  border: none !important; background: var(--panel);
+  box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge), -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge),
+              inset 0 4px 0 0 var(--panel-hi);
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.stage { background: #0b0922; box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge), -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge); }
+.card { margin: 4px 4px 22px; }
+
+/* type */
+h1, h2, h3, .label, .brand b, .transmission, .opt-label, .stations, .dock-btn span, .pl-title, .chosen-title, .new-btn span, .badge, #sheetTitle {
+  font-family: var(--pixel) !important; letter-spacing: 0; font-weight: 400 !important; }
+.hero h1 { font-size: clamp(1.25rem, 4.2vw, 2.4rem); line-height: 1.45; text-shadow: 4px 4px 0 #000; }
+.hl { background: none; -webkit-background-clip: initial; background-clip: initial; color: #ffd166; }
+.lede { font-size: 1.15rem; }
+.label { font-size: .62rem; color: #b8b2ee; }
+.brand b { font-size: .75rem; }
+.chosen-title { font-size: .9rem; line-height: 1.5; }
+.transmission { font-size: .55rem; letter-spacing: .05em; }
+.pl-title { font-size: .62rem; line-height: 1.6; }
+.opt-label { font-size: .5rem; }
+.badge { font-size: .5rem; line-height: 1.6; padding: 8px 12px; }
+.stations { font-size: .45rem; }
+#sheetTitle { font-size: .8rem; }
+
+/* buttons: chunky, shaded, press down */
+.btn, .icon-btn, .new-btn, .chip, .q-opt, .save-item, .drawer-item, .sample, .tab, .presets label, .langs label {
+  border: none !important; box-shadow: 0 -3px 0 0 var(--ink-px), 0 3px 0 0 var(--ink-px), -3px 0 0 0 var(--ink-px), 3px 0 0 0 var(--ink-px),
+    inset -3px -3px 0 0 rgba(0, 0, 0, .35), inset 3px 3px 0 0 rgba(255, 255, 255, .12); transition: none; }
+.btn, .new-btn, .tab, .presets label, .langs label, .chip { font-family: var(--pixel); font-size: .58rem; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
+.btn { background: var(--panel-hi); }
+.btn.primary { background: #6b60c9; color: #fff; }
+.btn.primary::after { display: none; }
+.btn:active, .icon-btn:active, .new-btn:active, .chip:active, .q-opt:active, .dock-btn:active, .play:active, .sample:active {
+  transform: translate(0, 3px) !important; box-shadow: 0 -3px 0 0 var(--ink-px), 0 3px 0 0 var(--ink-px), -3px 0 0 0 var(--ink-px), 3px 0 0 0 var(--ink-px),
+    inset 3px 3px 0 0 rgba(0, 0, 0, .35) !important; }
+.btn.big { font-size: .75rem; padding: 18px 24px; }
+.icon-btn, .new-btn { background: var(--panel-hi); }
+.tabs.seg, .presets { background: transparent; border: none; padding: 4px; gap: 10px; }
+.tab, .presets label, .langs label { background: var(--panel); color: #b8b2ee; }
+.tab[aria-selected=true], .presets input:checked + label, .langs input:checked + label { background: #ffd166; color: var(--ink-px); }
+.langs { gap: 10px; padding: 4px; }
+.langs label { font-family: var(--font); font-size: .95rem; }
+input[type=text], textarea { border: none; background: #0b0922; box-shadow: 0 -3px 0 0 var(--panel-edge), 0 3px 0 0 var(--panel-edge), -3px 0 0 0 var(--panel-edge), 3px 0 0 0 var(--panel-edge); margin: 8px 3px; }
+.sample { background: var(--panel-hi); margin: 3px; }
+.sample.sel { background: #3a3480; }
+.sample::after { display: none; }
+.sample:hover { transform: translateY(-3px); }
+.book { transform: none; box-shadow: inset 4px 0 0 rgba(0, 0, 0, .35), 3px 3px 0 #000; }
+.sample:hover .book { transform: translateY(-3px); }
+
+/* the play button: a square yellow game button */
+.play { width: 64px; height: 64px; background: #ffd166; color: var(--ink-px);
+  box-shadow: 0 -4px 0 0 var(--ink-px), 0 4px 0 0 var(--ink-px), -4px 0 0 0 var(--ink-px), 4px 0 0 0 var(--ink-px),
+    inset -4px -4px 0 0 #d9a52f, inset 4px 4px 0 0 #fff0b8, 0 0 0 calc(4px + var(--lvl, 0) * 10px) rgba(255, 209, 102, .25); margin: 4px; }
+.play.ready { animation: px-breathe 1s steps(2) infinite; }
+@keyframes px-breathe { 50% { background: #ffe39a; } }
+.speed { font-family: var(--pixel); font-size: .55rem; }
+.times { font-family: var(--pixel); font-size: .5rem; margin-top: 4px; }
+
+/* speech bubbles, in the style of the reference: white, dark pixel border, lavender bottom shade, stepped tail */
+.caption, .line .bubble, .hero-say, .thought {
+  --bb: #fff; background: var(--bb); color: var(--ink-px); border: none !important;
+  /* dark pixel outline, then a light outer ring so the bubble still pops on the dark page */
+  box-shadow: 0 -4px 0 0 var(--ink-px), 0 4px 0 0 var(--ink-px), -4px 0 0 0 var(--ink-px), 4px 0 0 0 var(--ink-px),
+    0 -12px 0 -4px #e6e4ff, 0 12px 0 -4px #e6e4ff, -12px 0 0 -4px #e6e4ff, 12px 0 0 -4px #e6e4ff,
+    4px -4px 0 0 transparent, inset 0 -4px 0 0 var(--shade-2), inset 0 -8px 0 0 var(--shade-1) !important;
+  padding-bottom: 14px; }
+.caption { margin: 22px 4px 4px; font: 500 1.15rem/1.45 var(--comic); }
+.caption.from-host, .line.host .bubble { --bb: var(--bubble-host); }
+.caption.from-expert, .line.expert .bubble { --bb: var(--bubble-expert); }
+.line.now .bubble { --bb: var(--bubble-now); transform: none; }
+.line .bubble { font: 500 1.02rem/1.5 var(--comic); margin: 4px; }
+.caption .say b, .line .who { font-family: var(--pixel); font-size: .5rem; letter-spacing: 0; margin-bottom: 6px; }
+.caption::after, .line .bubble::after, .hero-say::after { display: none !important; }
+/* the tail: 4px "pixels" stacked as shadows of a 4x4 transparent box (B = outline, F = bubble fill) */
+.caption::before, .line .bubble::before, .hero-say::before {
+  content: "" !important; display: block !important; position: absolute; width: 4px; height: 4px; background: transparent !important; border: 0 !important; transform: none !important; }
+/* up-pointing tail (phone caption: the ships are above the bubble) */
+.caption.from-host::before, .caption.from-expert::before { top: 0; left: 22%; right: auto;
+  box-shadow: 0 -4px 0 var(--ink-px), 4px -4px 0 var(--bb), 8px -4px 0 var(--bb), 12px -4px 0 var(--ink-px),
+    0 -8px 0 var(--ink-px), 4px -8px 0 var(--bb), 8px -8px 0 var(--ink-px), 0 -12px 0 var(--ink-px), 4px -12px 0 var(--ink-px), 0 -16px 0 var(--ink-px) !important; }
+.caption.from-expert::before { left: auto; right: 22%;
+  box-shadow: 0 -4px 0 var(--ink-px), -4px -4px 0 var(--bb), -8px -4px 0 var(--bb), -12px -4px 0 var(--ink-px),
+    0 -8px 0 var(--ink-px), -4px -8px 0 var(--bb), -8px -8px 0 var(--ink-px), 0 -12px 0 var(--ink-px), -4px -12px 0 var(--ink-px), 0 -16px 0 var(--ink-px) !important; }
+/* side tails (script bubbles; caption on wide screens): out of the left edge for the alien, the right edge for Gree */
+.line.host .bubble::before { left: 0; bottom: 14px; top: auto;
+  box-shadow: -4px 0 0 var(--ink-px), -4px 4px 0 var(--bb), -4px 8px 0 var(--ink-px), -8px 0 0 var(--ink-px), -8px 4px 0 var(--ink-px), -12px 0 0 var(--ink-px) !important; }
+.line.expert .bubble::before { right: 0; left: auto; bottom: 14px; top: auto;
+  box-shadow: 4px 0 0 var(--ink-px), 4px 4px 0 var(--bb), 4px 8px 0 var(--ink-px), 8px 0 0 var(--ink-px), 8px 4px 0 var(--ink-px), 12px 0 0 var(--ink-px) !important; }
+.hero-say::before { left: 26px; bottom: 0; top: auto;
+  box-shadow: 0 4px 0 var(--ink-px), 4px 4px 0 var(--bb), 8px 4px 0 var(--ink-px), 0 8px 0 var(--ink-px), 4px 8px 0 var(--ink-px), 0 12px 0 var(--ink-px) !important; }
+.hero-say { font: 600 .95rem/1.35 var(--comic); animation: px-say 6s steps(1) infinite; }
+@keyframes px-say { 0%, 10% { opacity: 0; } 12%, 85% { opacity: 1; } 87%, 100% { opacity: 0; } }
+.pop-in, .line.fresh .bubble { animation: px-pop .3s steps(3) both; }
+@keyframes px-pop { 0% { transform: scale(.7); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.pts li::marker { content: "▸ "; }
+@media (min-width: 1100px) { #app.home-layout .hero h1 { font-size: clamp(1.5rem, 2.5vw, 2.5rem); } }
+@media (min-width: 700px) {
+  .caption { margin: 4px 16px; }
+  .caption.from-host::before { left: 0; top: 50%;
+    box-shadow: -4px 0 0 var(--ink-px), -4px 4px 0 var(--bb), -4px 8px 0 var(--bb), -4px 12px 0 var(--ink-px),
+      -8px 0 0 var(--ink-px), -8px 4px 0 var(--bb), -8px 8px 0 var(--ink-px), -12px 0 0 var(--ink-px), -12px 4px 0 var(--ink-px), -16px 0 0 var(--ink-px) !important; }
+  .caption.from-expert::before { right: 0; left: auto; top: 50%;
+    box-shadow: 4px 0 0 var(--ink-px), 4px 4px 0 var(--bb), 4px 8px 0 var(--bb), 4px 12px 0 var(--ink-px),
+      8px 0 0 var(--ink-px), 8px 4px 0 var(--bb), 8px 8px 0 var(--ink-px), 12px 0 0 var(--ink-px), 12px 4px 0 var(--ink-px), 16px 0 0 var(--ink-px) !important; }
+}
+
+/* sprites: frame animation in steps (inherited --talk/--talk-o reach into the <use> copies) */
+.spr-blink { opacity: 0; animation: spr-blink 4.2s steps(1) infinite; }
+@keyframes spr-blink { 0%, 92% { opacity: 0; } 93%, 96% { opacity: 1; } 97%, 100% { opacity: 0; } }
+.spr-talk { opacity: var(--talk-o, 0); animation: spr-flip .24s steps(1) infinite; animation-play-state: var(--talk, paused); }
+@keyframes spr-flip { 0% { visibility: visible; } 50% { visibility: hidden; } }
+.spr-lights-a { animation: spr-flip 1s steps(1) infinite; }
+.spr-lights-b { animation: spr-flip 1s steps(1) infinite -.5s; }
+.spr-flame { animation: spr-flame .3s steps(1) infinite; }
+@keyframes spr-flame { 0%, 60% { visibility: visible; } 61%, 100% { visibility: hidden; } }
+.spr-beam { animation: spr-beam 1.6s steps(1) infinite; }
+@keyframes spr-beam { 0%, 49% { opacity: .35; } 50%, 100% { opacity: .8; } }
+.stage-member.speaking .spr-flame { animation-duration: .16s; }
+.mini, .line .mini { --av-bg: #173a2c; }
+.line.expert .mini { --av-bg: #1b2c55; }
+.line .mini { width: 36px; height: 36px; box-shadow: 0 0 0 3px var(--ink-px); }
+/* ships move but never rotate (rotated pixels stop looking like pixels) */
+@keyframes flight-a { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -12px); } 50% { transform: translate(16px, -4px); } 75% { transform: translate(4px, 8px); } }
+@keyframes flight-b { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-10px, 8px); } 50% { transform: translate(-16px, -4px); } 75% { transform: translate(-4px, -12px); } }
+@keyframes flight-a-s { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -6px); } }
+@keyframes flight-b-s { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-3px, -6px); } }
+@keyframes hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes hop { 0% { transform: translateY(0); } 40% { transform: translateY(-16px); } 100% { transform: translateY(0); } }
+.stage-member.host.speaking, .stage-member.expert.speaking { transform: none; }
+.stage-member.speaking .ship { filter: drop-shadow(0 0 0 transparent) drop-shadow(4px 0 0 rgba(255, 209, 102, .0)); }
+.stage-member figcaption { font-family: var(--pixel); font-size: .5rem; padding: 6px 8px; border: none; background: var(--ink-px);
+  box-shadow: 0 0 0 3px var(--c); }
+.stage-member::after { border-width: 3px; border-style: solid; }  /* radio waves: square pixel rings */
+.signal i { box-shadow: none; width: 6px; height: 6px; }
+
+/* pixel sky: tiled single-pixel stars at three depths, sprite planet, moon and fleet */
+.nebula, .shooting { display: none; }
+.stars { background-image: none !important; background-repeat: repeat; }
+.stars.s1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; animation: drift-px1 120s steps(240) infinite, px-twinkle 3s steps(2) infinite; }
+.stars.s2 { background: url("/sprites/stars_b.png") 0 0 / 280px 280px repeat; animation: drift-px2 80s steps(160) infinite; }
+.stars.s3 { background: url("/sprites/stars_c.png") 0 0 / 400px 400px repeat; animation: drift-px3 50s steps(100) infinite, px-twinkle 2s steps(2) infinite -1s; }
+@keyframes drift-px1 { to { transform: translate3d(-384px, 192px, 0); } }
+@keyframes drift-px2 { to { transform: translate3d(-560px, 280px, 0); } }
+@keyframes drift-px3 { to { transform: translate3d(-800px, 400px, 0); } }
+@keyframes px-twinkle { 50% { opacity: .55; } }
+img.planet { position: absolute; right: -40px; top: 90px; width: 224px; height: auto; opacity: .9; background: none; box-shadow: none; }
+img.planet::after { display: none; }
+img.moon { position: absolute; left: 4%; bottom: 10%; width: 60px; height: auto; opacity: .8; background: none; animation: hover 12s steps(6) infinite; }
+.fl { will-change: transform; }
+.sat { width: 90px; } .ufo-s { width: 72px; } .rocket-s { width: 102px; } .comet { width: 176px; } .station { width: 112px; opacity: .8; }
+.astro { width: 54px; animation-timing-function: linear; } .rock { width: 36px; } .rock.r2 { width: 30px; } .rock.r3 { width: 42px; }
+.rock.r1 { animation: fly-rock1 80s linear infinite; animation-delay: -30s; }
+@media (max-width: 640px) { .sat { width: 60px; } .ufo-s { width: 48px; } .rocket-s { width: 68px; } .station { width: 56px; } .comet { width: 88px; } .astro { width: 36px; }
+  img.planet { width: 168px; } }
+.cruise .c1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; opacity: .8; animation: cruise 6s steps(48) infinite; }
+.cruise .c1 { width: calc(100% + 192px); }
+@keyframes cruise { to { transform: translateX(-192px); } }
+.cruise .c2 { display: none; }
+.far-planet { background: url("/sprites/moon.png") center / contain no-repeat; box-shadow: none; width: 80px; height: 80px; }
+
+/* waveform, progress and dock */
+.rail { height: 8px; background: #0b0922; box-shadow: 0 0 0 3px var(--panel-edge); }
+.rail i { background: repeating-linear-gradient(90deg, #ffd166 0 8px, #d9a52f 8px 10px); }
+.dock { padding: 8px; gap: 8px; background: var(--panel); }
+.dock-btn { color: #b8b2ee; padding: 8px 10px; }
+.dock-btn span { font-size: .45rem; margin-top: 4px; }
+.dock-btn.on, .dock-btn:hover { background: var(--panel-hi); color: #ffd166; }
+.toast { font-family: var(--pixel); font-size: .55rem; line-height: 1.6; background: #ffd166; color: var(--ink-px);
+  box-shadow: 0 -4px 0 0 var(--ink-px), 0 4px 0 0 var(--ink-px), -4px 0 0 0 var(--ink-px), 4px 0 0 0 var(--ink-px); }
+.segment { border: none; background: transparent; box-shadow: 0 0 0 3px var(--panel-edge); margin: 4px 4px 18px; }
+.seg-head { background: var(--panel-hi); border-bottom: 3px solid var(--panel-edge); }
+.seg-head h3 { font-size: .55rem; line-height: 1.6; }
+.seg-num { font-family: var(--pixel); font-size: .55rem; background: #ffd166; color: var(--ink-px); }
+.badge.warn { background: #3a2c0e; }
+.spinner { border-radius: 0 !important; animation: spin .8s steps(4) infinite; }
+.new-btn .ico, .icon-btn .ico { shape-rendering: crispEdges; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .confetti { display: none; }
