@@ -272,8 +272,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; paddi
 .stage-member.speaking::after { animation: ping 1s ease-out infinite; }
 @keyframes ping { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.9); opacity: 0; } }
 .stage.busy .stage-member .ship { animation-duration: 2.4s; }
-.stage.launch .stage-member.host { animation: in-left 1.2s cubic-bezier(.2, .9, .3, 1.1) both; }
-.stage.launch .stage-member.expert { animation: in-right 1.2s cubic-bezier(.2, .9, .3, 1.1) both; }
+.stage.launch .stage-member.host { animation: in-left 2.4s cubic-bezier(.15, .8, .25, 1.05) both; }  /* lands as the landing sound peaks */
+.stage.launch .stage-member.expert { animation: in-right 2.4s cubic-bezier(.15, .8, .25, 1.05) both; }
 @keyframes in-left { from { transform: translate(-130%, -30px) rotate(-14deg); opacity: 0; } }
 @keyframes in-right { from { transform: translate(130%, -30px) rotate(14deg); opacity: 0; } }
 

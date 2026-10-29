@@ -275,7 +275,6 @@ async function renderEpisode(id) {
   seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
   const app = $("#app"); app.className = "ep-layout"; app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   if (wide()) openSheet("script");  // on monitors the panel is a permanent sidebar
-  if (sfx.ctx && sfx.ctx.state === "running") playIntro(4.5);
   journey("make");
   const a = $("#audio");
   $("#playBtn").classList.add("waiting");
@@ -429,7 +428,7 @@ function setAudio(ep) {
     if (wasPlaying) a.play().catch(() => {});
   }, {once: true});
   $("#player").classList.remove("hidden");
-  if (!launched) { launched = true; launch(); }
+  if (!launched) { launched = true; launch(true); }
   if (!wasPlaying) {
     $("#playBtn").classList.add("ready"); const cap = $("#nowLine"); cap.dataset.say = "";
     cap.classList.remove("from-host", "from-expert"); cap.innerHTML = "<span>🎧 Ready. Press play!</span>";
@@ -575,7 +574,7 @@ const partReady = (ep, k) => { const s = ep && ep.segments[k], v = s && currentV
 function startLive(ep) {
   live = {on: true, k: 0, waiting: false};
   $("#player").classList.remove("hidden");
-  if (!launched) { launched = true; launch(); }
+  if (!launched) { launched = true; launch(true); }
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
   $("#nowLine").classList.remove("from-host", "from-expert");
@@ -609,10 +608,12 @@ function nextLivePart() {
 }
 
 // "Incoming transmission": the two ships fly in and the banner flashes
-function launch() {
-  const st = $("#stage"); if (!st || reducedMotion()) return;
+function launch(withSound = false) {  // withSound: the ships arriving on the page (not each replay)
+  const st = $("#stage"); if (!st) return;
+  if (withSound && !ambient.podcast) playLanding();
+  if (reducedMotion()) return;
   st.classList.remove("launch"); void st.offsetWidth; st.classList.add("launch");
-  clearTimeout(launch.t); launch.t = setTimeout(() => st.classList.remove("launch"), 3200);
+  clearTimeout(launch.t); launch.t = setTimeout(() => st.classList.remove("launch"), 3600);
 }
 
 // karaoke: highlight the line being spoken and make that host "talk"
@@ -1062,28 +1063,38 @@ document.addEventListener("visibilitychange", () => updateAmbient(0.5));
 // Shown when the app opens: Error606 asks for the secret code (when the server has one), then
 // START plays the alien intro (Alien Song by Dragon Studio, Pixabay) and lets you in. The tap also
 // unlocks browser audio. The server enforces the code; this screen is the friendly face of it.
-const intro = {bytes: null, buf: null, src: null, gain: null};
-function introLoad() {
-  if (!intro.bytes) intro.bytes = fetch("/sounds/intro.mp3").then(r => r.arrayBuffer()).catch(() => null);
-  return intro.bytes;
+// One-shot sound files (frontend/sounds/*.mp3): downloaded with the page, decoded when audio unlocks.
+// Only one plays at a time, and stopStings() hushes it the moment an episode starts playing.
+const stings = {files: {}, decoded: {}, playing: null};
+function stingLoad(name) {
+  if (!stings.files[name]) stings.files[name] = fetch(`/sounds/${name}.mp3`).then(r => r.arrayBuffer()).catch(() => null);
+  return stings.files[name];
 }
-async function playIntro(seconds = 8.2) {  // the full sting at the gate; a shorter one when an episode opens
+async function playSting(name, level = 0.55) {
   const ctx = sfxContext();
   if (!ctx) return;
-  if (!intro.buf) { const b = await introLoad(); if (!b) return; intro.buf = await ctx.decodeAudioData(b.slice(0)).catch(() => null); if (!intro.buf) return; }
-  stopIntro();
-  const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime, end = Math.min(seconds, intro.buf.duration);
-  src.buffer = intro.buf; g.gain.setValueAtTime(0.55, t);
-  if (end < intro.buf.duration) { g.gain.setValueAtTime(0.55, t + end - 0.8); g.gain.linearRampToValueAtTime(0.0001, t + end); }
-  src.connect(g).connect(ctx.destination); src.start(t); src.stop(t + end + 0.05);
-  intro.src = src; intro.gain = g;
+  if (!stings.decoded[name]) {
+    const b = await stingLoad(name);
+    if (!b) return;
+    stings.decoded[name] = await ctx.decodeAudioData(b.slice(0)).catch(() => null);
+    if (!stings.decoded[name]) return;
+  }
+  stopStings();
+  const src = ctx.createBufferSource(), g = ctx.createGain();
+  src.buffer = stings.decoded[name]; g.gain.value = level;
+  src.connect(g).connect(ctx.destination); src.start();
+  stings.playing = {src, g};
 }
-function stopIntro() {  // e.g. when the episode starts playing: never talk over the hosts
-  if (!intro.src) return;
-  try { const t = sfx.ctx.currentTime; intro.gain.gain.cancelScheduledValues(t); intro.gain.gain.setValueAtTime(intro.gain.gain.value, t);
-    intro.gain.gain.linearRampToValueAtTime(0.0001, t + 0.3); intro.src.stop(t + 0.35); } catch { /* already stopped */ }
-  intro.src = null;
+function stopStings() {  // e.g. when the episode starts playing: never talk over the hosts
+  const p = stings.playing;
+  if (!p) return;
+  try { const t = sfx.ctx.currentTime; p.g.gain.cancelScheduledValues(t); p.g.gain.setValueAtTime(p.g.gain.value, t);
+    p.g.gain.linearRampToValueAtTime(0.0001, t + 0.3); p.src.stop(t + 0.35); } catch { /* already stopped */ }
+  stings.playing = null;
 }
+const playIntro = () => playSting("intro", 0.55);      // Alien Song (Dragon Studio): the entry screen
+const playLanding = () => playSting("landing", 0.6);   // Futuristic Spaceship Landing (Epic Stock Media): ships arriving
+const stopIntro = stopStings;
 function gateSay(text, mood = "") {
   const say = $("#gateSay"), alien = $("#gateAlien");
   say.textContent = text; say.classList.remove("pop-in"); void say.offsetWidth; say.classList.add("pop-in");
@@ -1105,7 +1116,7 @@ function closeGate() {
   try { sessionStorage.setItem("started", "1"); } catch { /* ignore */ }
 }
 function initGate() {
-  introLoad(); ambientLoad();
+  stingLoad("intro"); stingLoad("landing"); ambientLoad();
   $("#gateForm").addEventListener("submit", async e => {
     e.preventDefault();
     sfxContext();  // this tap unlocks audio
