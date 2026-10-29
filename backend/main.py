@@ -82,7 +82,7 @@ def rate_limit(request: Request, key: str, limit: int, window_s: int = 3600) -> 
 
 # --- the entry gate (secret code) ----------------------------------------------------
 GATE_COOKIE = "m606"
-GATE_OPEN = {"/api/unlock"}  # the only request that may change something without the code
+GATE_OPEN = {"/api/unlock", "/api/lock"}  # the only requests that may change something without the code
 
 
 def _gate_token(code: str) -> str:
@@ -118,7 +118,16 @@ async def unlock(body: UnlockIn, request: Request):
         raise HTTPException(401, "That's not the code.")
     resp = JSONResponse({"ok": True})
     https = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-    resp.set_cookie(GATE_COOKIE, _gate_token(code), max_age=30 * 24 * 3600, httponly=True, samesite="lax", secure=https)
+    # a session cookie (no expiry date), and the app locks again on every page load, so the code is asked each visit
+    resp.set_cookie(GATE_COOKIE, _gate_token(code), httponly=True, samesite="lax", secure=https)
+    return resp
+
+
+@app.post("/api/lock")
+async def lock():
+    """Forget the entered code (the app calls this on every page load, so Error606 asks again)."""
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(GATE_COOKIE)
     return resp
 
 

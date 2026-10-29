@@ -1117,7 +1117,6 @@ function openGate() {
 function closeGate() {
   const g = $("#gate"); g.classList.add("leaving");
   setTimeout(() => { g.hidden = true; g.classList.remove("leaving"); document.body.classList.remove("gated"); }, 650);
-  try { sessionStorage.setItem("started", "1"); } catch { /* ignore */ }
 }
 function initGate() {
   stingLoad("intro"); stingLoad("landing"); ambientLoad();
@@ -1129,6 +1128,7 @@ function initGate() {
       if (!code) { gateSay("I need the code first, Earthling!", "shake"); $("#gateCode").focus(); return; }
       $("#gateGo").disabled = true;
       try {
+        await initGate.locking;  // the page-load lock must land before this unlock, never after it
         await postJSON("/api/unlock", {code});
         CONFIG.unlocked = true;
       } catch (err) {
@@ -1143,8 +1143,13 @@ function initGate() {
     startAmbient(5);
     setTimeout(closeGate, 700);
   });
-  let started = false; try { started = sessionStorage.getItem("started") === "1"; } catch { /* ignore */ }
-  if (!started || (CONFIG.locked && !CONFIG.unlocked)) openGate();
+  // Every page load starts locked, so the code is asked each time the app is opened or refreshed
+  // (moving around inside the app afterwards doesn't ask again).
+  if (CONFIG.locked) {
+    CONFIG.unlocked = false;
+    initGate.locking = api("/api/lock", {method: "POST"}).catch(() => {});
+  }
+  openGate();
 }
 
 // ------------------------------------------------------------------ router + boot

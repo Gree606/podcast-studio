@@ -35,3 +35,15 @@ def test_no_code_configured_means_no_gate():
     with TestClient(app) as client:
         assert client.get("/api/config").json()["locked"] is False
         assert client.post("/api/unlock", json={"code": "anything"}).json() == {"ok": True}
+
+
+def test_lock_forgets_the_code(monkeypatch):
+    monkeypatch.setattr(get_settings(), "access_code", "Earthling606")
+    main._hits.clear()
+    with TestClient(app) as client:
+        client.post("/api/unlock", json={"code": "Earthling606"})
+        assert client.get("/api/config").json()["unlocked"] is True
+        assert client.post("/api/lock").status_code == 200  # allowed without the code
+        assert client.get("/api/config").json()["unlocked"] is False
+        sample = client.get("/api/samples").json()[0]["id"]
+        assert client.post("/api/sources", data={"sample_id": sample}).status_code == 401
