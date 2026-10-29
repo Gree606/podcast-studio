@@ -76,6 +76,8 @@ def jobs() -> dict[str, tuple[str, str, int, str, bool]]:
         "rocket_rim": ("0 0 200 150", '<circle cx="90" cy="75" r="40" fill="none" stroke="#9aa7c7" stroke-width="8"/>'
                        '<path d="M62 56a34 34 0 0 1 16-14" stroke="#fff" stroke-width="5" fill="none"/>', 60, "", False),
     })
+    logo_vb, logo = symbol("logo")
+    j["logo"] = (logo_vb, logo, 26, "", True)  # header icon (shown at 2x) and favicon
     # background bodies (smooth gradients in the old theme)
     j["planet"] = ("0 0 200 120", '<defs><radialGradient id="pg" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#c4b5ff"/>'
                    '<stop offset=".5" stop-color="#6c4cf5"/><stop offset="1" stop-color="#241a6b"/></radialGradient></defs>'

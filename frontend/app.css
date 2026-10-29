@@ -678,6 +678,7 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
 * { border-radius: 0 !important; }
 body { background: var(--bg); background-attachment: fixed; font-size: 17px; }
 image, img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+.logo { width: 52px; height: 52px; margin: -6px 0; }  /* 26 px sprite at exactly 2x */
 svg { shape-rendering: crispEdges; }
 /* CRT scanlines, very faint */
 body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 80;

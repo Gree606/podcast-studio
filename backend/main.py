@@ -405,4 +405,4 @@ async def sprite(name: str):
 
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse(FRONTEND / "favicon.svg", media_type="image/svg+xml")
+    return FileResponse(FRONTEND / "sprites" / "logo.png", media_type="image/png")
