@@ -1029,15 +1029,19 @@ function initSfx() {
 
 // ------------------------------------------------------------------ background hum
 // "Spaceship Transmitter Hum" (Epic Stock Media, Pixabay), cross-faded into a seamless 12 s loop.
-// It plays softly whenever sound is on, fades out while an episode plays (and when the tab is
-// hidden), and fades back in afterwards. The source keeps looping; only its volume moves.
+// It plays softly whenever sound is on and keeps going under an episode (a little lower, so the
+// hosts stay clear); it fades out only when the tab is hidden. The source keeps looping; only its
+// volume moves.
 const ambient = {bytes: null, buf: null, src: null, gain: null, podcast: false, starting: false};
-const AMBIENT_LEVEL = 0.22;
+const AMBIENT_LEVEL = 0.22, AMBIENT_UNDER_PODCAST = 0.12;
 function ambientLoad() {
   if (!ambient.bytes) ambient.bytes = fetch("/sounds/ambient.mp3").then(r => r.arrayBuffer()).catch(() => null);
   return ambient.bytes;
 }
-function ambientTarget() { return sfx.on && !ambient.podcast && !document.hidden ? AMBIENT_LEVEL : 0; }
+function ambientTarget() {
+  if (!sfx.on || document.hidden) return 0;
+  return ambient.podcast ? AMBIENT_UNDER_PODCAST : AMBIENT_LEVEL;
+}
 async function startAmbient(delay = 0) {
   const ctx = sfx.ctx;
   if (!ctx || ctx.state !== "running" || ambient.src || ambient.starting || !sfx.on) return updateAmbient();

@@ -5,7 +5,7 @@
 - `intro.mp3`: "Alien Song" by Dragon Studio, Pixabay (https://pixabay.com/sound-effects/), Pixabay Content License;
   faded out and level-matched. Plays on the entry screen.
 - `ambient.mp3`: "Spaceship Transmitter Hum" by Epic Stock Media, Pixabay, Pixabay Content License;
-  cross-faded into a seamless 12 s loop. Plays softly in the background and fades out while an episode plays.
+  cross-faded into a seamless 12 s loop. Plays softly in the background, a little lower while an episode plays.
 - `landing.mp3`: "Futuristic Spaceship Landing" by Epic Stock Media, Pixabay, Pixabay Content License;
   trimmed to the approach and touchdown. Plays as the two ships fly onto an episode page.
 
