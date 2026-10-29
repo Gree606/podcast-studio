@@ -868,6 +868,90 @@ function renderVersions(ep) {
   });
 }
 
+// ------------------------------------------------------------------ sound effects
+// Synthesised with Web Audio (no audio files): an 8-bit menu "blip" when the mouse moves onto a
+// control, and a mechanical-keyboard "thock" when you press one. Quiet, quieter still while an
+// episode plays, and switchable off in the menu (remembered). Browsers allow sound only after the
+// first tap or click, so the context is created then.
+const SFX_TARGETS = "button, a.btn, a.new-btn, a.icon-btn, a.drawer-item, a.save-item, .sample, .tab, .presets label, .langs label, .dock-btn, .chip, .q-opt, .line, label.btn, summary";
+const sfx = {ctx: null, on: true, lastHover: 0, hoverEl: null};
+try { sfx.on = localStorage.getItem("sfx") !== "0"; } catch { /* private mode */ }
+function sfxContext() {
+  if (!sfx.on) return null;
+  if (!sfx.ctx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    sfx.ctx = new Ctx();
+  }
+  if (sfx.ctx.state === "suspended") sfx.ctx.resume();
+  return sfx.ctx;
+}
+function sfxLevel() {
+  const a = $("#audio");
+  return a && !a.paused ? 0.45 : 1;  // stay under the hosts' voices
+}
+function sfxHover() {  // a two-step square-wave blip, like moving the cursor in a Nintendo menu
+  const ctx = sfx.ctx && sfx.on ? sfx.ctx : null;
+  if (!ctx || ctx.state !== "running") return;
+  const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = "square";
+  o.frequency.setValueAtTime(988, t);           // B5 ...
+  o.frequency.setValueAtTime(1319, t + 0.035);  // ... then E6
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.035 * sfxLevel(), t + 0.005);
+  g.gain.setValueAtTime(0.035 * sfxLevel(), t + 0.06);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  o.connect(g).connect(ctx.destination);
+  o.start(t); o.stop(t + 0.1);
+}
+function sfxClick() {  // mechanical key: a bright click (filtered noise) on top of a short low thock
+  const ctx = sfxContext();
+  if (!ctx) return;
+  const t = ctx.currentTime, lvl = sfxLevel(), vary = 0.9 + Math.random() * 0.2;
+  const len = Math.floor(ctx.sampleRate * 0.03), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+  const noise = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+  noise.buffer = buf; bp.type = "bandpass"; bp.frequency.value = 3800 * vary; bp.Q.value = 1.2;
+  ng.gain.value = 0.32 * lvl;
+  noise.connect(bp).connect(ng).connect(ctx.destination);
+  const o = ctx.createOscillator(), og = ctx.createGain();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(190 * vary, t);
+  o.frequency.exponentialRampToValueAtTime(70, t + 0.05);
+  og.gain.setValueAtTime(0.0001, t);
+  og.gain.exponentialRampToValueAtTime(0.22 * lvl, t + 0.004);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  o.connect(og).connect(ctx.destination);
+  noise.start(t); o.start(t); o.stop(t + 0.08);
+}
+function setSfx(on) {
+  sfx.on = on;
+  try { localStorage.setItem("sfx", on ? "1" : "0"); } catch { /* ignore */ }
+  const b = $("#soundToggle");
+  b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "🔊 Sound effects: on" : "🔇 Sound effects: off";
+}
+function initSfx() {
+  setSfx(sfx.on);
+  $("#soundToggle").addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
+  document.addEventListener("pointerdown", e => {
+    if (e.button === 0 && e.target.closest(SFX_TARGETS) && !e.target.closest(":disabled, [aria-disabled=true]")) sfxClick();
+    else sfxContext();  // any first tap unlocks audio for the hover blips
+  }, {capture: true, passive: true});
+  document.addEventListener("keydown", e => {
+    if ((e.key === "Enter" || e.key === " ") && !e.repeat && document.activeElement && document.activeElement.matches(SFX_TARGETS)) sfxClick();
+  }, {capture: true});
+  document.addEventListener("pointerover", e => {
+    if (e.pointerType !== "mouse") return;  // phones have no hover
+    const el = e.target.closest(SFX_TARGETS);
+    if (!el || el === sfx.hoverEl || el.matches(":disabled")) { if (!el) sfx.hoverEl = null; return; }
+    sfx.hoverEl = el;
+    const now = performance.now();
+    if (now - sfx.lastHover < 45) return;  // sweeping across a row shouldn't buzz
+    sfx.lastHover = now;
+    sfxHover();
+  }, {passive: true});
+}
+
 // ------------------------------------------------------------------ router + boot
 function route() {
   const m = location.hash.match(/^#\/episode\/([\w-]+)/);
@@ -878,6 +962,7 @@ function route() {
 (async () => {
   $("#howBtn").onclick = () => { openDrawer(false); $("#how").showModal(); };
   $("#menuBtn").onclick = () => openDrawer(!$("#drawer").classList.contains("open"));
+  initSfx();
   $$("[data-close-drawer]").forEach(b => { b.onclick = () => openDrawer(false); });
   addEventListener("keydown", e => { if (e.key === "Escape") { openDrawer(false); openSheet(null); } });
   $("#teacherToggle").onclick = () => setTeacher(!document.body.classList.contains("teacher"));
