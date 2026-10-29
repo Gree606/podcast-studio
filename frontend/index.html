@@ -95,6 +95,20 @@
   </nav>
 </div>
 
+<!-- the entry gate: PRESS START (and the secret code, when one is set). Also unlocks sound. -->
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle" hidden>
+  <div class="gate-box">
+    <svg class="gate-alien" id="gateAlien" viewBox="0 0 40 40" role="img" aria-label="Error606 the alien"><title>Error606</title><use href="#av-host"/></svg>
+    <div class="gate-say" id="gateSay" aria-live="polite">Halt, Earthling! Please say the secret code to enter.</div>
+    <form class="gate-form" id="gateForm" autocomplete="off">
+      <label class="sr" for="gateCode">Secret code</label>
+      <input type="password" id="gateCode" placeholder="Secret code" autocomplete="off" spellcheck="false">
+      <button class="btn primary big" id="gateGo" type="submit">▶ START</button>
+    </form>
+    <p class="gate-title" id="gateTitle">Mission 606 · Earth Unknown</p>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="confetti" id="confetti" aria-hidden="true"></div>
 

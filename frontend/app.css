@@ -894,6 +894,34 @@ img.moon { position: absolute; left: 4%; bottom: 10%; width: 52px; height: auto;
   .dock-btn span { font-size: .8rem; }
 }
 
+/* the entry gate: a dark space screen, Error606's big pixel head, a dialog bubble, the code box and START */
+.gate { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(60% 50% at 50% 40%, #241e5c, #0b0922 70%), #0b0922; }
+.gate[hidden] { display: none; }
+.gate::before { content: ""; position: absolute; inset: 0; background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat;
+  animation: drift-px1 120s steps(240) infinite; opacity: .8; }
+body.gated { overflow: hidden; }
+.gate-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 460px; width: 100%; text-align: center; }
+.gate-alien { width: 200px; height: 200px; image-rendering: pixelated; animation: hover 3s steps(6) infinite; filter: drop-shadow(0 0 24px rgba(123, 228, 149, .35)); }
+.gate-alien.talking { --talk: running; --talk-o: 1; }
+.gate-alien.shake { animation: gate-shake .4s steps(4); }
+@keyframes gate-shake { 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+.gate-say { position: relative; background: var(--bubble-host); color: var(--ink-px); font: 600 1.2rem/1.45 var(--font); padding: 14px 18px 18px; max-width: 380px;
+  box-shadow: 0 -4px 0 0 var(--ink-px), 0 4px 0 0 var(--ink-px), -4px 0 0 0 var(--ink-px), 4px 0 0 0 var(--ink-px),
+    0 -12px 0 -4px #e6e4ff, 0 12px 0 -4px #e6e4ff, -12px 0 0 -4px #e6e4ff, 12px 0 0 -4px #e6e4ff,
+    inset 0 -4px 0 0 var(--shade-2), inset 0 -8px 0 0 var(--shade-1); }
+.gate-say::before { content: ""; position: absolute; top: 0; left: 50%; width: 4px; height: 4px;
+  box-shadow: 0 -4px 0 var(--ink-px), 4px -4px 0 var(--bubble-host), 8px -4px 0 var(--bubble-host), 12px -4px 0 var(--ink-px),
+    0 -8px 0 var(--ink-px), 4px -8px 0 var(--bubble-host), 8px -8px 0 var(--ink-px), 0 -12px 0 var(--ink-px), 4px -12px 0 var(--ink-px), 0 -16px 0 var(--ink-px); }
+.gate-form { display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 320px; }
+.gate-form input { text-align: center; font-size: 1.15rem; letter-spacing: .25em; background: #f2f0ff !important; color: var(--nb-border) !important;
+  border: 3px solid var(--nb-border) !important; box-shadow: 4px 4px 0 var(--nb-shadow) !important; }
+.gate-form input::placeholder { color: #6b6890; }
+.gate-form .btn { width: 100%; }
+.gate-title { margin: 0; font-family: var(--pixel); font-size: .62rem; color: #ffd166; letter-spacing: .05em; }
+.gate.leaving { animation: gate-out .65s steps(6) forwards; }
+@keyframes gate-out { to { opacity: 0; transform: scale(1.08); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .confetti { display: none; }

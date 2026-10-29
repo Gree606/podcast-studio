@@ -118,6 +118,9 @@ class Settings(BaseSettings):
     planner_max_steps: int = 8  # each real-model step can take seconds to a minute; a TA won't wait for 14
     # "fast": 2 LLM calls per episode (write all, then verify+fix); "agent": planner + best-of-N + critic loop
     pipeline_mode: str = "fast"
+    # Secret code for the entry gate. When set, anything that costs API calls (making episodes,
+    # uploading chapters, regenerating) needs it; listening to and sharing episodes does not.
+    access_code: str = ""
     # Gemini thinking level per fast-pipeline call ("" = the model's default, "low", "high").
     # Checking needs little deliberation; writing benefits from some.
     llm_write_thinking: str = ""

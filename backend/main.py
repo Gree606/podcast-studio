@@ -4,6 +4,8 @@ Run: uvicorn backend.main:app --host 0.0.0.0 --port 8000  (single worker; see st
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import time
@@ -78,6 +80,48 @@ def rate_limit(request: Request, key: str, limit: int, window_s: int = 3600) -> 
     q.append(now)
 
 
+# --- the entry gate (secret code) ----------------------------------------------------
+GATE_COOKIE = "m606"
+GATE_OPEN = {"/api/unlock"}  # the only request that may change something without the code
+
+
+def _gate_token(code: str) -> str:
+    return hmac.new(code.encode(), b"mission-606-earth-unknown", hashlib.sha256).hexdigest()
+
+
+def gate_unlocked(request: Request) -> bool:
+    code = get_settings().access_code
+    return not code or hmac.compare_digest(request.cookies.get(GATE_COOKIE, ""), _gate_token(code))
+
+
+@app.middleware("http")
+async def access_gate(request: Request, call_next):
+    """With ACCESS_CODE set, every state-changing API call needs the gate cookie. Reads (episodes,
+    audio, transcripts) stay open so shared links keep working."""
+    if (request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD", "OPTIONS")
+            and request.url.path not in GATE_OPEN and not gate_unlocked(request)):
+        return JSONResponse(status_code=401, content={"detail": "Please enter the secret code first.", "locked": True})
+    return await call_next(request)
+
+
+class UnlockIn(BaseModel):
+    code: str = Field(max_length=200)
+
+
+@app.post("/api/unlock")
+async def unlock(body: UnlockIn, request: Request):
+    code = get_settings().access_code
+    if not code:
+        return {"ok": True}
+    if not hmac.compare_digest(body.code.strip().lower(), code.strip().lower()):
+        rate_limit(request, "secret code", limit=8, window_s=300)  # 8 wrong guesses per 5 minutes per client
+        raise HTTPException(401, "That's not the code.")
+    resp = JSONResponse({"ok": True})
+    https = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    resp.set_cookie(GATE_COOKIE, _gate_token(code), max_age=30 * 24 * 3600, httponly=True, samesite="lax", secure=https)
+    return resp
+
+
 # --- health / config ---------------------------------------------------------------
 @app.get("/api/health")
 async def health():
@@ -110,12 +154,13 @@ PRESETS = {
 
 
 @app.get("/api/config")
-async def config():
+async def config(request: Request):
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
             "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS},
             "presets": PRESETS, "secrets_path": str(secrets_path()), "configured": s.configured(),
-            "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()]}
+            "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()],
+            "locked": bool(s.access_code), "unlocked": gate_unlocked(request)}
 
 
 # --- samples -----------------------------------------------------------------------
@@ -406,9 +451,10 @@ async def sprite(name: str):
 @app.get("/sounds/{name}")
 async def sound(name: str):
     p = FRONTEND / "sounds" / name
-    if not name.endswith(".wav") or "/" in name or ".." in name or not p.is_file():
+    if not name.endswith((".wav", ".mp3")) or "/" in name or ".." in name or not p.is_file():
         raise HTTPException(404, "Not found.")
-    return FileResponse(p, media_type="audio/wav", headers={"Cache-Control": "public, max-age=86400"})
+    kind = "audio/mpeg" if name.endswith(".mp3") else "audio/wav"
+    return FileResponse(p, media_type=kind, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/favicon.ico")

@@ -40,6 +40,7 @@ async function api(path, opts = {}) {
   catch { throw new Error("Can't reach the studio right now. Check your internet and try again."); }
   let data = null;
   try { data = await r.json(); } catch { /* not JSON */ }
+  if (r.status === 401 && data && data.locked && !path.endsWith("/unlock")) { CONFIG.unlocked = false; openGate(); }
   if (!r.ok) throw new Error((data && data.detail) || `Something went wrong (${r.status}). Please try again.`);
   return data;
 }
@@ -274,6 +275,7 @@ async function renderEpisode(id) {
   seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
   const app = $("#app"); app.className = "ep-layout"; app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   if (wide()) openSheet("script");  // on monitors the panel is a permanent sidebar
+  if (sfx.ctx && sfx.ctx.state === "running") playIntro(4.5);
   journey("make");
   const a = $("#audio");
   $("#playBtn").classList.add("waiting");
@@ -285,6 +287,7 @@ async function renderEpisode(id) {
   a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); $("#playBtn").classList.remove("waiting"); drawWave.peaks = null; loadWave(a.getAttribute("src")); });
   addEventListener("resize", () => drawWave());
   a.addEventListener("play", startMeter);
+  a.addEventListener("play", stopIntro);
   a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
   a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz."); $("#quizBtn").classList.add("nudge"); } });
@@ -984,6 +987,7 @@ function sfxClick() {
 }
 function setSfx(on) {
   sfx.on = on;
+  if (!on && typeof stopIntro === "function") stopIntro();
   try { localStorage.setItem("sfx", on ? "1" : "0"); } catch { /* ignore */ }
   const b = $("#soundToggle");
   b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "🔊 Sound effects: on" : "🔇 Sound effects: off";
@@ -1011,6 +1015,79 @@ function initSfx() {
   }, {passive: true});
 }
 
+// ------------------------------------------------------------------ the entry gate + alien intro
+// Shown when the app opens: Error606 asks for the secret code (when the server has one), then
+// START plays the alien intro (Alien Song by Dragon Studio, Pixabay) and lets you in. The tap also
+// unlocks browser audio. The server enforces the code; this screen is the friendly face of it.
+const intro = {bytes: null, buf: null, src: null, gain: null};
+function introLoad() {
+  if (!intro.bytes) intro.bytes = fetch("/sounds/intro.mp3").then(r => r.arrayBuffer()).catch(() => null);
+  return intro.bytes;
+}
+async function playIntro(seconds = 8.2) {  // the full sting at the gate; a shorter one when an episode opens
+  const ctx = sfxContext();
+  if (!ctx) return;
+  if (!intro.buf) { const b = await introLoad(); if (!b) return; intro.buf = await ctx.decodeAudioData(b.slice(0)).catch(() => null); if (!intro.buf) return; }
+  stopIntro();
+  const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime, end = Math.min(seconds, intro.buf.duration);
+  src.buffer = intro.buf; g.gain.setValueAtTime(0.55, t);
+  if (end < intro.buf.duration) { g.gain.setValueAtTime(0.55, t + end - 0.8); g.gain.linearRampToValueAtTime(0.0001, t + end); }
+  src.connect(g).connect(ctx.destination); src.start(t); src.stop(t + end + 0.05);
+  intro.src = src; intro.gain = g;
+}
+function stopIntro() {  // e.g. when the episode starts playing: never talk over the hosts
+  if (!intro.src) return;
+  try { const t = sfx.ctx.currentTime; intro.gain.gain.cancelScheduledValues(t); intro.gain.gain.setValueAtTime(intro.gain.gain.value, t);
+    intro.gain.gain.linearRampToValueAtTime(0.0001, t + 0.3); intro.src.stop(t + 0.35); } catch { /* already stopped */ }
+  intro.src = null;
+}
+function gateSay(text, mood = "") {
+  const say = $("#gateSay"), alien = $("#gateAlien");
+  say.textContent = text; say.classList.remove("pop-in"); void say.offsetWidth; say.classList.add("pop-in");
+  alien.classList.remove("talking", "shake"); void alien.offsetWidth; alien.classList.add("talking");
+  if (mood) alien.classList.add(mood);
+  clearTimeout(gateSay.t); gateSay.t = setTimeout(() => alien.classList.remove("talking"), 1600);
+}
+function openGate() {
+  const locked = CONFIG.locked && !CONFIG.unlocked;
+  $("#gateForm").classList.toggle("open", !locked);
+  $("#gateCode").classList.toggle("hidden", !locked);
+  $("#gate").hidden = false; document.body.classList.add("gated");
+  gateSay(locked ? "Halt, Earthling! Please say the secret code to enter." : "Psst… ready to explore Earth? Press START!");
+  setTimeout(() => (locked ? $("#gateCode") : $("#gateGo")).focus(), 50);
+}
+function closeGate() {
+  const g = $("#gate"); g.classList.add("leaving");
+  setTimeout(() => { g.hidden = true; g.classList.remove("leaving"); document.body.classList.remove("gated"); }, 650);
+  try { sessionStorage.setItem("started", "1"); } catch { /* ignore */ }
+}
+function initGate() {
+  introLoad();
+  $("#gateForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    sfxContext();  // this tap unlocks audio
+    if (CONFIG.locked && !CONFIG.unlocked) {
+      const code = $("#gateCode").value.trim();
+      if (!code) { gateSay("I need the code first, Earthling!", "shake"); $("#gateCode").focus(); return; }
+      $("#gateGo").disabled = true;
+      try {
+        await postJSON("/api/unlock", {code});
+        CONFIG.unlocked = true;
+      } catch (err) {
+        $("#gateGo").disabled = false; $("#gateCode").select();
+        gateSay(/too many|a lot of/i.test(err.message) ? "Too many tries! Wait a few minutes, Earthling." : "Hmm… that's not the code. Try again!", "shake");
+        return;
+      }
+      $("#gateGo").disabled = false;
+    }
+    gateSay("Code accepted. Welcome aboard!");
+    playIntro();
+    setTimeout(closeGate, 700);
+  });
+  let started = false; try { started = sessionStorage.getItem("started") === "1"; } catch { /* ignore */ }
+  if (!started || (CONFIG.locked && !CONFIG.unlocked)) openGate();
+}
+
 // ------------------------------------------------------------------ router + boot
 function route() {
   const m = location.hash.match(/^#\/episode\/([\w-]+)/);
@@ -1030,6 +1107,7 @@ function route() {
   try {
     CONFIG = {...CONFIG, ...(await api("/api/config"))};
     renderSetup();
+    initGate();
   } catch {
     $("#demoNote").innerHTML = `<div class="notice warn small">😴 The studio is waking up. Please refresh in a few seconds.</div>`;
   }
