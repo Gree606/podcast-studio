@@ -869,8 +869,8 @@ function renderVersions(ep) {
 }
 
 // ------------------------------------------------------------------ sound effects
-// Synthesised with Web Audio (no audio files): a soft, rounded 8-bit blip when the mouse moves
-// onto a control; a click sound can be switched on per SFX_STYLE below. Quiet, quieter still while an
+// A soft, rounded 8-bit blip (synthesised with Web Audio) when the mouse moves onto a control, and a
+// recorded mouse click-clack when you press one. Quiet, quieter still while an
 // episode plays, and switchable off in the menu (remembered). Browsers allow sound only after the
 // first tap or click, so the context is created then.
 const SFX_TARGETS = "button, a.btn, a.new-btn, a.icon-btn, a.drawer-item, a.save-item, .sample, .tab, .presets label, .langs label, .dock-btn, .chip, .q-opt, .line, label.btn, summary";
@@ -882,6 +882,7 @@ function sfxContext() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return null;
     sfx.ctx = new Ctx();
+    sfxLoadClick(sfx.ctx);
   }
   if (sfx.ctx.state === "suspended") sfx.ctx.resume();
   return sfx.ctx;
@@ -892,9 +893,9 @@ function sfxLevel() {
 }
 // Soft voices for the two sounds. Each takes (ctx, start time, output node, level) so the same code
 // plays live and renders the preview files in scripts/render_sfx.py. SFX_STYLE picks the variant.
-// Chosen by blind listening test: hover "soft8bit" (5/5). No click sound until we have one that
-// feels right (the synthesised ones were all rejected); set SFX_STYLE.click to a voice name to enable.
-const SFX_STYLE = {hover: "soft8bit", click: null};
+// Hover: "soft8bit", chosen by blind listening test (5/5). Click: a real recorded mouse click
+// (frontend/sounds/click.wav, Pixabay; see CREDITS.md), since the synthesised ones were all rejected.
+const SFX_STYLE = {hover: "soft8bit", click: "sample"};
 function sfxEnv(ctx, t, peak, attack, decay) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
@@ -935,6 +936,15 @@ const SFX_VOICES = {
     },
   },
   click: {
+    sample(ctx, t, out, lvl) {  // the recorded click-clack, a hair faster or slower each time so repeats sound natural
+      if (!sfx.clickBuf) {  // very first press: decoding takes a few ms, then play straight away
+        sfxLoadClick(ctx).then(() => sfx.clickBuf && SFX_VOICES.click.sample(ctx, ctx.currentTime, out, lvl));
+        return;
+      }
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = sfx.clickBuf; src.playbackRate.value = 0.97 + Math.random() * 0.06; g.gain.value = 0.6 * lvl;
+      src.connect(g).connect(out); src.start(t);
+    },
     paper(ctx, t, out, lvl) {  // a light paper "tk": three soft grains, warm band, no thump
       const n = sfxNoise(ctx, 0.045, 3), bp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
       bp.type = "bandpass"; bp.frequency.value = 1500 * (0.92 + Math.random() * 0.16); bp.Q.value = 0.8;
@@ -956,6 +966,12 @@ const SFX_VOICES = {
     },
   },
 };
+function sfxLoadClick(ctx) {  // fetched and decoded once, the first time audio is unlocked
+  if (sfx.clickLoading) return sfx.clickLoading;
+  sfx.clickLoading = (sfx.clickBytes || fetch("/sounds/click.wav").then(r => r.arrayBuffer())).then(b => ctx.decodeAudioData(b.slice(0)))
+    .then(buf => { sfx.clickBuf = buf; }).catch(() => { sfx.clickLoading = null; });
+  return sfx.clickLoading;
+}
 function sfxHover() {
   const ctx = sfx.ctx && sfx.on ? sfx.ctx : null;
   if (!ctx || ctx.state !== "running") return;
@@ -974,6 +990,7 @@ function setSfx(on) {
 }
 function initSfx() {
   setSfx(sfx.on);
+  sfx.clickBytes = fetch("/sounds/click.wav").then(r => r.arrayBuffer());  // downloaded now, decoded when audio unlocks
   $("#soundToggle").addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
   document.addEventListener("pointerdown", e => {
     if (e.button === 0 && e.target.closest(SFX_TARGETS) && !e.target.closest(":disabled, [aria-disabled=true]")) sfxClick();

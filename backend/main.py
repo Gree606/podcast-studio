@@ -403,6 +403,14 @@ async def sprite(name: str):
     return FileResponse(p, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/sounds/{name}")
+async def sound(name: str):
+    p = FRONTEND / "sounds" / name
+    if not name.endswith(".wav") or "/" in name or ".." in name or not p.is_file():
+        raise HTTPException(404, "Not found.")
+    return FileResponse(p, media_type="audio/wav", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse(FRONTEND / "sprites" / "logo.png", media_type="image/png")
