@@ -922,6 +922,15 @@ body.gated { overflow: hidden; }
 .gate.leaving { animation: gate-out .65s steps(6) forwards; }
 @keyframes gate-out { to { opacity: 0; transform: scale(1.08); } }
 
+/* the speaker button (top bar and gate): one switch for all sound */
+.sound-btn .i-off, .sound-btn.muted .i-on { display: none; }
+.sound-btn.muted .i-off { display: block; }
+.sound-btn.muted { background: #f2f0ff !important; }
+.gate-sound { position: absolute; top: -8px; right: 0; }
+@media (max-width: 380px) { .new-btn span { display: none; } .new-btn { padding: 0 10px; } }
+.brand-name b, .brand-name small { white-space: nowrap; }
+@media (max-width: 480px) { .brand-name b { font-size: .62rem; } .brand-name small { font-size: .8rem; } .logo { width: 44px; height: 44px; } .topnav { gap: 6px; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .confetti { display: none; }

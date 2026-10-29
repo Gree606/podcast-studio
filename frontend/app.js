@@ -288,6 +288,9 @@ async function renderEpisode(id) {
   addEventListener("resize", () => drawWave());
   a.addEventListener("play", startMeter);
   a.addEventListener("play", stopIntro);
+  a.addEventListener("play", () => { ambient.podcast = true; updateAmbient(0.6); });
+  a.addEventListener("pause", () => { ambient.podcast = false; updateAmbient(1.5); });
+  a.addEventListener("ended", () => { ambient.podcast = false; updateAmbient(1.5); });
   a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
   a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz."); $("#quizBtn").classList.add("nudge"); } });
@@ -990,15 +993,23 @@ function setSfx(on) {
   if (!on && typeof stopIntro === "function") stopIntro();
   try { localStorage.setItem("sfx", on ? "1" : "0"); } catch { /* ignore */ }
   const b = $("#soundToggle");
-  b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "🔊 Sound effects: on" : "🔇 Sound effects: off";
+  b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "🔊 Sound: on" : "🔇 Sound: off";
+  for (const id of ["#soundBtn", "#gateSound"]) {
+    const x = $(id); if (!x) continue;
+    x.setAttribute("aria-pressed", String(on)); x.setAttribute("aria-label", on ? "Sound on (tap to mute)" : "Sound off (tap to unmute)");
+    x.classList.toggle("muted", !on);
+  }
+  if (typeof updateAmbient === "function") { if (on) sfxContext(); updateAmbient(on ? 1.2 : 0.4); }
 }
 function initSfx() {
   setSfx(sfx.on);
   sfx.clickBytes = fetch("/sounds/click.wav").then(r => r.arrayBuffer());  // downloaded now, decoded when audio unlocks
   $("#soundToggle").addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
+  for (const id of ["#soundBtn", "#gateSound"]) $(id).addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
   document.addEventListener("pointerdown", e => {
     if (e.button === 0 && e.target.closest(SFX_TARGETS) && !e.target.closest(":disabled, [aria-disabled=true]")) sfxClick();
     else sfxContext();  // any first tap unlocks audio for the hover blips
+    if (sfx.on && !ambient.src && $("#gate").hidden) startAmbient(0.3);
   }, {capture: true, passive: true});
   document.addEventListener("keydown", e => {
     if ((e.key === "Enter" || e.key === " ") && !e.repeat && document.activeElement && document.activeElement.matches(SFX_TARGETS)) sfxClick();
@@ -1014,6 +1025,38 @@ function initSfx() {
     sfxHover();
   }, {passive: true});
 }
+
+// ------------------------------------------------------------------ background hum
+// "Spaceship Transmitter Hum" (Epic Stock Media, Pixabay), cross-faded into a seamless 12 s loop.
+// It plays softly whenever sound is on, fades out while an episode plays (and when the tab is
+// hidden), and fades back in afterwards. The source keeps looping; only its volume moves.
+const ambient = {bytes: null, buf: null, src: null, gain: null, podcast: false, starting: false};
+const AMBIENT_LEVEL = 0.22;
+function ambientLoad() {
+  if (!ambient.bytes) ambient.bytes = fetch("/sounds/ambient.mp3").then(r => r.arrayBuffer()).catch(() => null);
+  return ambient.bytes;
+}
+function ambientTarget() { return sfx.on && !ambient.podcast && !document.hidden ? AMBIENT_LEVEL : 0; }
+async function startAmbient(delay = 0) {
+  const ctx = sfx.ctx;
+  if (!ctx || ctx.state !== "running" || ambient.src || ambient.starting || !sfx.on) return updateAmbient();
+  ambient.starting = true;
+  try {
+    if (!ambient.buf) { const b = await ambientLoad(); if (!b) return; ambient.buf = await ctx.decodeAudioData(b.slice(0)); }
+    const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime + delay;
+    src.buffer = ambient.buf; src.loop = true;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    src.connect(g).connect(ctx.destination); src.start(t);
+    ambient.src = src; ambient.gain = g;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(ambientTarget(), t + 3);  // a slow fade-in
+  } catch { /* the app works without it */ } finally { ambient.starting = false; }
+}
+function updateAmbient(seconds = 0.8) {  // glide the hum to where it should be right now
+  if (!ambient.gain || !sfx.ctx) { if (sfx.on && sfx.ctx && sfx.ctx.state === "running") startAmbient(); return; }
+  const g = ambient.gain.gain, t = sfx.ctx.currentTime;
+  g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(Math.max(0.0001, ambientTarget()), t + seconds);
+}
+document.addEventListener("visibilitychange", () => updateAmbient(0.5));
 
 // ------------------------------------------------------------------ the entry gate + alien intro
 // Shown when the app opens: Error606 asks for the secret code (when the server has one), then
@@ -1062,7 +1105,7 @@ function closeGate() {
   try { sessionStorage.setItem("started", "1"); } catch { /* ignore */ }
 }
 function initGate() {
-  introLoad();
+  introLoad(); ambientLoad();
   $("#gateForm").addEventListener("submit", async e => {
     e.preventDefault();
     sfxContext();  // this tap unlocks audio
@@ -1082,6 +1125,7 @@ function initGate() {
     }
     gateSay("Code accepted. Welcome aboard!");
     playIntro();
+    startAmbient(5);
     setTimeout(closeGate, 700);
   });
   let started = false; try { started = sessionStorage.getItem("started") === "1"; } catch { /* ignore */ }
