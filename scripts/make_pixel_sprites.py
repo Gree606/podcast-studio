@@ -50,31 +50,31 @@ def jobs() -> dict[str, tuple[str, str, int, str, bool]]:
                 "circle[fill='#c98e63']{fill:#b9774a}.m-closed{stroke-width:2.6px;stroke:#6b2e20}")
     j = {
         # characters: base, eyes shut, mouth open (blink/talk overlays are diffs of these)
-        "alien": (host_vb, host, 30, still + "circle[fill^='var(--host-bg']{display:none}", True),
-        "alien_blink": (host_vb, host + '<path d="M36 66q10 5 20 0M64 66q10 5 20 0" stroke="#15122e" stroke-width="5" fill="none"/>', 30,
+        "alien": (host_vb, host, 40, still + "circle[fill^='var(--host-bg']{display:none}", True),
+        "alien_blink": (host_vb, host + '<path d="M36 66q10 5 20 0M64 66q10 5 20 0" stroke="#15122e" stroke-width="5" fill="none"/>', 40,
                         still + "circle[fill^='var(--host-bg']{display:none}.eyes{display:none}", True),
-        "alien_talk": (host_vb, host, 30, ".m-closed{display:none}circle[fill^='var(--host-bg']{display:none}", True),
-        "astro": (exp_vb, exp, 34, no_specs + still + "circle[fill^='var(--expert-bg']{display:none}", True),
-        "astro_blink": (exp_vb, exp + '<path d="M47 67q5 3 10 0M63 67q5 3 10 0" stroke="#1d1d2b" stroke-width="3.6" fill="none"/>', 34,
+        "alien_talk": (host_vb, host, 40, ".m-closed{display:none}circle[fill^='var(--host-bg']{display:none}", True),
+        "astro": (exp_vb, exp, 44, no_specs + still + "circle[fill^='var(--expert-bg']{display:none}", True),
+        "astro_blink": (exp_vb, exp + '<path d="M47 67q5 3 10 0M63 67q5 3 10 0" stroke="#1d1d2b" stroke-width="3.6" fill="none"/>', 44,
                         no_specs + still + "circle[fill^='var(--expert-bg']{display:none}.eyes{display:none}", True),
-        "astro_talk": (exp_vb, exp, 34, no_specs + ".m-closed{display:none}circle[fill^='var(--expert-bg']{display:none}", True),
+        "astro_talk": (exp_vb, exp, 44, no_specs + ".m-closed{display:none}circle[fill^='var(--expert-bg']{display:none}", True),
     }
     # a smaller Gree for the rocket's porthole (scaling the 34 px sprite to 22 px would give uneven pixels)
     for name in ("astro", "astro_blink", "astro_talk"):
         vb, body, _, css, ol = j[name]
-        j[name.replace("astro", "astros")] = (vb, body, 22, css, ol)
+        j[name.replace("astro", "astros")] = (vb, body, 30, css, ol)
     j.update({
         # ships: body without its animated parts, then each part on its own
-        "ufo": (ufo_vb, ufo, 60, ".beam,.blink{display:none}", True),
-        "ufo_lights_a": (ufo_vb, ufo, 60, "#s *:not(.blink){display:none}.b2{display:none}", False),
-        "ufo_lights_b": (ufo_vb, ufo, 60, "#s *:not(.b2){display:none}", False),
-        "ufo_beam": (ufo_vb, ufo, 60, "#s *:not(.beam){display:none}.beam{opacity:.5!important}", False),
+        "ufo": (ufo_vb, ufo, 80, ".beam,.blink{display:none}", True),
+        "ufo_lights_a": (ufo_vb, ufo, 80, "#s *:not(.blink){display:none}.b2{display:none}", False),
+        "ufo_lights_b": (ufo_vb, ufo, 80, "#s *:not(.b2){display:none}", False),
+        "ufo_beam": (ufo_vb, ufo, 80, "#s *:not(.beam){display:none}.beam{opacity:.5!important}", False),
         "ufo_dome": ("0 0 200 150", '<ellipse cx="100" cy="66" rx="48" ry="46" fill="none" stroke="#bfe9ff" stroke-width="5"/>'
-                     '<path d="M70 40a40 40 0 0 1 22-18" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="square"/>', 60, "", False),
-        "rocket": (rkt_vb, rkt, 60, ".flame{display:none}", True),
-        "rocket_flame": (rkt_vb, rkt, 60, "#s *:not(.flame){display:none}", False),
+                     '<path d="M70 40a40 40 0 0 1 22-18" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="square"/>', 80, "", False),
+        "rocket": (rkt_vb, rkt, 80, ".flame{display:none}", True),
+        "rocket_flame": (rkt_vb, rkt, 80, "#s *:not(.flame){display:none}", False),
         "rocket_rim": ("0 0 200 150", '<circle cx="90" cy="75" r="40" fill="none" stroke="#9aa7c7" stroke-width="8"/>'
-                       '<path d="M62 56a34 34 0 0 1 16-14" stroke="#fff" stroke-width="5" fill="none"/>', 60, "", False),
+                       '<path d="M62 56a34 34 0 0 1 16-14" stroke="#fff" stroke-width="5" fill="none"/>', 80, "", False),
     })
     logo_vb, logo = symbol("logo")
     j["logo"] = (logo_vb, logo, 26, "", True)  # header icon (shown at 2x) and favicon
@@ -82,12 +82,12 @@ def jobs() -> dict[str, tuple[str, str, int, str, bool]]:
     j["planet"] = ("0 0 200 120", '<defs><radialGradient id="pg" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#c4b5ff"/>'
                    '<stop offset=".5" stop-color="#6c4cf5"/><stop offset="1" stop-color="#241a6b"/></radialGradient></defs>'
                    '<ellipse cx="100" cy="62" rx="96" ry="20" fill="none" stroke="#ffd166" stroke-width="7" transform="rotate(-14 100 62)"/>'
-                   '<circle cx="100" cy="60" r="50" fill="url(#pg)"/>', 56, "", True)
+                   '<circle cx="100" cy="60" r="50" fill="url(#pg)"/>', 72, "", True)
     j["moon"] = ("0 0 100 100", '<defs><radialGradient id="mg" cx=".3" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/>'
                  '<stop offset=".6" stop-color="#9aa7c7"/><stop offset="1" stop-color="#4b5578"/></radialGradient></defs>'
-                 '<circle cx="50" cy="50" r="46" fill="url(#mg)"/><circle cx="36" cy="40" r="9" fill="#7d88aa"/><circle cx="62" cy="62" r="6" fill="#7d88aa"/>', 20, "", True)
-    for cls, w in (("sat", 30), ("ufo-s", 24), ("rocket-s", 34), ("comet", 44), ("station", 28), ("astro", 18),
-                   ("rock r1", 12), ("rock r2", 10), ("rock r3", 14)):
+                 '<circle cx="50" cy="50" r="46" fill="url(#mg)"/><circle cx="36" cy="40" r="9" fill="#7d88aa"/><circle cx="62" cy="62" r="6" fill="#7d88aa"/>', 26, "", True)
+    for cls, w in (("sat", 40), ("ufo-s", 32), ("rocket-s", 46), ("comet", 58), ("station", 38), ("astro", 24),
+                   ("rock r1", 16), ("rock r2", 14), ("rock r3", 18)):
         vb, body = fleet(cls)
         j["fl_" + cls.split()[-1].replace("-", "_")] = (vb, body, w, ".lamp{opacity:1!important}", True)
     return j

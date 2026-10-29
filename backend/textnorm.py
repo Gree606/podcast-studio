@@ -106,7 +106,7 @@ _DIGITS = ["oh", "one", "two", "three", "four", "five", "six", "seven", "eight",
 def normalize_for_tts(text: str, language: str | None = None) -> str:
     """Make text speakable. Number, unit and symbol reading is English; for other languages
     the voice reads digits itself, so only markdown and names like "Error606" are handled."""
-    t = text
+    t = re.sub(r"\bMission\s*606\b", "Mission six oh six", text)  # the show's name
     if language not in (None, "en"):
         t = re.sub(r"[*_#`]+", "", t)
         t = re.sub(r"(?<=[A-Za-z])\d{1,4}\b", lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)

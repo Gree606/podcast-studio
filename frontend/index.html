@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#060918">
-<title>Chapter Chat · learn any chapter from space</title>
+<title>Mission 606: Earth Unknown · learn any chapter from space</title>
 <meta name="description" content="Pick an NCERT chapter. Gree the astronaut explains it to Error606, a curious alien, in a fact-checked two-minute podcast.">
 <link rel="icon" type="image/png" href="/sprites/logo.png">
 <link rel="stylesheet" href="/app.css">
@@ -16,28 +16,28 @@
      ship sets --talk/--talk-o, which inherit into these <use> copies. -->
 <svg class="defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
   <title>Character drawings</title>
-  <symbol id="av-host" viewBox="0 0 30 30">
+  <symbol id="av-host" viewBox="0 0 40 40">
     <title>Error606, the curious alien</title>
-    <rect width="30" height="30" fill="var(--av-bg, none)"/>
-    <image href="/sprites/alien.png" x="0" y="0" width="30" height="30"/><image class="spr-blink" href="/sprites/alien_blink.png" x="0" y="0" width="30" height="30"/><image class="spr-talk" href="/sprites/alien_talk.png" x="0" y="0" width="30" height="30"/>
+    <rect width="40" height="40" fill="var(--av-bg, none)"/>
+    <image href="/sprites/alien.png" x="0" y="0" width="40" height="40"/><image class="spr-blink" href="/sprites/alien_blink.png" x="0" y="0" width="40" height="40"/><image class="spr-talk" href="/sprites/alien_talk.png" x="0" y="0" width="40" height="40"/>
   </symbol>
-  <symbol id="av-expert" viewBox="0 0 34 34">
+  <symbol id="av-expert" viewBox="0 0 44 44">
     <title>Gree, the astronaut</title>
-    <rect width="34" height="34" fill="var(--av-bg, none)"/>
-    <image href="/sprites/astro.png" x="0" y="0" width="34" height="34"/><image class="spr-blink" href="/sprites/astro_blink.png" x="0" y="0" width="34" height="34"/><image class="spr-talk" href="/sprites/astro_talk.png" x="0" y="0" width="34" height="34"/>
+    <rect width="44" height="44" fill="var(--av-bg, none)"/>
+    <image href="/sprites/astro.png" x="0" y="0" width="44" height="44"/><image class="spr-blink" href="/sprites/astro_blink.png" x="0" y="0" width="44" height="44"/><image class="spr-talk" href="/sprites/astro_talk.png" x="0" y="0" width="44" height="44"/>
   </symbol>
-  <symbol id="av-expert-s" viewBox="0 0 22 22">
+  <symbol id="av-expert-s" viewBox="0 0 30 30">
     <title>Gree in the porthole</title>
-    <image href="/sprites/astros.png" x="0" y="0" width="22" height="22"/><image class="spr-blink" href="/sprites/astros_blink.png" x="0" y="0" width="22" height="22"/><image class="spr-talk" href="/sprites/astros_talk.png" x="0" y="0" width="22" height="22"/>
+    <image href="/sprites/astros.png" x="0" y="0" width="30" height="30"/><image class="spr-blink" href="/sprites/astros_blink.png" x="0" y="0" width="30" height="30"/><image class="spr-talk" href="/sprites/astros_talk.png" x="0" y="0" width="30" height="30"/>
   </symbol>
-  <symbol id="ufo-px" viewBox="0 0 60 45">
+  <symbol id="ufo-px" viewBox="0 0 80 60">
     <title>Error606's flying saucer</title>
-    <image class="spr-beam" href="/sprites/ufo_beam.png" x="0" y="0" width="60" height="45"/><use href="#av-host" x="15" y="3" width="30" height="30"/><image href="/sprites/ufo.png" x="0" y="0" width="60" height="45"/>
-    <image class="spr-lights-a" href="/sprites/ufo_lights_a.png" x="0" y="0" width="60" height="45"/><image class="spr-lights-b" href="/sprites/ufo_lights_b.png" x="0" y="0" width="60" height="45"/><image href="/sprites/ufo_dome.png" x="0" y="0" width="60" height="45"/>
+    <image class="spr-beam" href="/sprites/ufo_beam.png" x="0" y="0" width="80" height="60"/><use href="#av-host" x="20" y="4" width="40" height="40"/><image href="/sprites/ufo.png" x="0" y="0" width="80" height="60"/>
+    <image class="spr-lights-a" href="/sprites/ufo_lights_a.png" x="0" y="0" width="80" height="60"/><image class="spr-lights-b" href="/sprites/ufo_lights_b.png" x="0" y="0" width="80" height="60"/><image href="/sprites/ufo_dome.png" x="0" y="0" width="80" height="60"/>
   </symbol>
-  <symbol id="rocket-px" viewBox="0 0 60 45">
+  <symbol id="rocket-px" viewBox="0 0 80 60">
     <title>Gree's rocket</title>
-    <image class="spr-flame" href="/sprites/rocket_flame.png" x="0" y="0" width="60" height="45"/><image href="/sprites/rocket.png" x="0" y="0" width="60" height="45"/><use href="#av-expert-s" x="16" y="12" width="22" height="22"/><image href="/sprites/rocket_rim.png" x="0" y="0" width="60" height="45"/>
+    <image class="spr-flame" href="/sprites/rocket_flame.png" x="0" y="0" width="80" height="60"/><image href="/sprites/rocket.png" x="0" y="0" width="80" height="60"/><use href="#av-expert-s" x="21" y="15" width="30" height="30"/><image href="/sprites/rocket_rim.png" x="0" y="0" width="80" height="60"/>
   </symbol>
 </svg>
 
@@ -52,8 +52,8 @@
 <div class="wrap">
   <header class="top">
     <a class="brand" href="#/" id="brandHome">
-      <img class="logo" src="/sprites/logo.png" width="52" height="52" alt="Chapter Chat logo: an astronaut sitting on a ringed planet">
-      <b>Chapter Chat</b>
+      <img class="logo" src="/sprites/logo.png" width="52" height="52" alt="Mission 606 logo: an astronaut sitting on a ringed planet">
+      <span class="brand-name"><b>Mission 606</b><small>Earth Unknown</small></span>
     </a>
     <nav class="topnav" aria-label="Main">
       <a class="new-btn" href="#/" id="newBtn" aria-label="New podcast"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>New</title><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>New</span></a>
@@ -115,8 +115,8 @@
       <div class="hero-say" aria-hidden="true">Psst… teach me something about Earth?</div>
       <span class="spark k1">✦</span><span class="spark k2">✦</span><span class="spark k3">✧</span><span class="spark k4">✦</span><span class="spark k5">✧</span>
       <div class="orbit"></div>
-      <svg class="ship hero-ufo float" viewBox="0 0 60 45" role="img" aria-label="Error606 the alien in a flying saucer"><title>Error606's saucer</title><use href="#ufo-px"/></svg>
-      <svg class="ship hero-rocket float late" viewBox="0 0 60 45" role="img" aria-label="Gree the astronaut in a rocket"><title>Gree's rocket</title><use href="#rocket-px"/></svg>
+      <svg class="ship hero-ufo float" viewBox="0 0 80 60" role="img" aria-label="Error606 the alien in a flying saucer"><title>Error606's saucer</title><use href="#ufo-px"/></svg>
+      <svg class="ship hero-rocket float late" viewBox="0 0 80 60" role="img" aria-label="Gree the astronaut in a rocket"><title>Gree's rocket</title><use href="#rocket-px"/></svg>
     </div>
     <h1>Learn any chapter<br><span class="hl">from space.</span></h1>
     <p class="lede">Gree explains. Error606 asks. You listen.</p>
@@ -192,14 +192,14 @@
     <div class="stage" id="stage">
       <div class="cruise" aria-hidden="true"><span class="c1"></span><span class="c2"></span><span class="far-planet"></span></div>
       <div class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="transmission" id="transmission" aria-hidden="true">● Live from Space Station CC-1</div>
+      <div class="transmission" id="transmission" aria-hidden="true">● Live · Mission 606</div>
       <figure class="stage-member host" id="stageHost">
-        <svg class="ship" viewBox="0 0 60 45" role="img" aria-label="The alien's flying saucer"><title>Alien's saucer</title><use href="#ufo-px"/></svg>
+        <svg class="ship" viewBox="0 0 80 60" role="img" aria-label="The alien's flying saucer"><title>Alien's saucer</title><use href="#ufo-px"/></svg>
         <figcaption id="nameHost">Error606</figcaption>
       </figure>
       <div class="caption" id="nowLine" aria-live="off"><span>Tuning in…</span></div>
       <figure class="stage-member expert" id="stageExpert">
-        <svg class="ship" viewBox="0 0 60 45" role="img" aria-label="The astronaut's rocket"><title>Astronaut's rocket</title><use href="#rocket-px"/></svg>
+        <svg class="ship" viewBox="0 0 80 60" role="img" aria-label="The astronaut's rocket"><title>Astronaut's rocket</title><use href="#rocket-px"/></svg>
         <figcaption id="nameExpert">Gree</figcaption>
       </figure>
     </div>

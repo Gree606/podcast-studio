@@ -80,7 +80,7 @@ def test_static_routes_headers_and_fallback():
         r_index = client.get("/")
         assert r_index.status_code == 200
         assert r_index.headers["content-type"].startswith("text/html")
-        assert "Chapter Chat" in r_index.text
+        assert "Mission 606" in r_index.text
 
         r_css = client.get("/app.css")
         assert r_css.status_code == 200

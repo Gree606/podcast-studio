@@ -1,4 +1,4 @@
-/* Chapter Chat · minimal space theme. One big animated scene per screen, everything else
+/* Mission 606: Earth Unknown · minimal space theme. One big animated scene per screen, everything else
    (script, agent trace, downloads) in a slide-up sheet. No external fonts or assets. */
 :root {
   color-scheme: dark;
@@ -682,7 +682,7 @@ image, img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 svg { shape-rendering: crispEdges; }
 /* CRT scanlines, very faint */
 body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 80;
-  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .07) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .035) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
 
 /* notched pixel border: four offset shadows leave the corner pixels out */
 .card, .drawer-panel, .sheet-panel, .dock, .notice, .toast, .badge, dialog, .setup, .stage {
@@ -693,56 +693,77 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
 .stage { background: #0b0922; box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge), -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge); }
 .card { margin: 4px 4px 22px; }
 
-/* type */
-h1, h2, h3, .label, .brand b, .transmission, .opt-label, .stations, .dock-btn span, .pl-title, .chosen-title, .new-btn span, .badge, #sheetTitle {
-  font-family: var(--pixel) !important; letter-spacing: 0; font-weight: 400 !important; }
-.hero h1 { font-size: clamp(1.25rem, 4.2vw, 2.4rem); line-height: 1.45; text-shadow: 4px 4px 0 #000; }
+/* type: the blocky pixel face only for the big titles; everything you read is the softer Pixelify Sans, larger */
+h1, .brand b, .transmission { font-family: var(--pixel) !important; font-weight: 400 !important; letter-spacing: 0; }
+h2, h3, .label, .opt-label, .stations, .dock-btn span, .pl-title, .chosen-title, .new-btn span, .badge, #sheetTitle,
+.caption .say b, .line .who, .times, .speed, .seg-head h3, .seg-num, .toast, .stage-member figcaption {
+  font-family: var(--font) !important; font-weight: 700 !important; letter-spacing: .02em; }
+body { font-size: 18px; }
+.hero h1 { font-size: clamp(1.35rem, 4.6vw, 2.5rem); line-height: 1.45; text-shadow: 3px 3px 0 #000; }
 .hl { background: none; -webkit-background-clip: initial; background-clip: initial; color: #ffd166; }
-.lede { font-size: 1.15rem; }
-.label { font-size: .62rem; color: #b8b2ee; }
-.brand b { font-size: .75rem; }
-.chosen-title { font-size: .9rem; line-height: 1.5; }
-.transmission { font-size: .55rem; letter-spacing: .05em; }
-.pl-title { font-size: .62rem; line-height: 1.6; }
-.opt-label { font-size: .5rem; }
-.badge { font-size: .5rem; line-height: 1.6; padding: 8px 12px; }
-.stations { font-size: .45rem; }
-#sheetTitle { font-size: .8rem; }
+.lede { font-size: 1.2rem; }
+.brand-name { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-name b { font-size: .8rem; color: #ffd166; }
+.brand-name small { font-family: var(--font); font-size: .95rem; font-weight: 700; color: var(--ink); margin-top: 4px; }
+.label { font-size: .9rem; color: #c9c4f5; text-transform: uppercase; letter-spacing: .08em; }
+.chosen-title { font-size: 1.3rem; line-height: 1.35; }
+.transmission { font-size: .6rem; }
+.pl-title { font-size: 1.05rem; }
+.opt-label { font-size: .95rem; color: #c9c4f5; }
+.badge { font-size: .9rem; padding: 8px 14px; }
+.stations { font-size: .85rem; }
+#sheetTitle { font-size: 1.25rem; }
+.caption { font-size: 1.22rem !important; }
+.line .bubble { font-size: 1.1rem !important; }
+.caption .say b, .line .who { font-size: .82rem !important; text-transform: uppercase; letter-spacing: .08em; }
+.seg-head h3 { font-size: 1.05rem; }
+.times { font-size: .9rem; }
+.toast { font-size: 1rem; }
 
-/* buttons: chunky, shaded, press down */
-.btn, .icon-btn, .new-btn, .chip, .q-opt, .save-item, .drawer-item, .sample, .tab, .presets label, .langs label {
-  border: none !important; box-shadow: 0 -3px 0 0 var(--ink-px), 0 3px 0 0 var(--ink-px), -3px 0 0 0 var(--ink-px), 3px 0 0 0 var(--ink-px),
-    inset -3px -3px 0 0 rgba(0, 0, 0, .35), inset 3px 3px 0 0 rgba(255, 255, 255, .12); transition: none; }
-.btn, .new-btn, .tab, .presets label, .langs label, .chip { font-family: var(--pixel); font-size: .58rem; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
-.btn { background: var(--panel-hi); }
-.btn.primary { background: #6b60c9; color: #fff; }
+/* buttons: neobrutalism. Flat bright fills, a thick dark border and a hard offset shadow; they lift on
+   hover and press flat into their shadow on tap. */
+:root { --nb-border: #0a0818; --nb-shadow: #f2f0ff; --nb-yellow: #ffd166; --nb-pink: #ff8fb0; --nb-mint: #6fe0c8; --nb-lilac: #b8adf5; }
+.btn, .icon-btn, .new-btn, .chip, .q-opt, .save-item, .drawer-item, .tab, .presets label, .langs label, .dock-btn, .play, .speed {
+  border: 3px solid var(--nb-border) !important; box-shadow: 4px 4px 0 0 var(--nb-shadow) !important; color: var(--nb-border) !important;
+  font-family: var(--font) !important; font-weight: 700 !important; font-size: 1rem; letter-spacing: .01em;
+  transition: transform .08s ease, box-shadow .08s ease, background .15s; }
+.btn, .icon-btn, .chip, .speed { background: var(--nb-lilac) !important; }
+.btn.primary, .play { background: var(--nb-yellow) !important; }
 .btn.primary::after { display: none; }
-.btn:active, .icon-btn:active, .new-btn:active, .chip:active, .q-opt:active, .dock-btn:active, .play:active, .sample:active {
-  transform: translate(0, 3px) !important; box-shadow: 0 -3px 0 0 var(--ink-px), 0 3px 0 0 var(--ink-px), -3px 0 0 0 var(--ink-px), 3px 0 0 0 var(--ink-px),
-    inset 3px 3px 0 0 rgba(0, 0, 0, .35) !important; }
-.btn.big { font-size: .75rem; padding: 18px 24px; }
-.icon-btn, .new-btn { background: var(--panel-hi); }
-.tabs.seg, .presets { background: transparent; border: none; padding: 4px; gap: 10px; }
-.tab, .presets label, .langs label { background: var(--panel); color: #b8b2ee; }
-.tab[aria-selected=true], .presets input:checked + label, .langs input:checked + label { background: #ffd166; color: var(--ink-px); }
-.langs { gap: 10px; padding: 4px; }
-.langs label { font-family: var(--font); font-size: .95rem; }
-input[type=text], textarea { border: none; background: #0b0922; box-shadow: 0 -3px 0 0 var(--panel-edge), 0 3px 0 0 var(--panel-edge), -3px 0 0 0 var(--panel-edge), 3px 0 0 0 var(--panel-edge); margin: 8px 3px; }
-.sample { background: var(--panel-hi); margin: 3px; }
-.sample.sel { background: #3a3480; }
+.new-btn { background: var(--nb-pink) !important; }
+.save-item, .drawer-item { background: var(--nb-lilac) !important; margin: 6px 6px 10px 0; }
+.q-opt { background: #f2f0ff !important; }
+.q-opt.right { background: var(--nb-mint) !important; } .q-opt.wrong { background: var(--nb-pink) !important; }
+.btn:hover, .icon-btn:hover, .new-btn:hover, .chip:hover, .q-opt:hover:not(:disabled), .save-item:hover, .drawer-item:hover, .tab:hover, .presets label:hover, .langs label:hover, .dock-btn:hover, .play:hover, .speed:hover {
+  transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--nb-shadow) !important; }
+.btn:active, .icon-btn:active, .new-btn:active, .chip:active, .q-opt:active, .save-item:active, .drawer-item:active, .tab:active, .presets label:active, .langs label:active, .dock-btn:active, .play:active, .speed:active {
+  transform: translate(4px, 4px) !important; box-shadow: 0 0 0 0 var(--nb-shadow) !important; }
+.btn:disabled { opacity: .55; transform: none; }
+.btn.big { font-size: 1.15rem; padding: 16px 24px; }
+.tabs.seg, .presets { background: transparent; border: none; padding: 4px 8px 8px 0; gap: 12px; }
+.tab, .presets label, .langs label { background: #f2f0ff !important; }
+.tab[aria-selected=true], .presets input:checked + label, .langs input:checked + label { background: var(--nb-mint) !important; }
+.langs { gap: 12px; padding: 4px 8px 10px 4px; }
+.langs label { font-size: 1rem; }
+input[type=text], textarea { border: 3px solid var(--nb-border); background: #f2f0ff; color: var(--nb-border); box-shadow: 4px 4px 0 var(--nb-shadow); margin: 8px 0 12px; font-size: 1rem; }
+.sample { background: var(--panel-hi); margin: 3px; border: 3px solid var(--nb-border) !important; box-shadow: 4px 4px 0 0 #8c82d8 !important; color: var(--ink) !important; }
+.sample.sel { background: #3a3480; box-shadow: 4px 4px 0 0 var(--nb-yellow) !important; }
+.sample b { font-size: 1.05rem; }
+.sample .tag { font-size: .78rem; }
 .sample::after { display: none; }
-.sample:hover { transform: translateY(-3px); }
+.sample:hover { transform: translate(-2px, -2px); }
 .book { transform: none; box-shadow: inset 4px 0 0 rgba(0, 0, 0, .35), 3px 3px 0 #000; }
-.sample:hover .book { transform: translateY(-3px); }
+.dock { gap: 10px; padding: 10px; }
+.dock-btn { background: #f2f0ff !important; padding: 8px 12px; }
+.dock-btn.on { background: var(--nb-mint) !important; }
+.dock-btn span { font-size: .78rem; margin-top: 2px; }
+.speed { width: 52px; height: 44px; }
 
-/* the play button: a square yellow game button */
-.play { width: 64px; height: 64px; background: #ffd166; color: var(--ink-px);
-  box-shadow: 0 -4px 0 0 var(--ink-px), 0 4px 0 0 var(--ink-px), -4px 0 0 0 var(--ink-px), 4px 0 0 0 var(--ink-px),
-    inset -4px -4px 0 0 #d9a52f, inset 4px 4px 0 0 #fff0b8, 0 0 0 calc(4px + var(--lvl, 0) * 10px) rgba(255, 209, 102, .25); margin: 4px; }
+/* the play button: a big yellow neobrutalist square */
+.play { width: 66px; height: 66px; color: var(--nb-border) !important; margin: 0 6px 6px 0; }
 .play.ready { animation: px-breathe 1s steps(2) infinite; }
-@keyframes px-breathe { 50% { background: #ffe39a; } }
-.speed { font-family: var(--pixel); font-size: .55rem; }
-.times { font-family: var(--pixel); font-size: .5rem; margin-top: 4px; }
+@keyframes px-breathe { 50% { background: #ffe39a !important; } }
+.times { margin-top: 4px; }
 
 /* speech bubbles, in the style of the reference: white, dark pixel border, lavender bottom shade, stepped tail */
 .caption, .line .bubble, .hero-say, .thought {
@@ -831,15 +852,14 @@ input[type=text], textarea { border: none; background: #0b0922; box-shadow: 0 -3
 @keyframes drift-px2 { to { transform: translate3d(-560px, 280px, 0); } }
 @keyframes drift-px3 { to { transform: translate3d(-800px, 400px, 0); } }
 @keyframes px-twinkle { 50% { opacity: .55; } }
-img.planet { position: absolute; right: -40px; top: 90px; width: 224px; height: auto; opacity: .9; background: none; box-shadow: none; }
-img.planet::after { display: none; }
-img.moon { position: absolute; left: 4%; bottom: 10%; width: 60px; height: auto; opacity: .8; background: none; animation: hover 12s steps(6) infinite; }
+img.planet { position: absolute; right: -40px; top: 90px; width: 216px; height: auto; opacity: .9; background: none; box-shadow: none; }
+img.moon { position: absolute; left: 4%; bottom: 10%; width: 52px; height: auto; opacity: .8; background: none; animation: hover 12s steps(6) infinite; }
 .fl { will-change: transform; }
-.sat { width: 90px; } .ufo-s { width: 72px; } .rocket-s { width: 102px; } .comet { width: 176px; } .station { width: 112px; opacity: .8; }
-.astro { width: 54px; animation-timing-function: linear; } .rock { width: 36px; } .rock.r2 { width: 30px; } .rock.r3 { width: 42px; }
+.sat { width: 80px; } .ufo-s { width: 64px; } .rocket-s { width: 92px; } .comet { width: 116px; } .station { width: 76px; opacity: .8; }
+.astro { width: 48px; animation-timing-function: linear; } .rock { width: 32px; } .rock.r2 { width: 28px; } .rock.r3 { width: 36px; }
 .rock.r1 { animation: fly-rock1 80s linear infinite; animation-delay: -30s; }
-@media (max-width: 640px) { .sat { width: 60px; } .ufo-s { width: 48px; } .rocket-s { width: 68px; } .station { width: 56px; } .comet { width: 88px; } .astro { width: 36px; }
-  img.planet { width: 168px; } }
+@media (max-width: 640px) { .sat { width: 40px; } .ufo-s { width: 32px; } .rocket-s { width: 46px; } .station { width: 38px; } .comet { width: 58px; } .astro { width: 24px; }
+  img.planet { width: 144px; } }
 .cruise .c1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; opacity: .8; animation: cruise 6s steps(48) infinite; }
 .cruise .c1 { width: calc(100% + 192px); }
 @keyframes cruise { to { transform: translateX(-192px); } }
@@ -862,6 +882,17 @@ img.moon { position: absolute; left: 4%; bottom: 10%; width: 60px; height: auto;
 .badge.warn { background: #3a2c0e; }
 .spinner { border-radius: 0 !important; animation: spin .8s steps(4) infinite; }
 .new-btn .ico, .icon-btn .ico { shape-rendering: crispEdges; }
+
+/* neobrutalist controls on phones: rows wrap instead of running off the screen */
+.stage-member figcaption { font-size: .85rem !important; padding: 4px 10px; }
+@media (max-width: 560px) {
+  .tabs.seg { flex-wrap: wrap; gap: 10px; }
+  .tabs.seg .tab { flex: 1 1 40%; }
+  .opt { grid-template-columns: 1fr; gap: 6px; }
+  .presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-right: 6px; }
+  .presets label { min-width: 0; padding: 8px 4px; font-size: .92rem; flex-direction: column; gap: 2px; }
+  .dock-btn span { font-size: .8rem; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

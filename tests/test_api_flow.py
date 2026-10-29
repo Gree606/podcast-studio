@@ -54,7 +54,7 @@ def test_presets_have_kid_labels_and_valid_values(client):
 def test_new_ui_static_files_and_classic_fallback(client):
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
-    assert "/app.js" in r.text and "/app.css" in r.text and "Chapter Chat" in r.text
+    assert "/app.js" in r.text and "/app.css" in r.text and "Mission 606" in r.text
     css = client.get("/app.css")
     assert css.status_code == 200 and css.headers["content-type"].startswith("text/css") and "prefers-reduced-motion" in css.text
     js = client.get("/app.js")

@@ -327,7 +327,7 @@ async def transcript(eid: str):
     st = ep.settings
     src = store.get_source(ep.source_id)
     by_id = {c.id: c for c in src.chunks} if src else {}
-    lines = [f"# {ep.title}", "", f"A Chapter Chat episode with {st.host_name} (host) and {st.expert_name} (explainer).", ""]
+    lines = [f"# {ep.title}", "", f"A Mission 606: Earth Unknown episode with {st.host_name} (host) and {st.expert_name} (explainer).", ""]
     for seg in ep.segments:
         v = seg.current
         lines.append(f"## {seg.index + 1}. {seg.title}")

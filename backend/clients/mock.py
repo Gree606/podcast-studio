@@ -105,7 +105,7 @@ def _episode(messages: list[dict]) -> str:
     parts = []
     for i in range(3):
         mine = ps[i::3] or ps[:1]
-        turns = [{"speaker": "host", "text": f"Welcome to Chapter Chat! Today: {title}. So what's first?" if i == 0
+        turns = [{"speaker": "host", "text": f"Welcome to Mission 606! Today: {title}. So what's first?" if i == 0
                   else "Okay, so what comes next?"}]
         for cid, txt in mine[:2]:
             turns.append({"speaker": "expert", "text": f"Think of it like this: {_first_sentence(txt).rstrip('.')}. It's like making chai."})

@@ -1,5 +1,5 @@
 "use strict";
-// Chapter Chat frontend. Plain JS, no build step. Every element looked up by id here
+// Mission 606: Earth Unknown frontend. Plain JS, no build step. Every element looked up by id here
 // exists in index.html (checked by tests/test_frontend.py).
 
 const $ = (s, el = document) => el.querySelector(s);

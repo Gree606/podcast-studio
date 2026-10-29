@@ -12,7 +12,7 @@ from ..schemas import Segment, Turn
 from .context import AgentContext
 
 log = logging.getLogger("podcast.writer")
-SHOW = "Chapter Chat"
+SHOW = "Mission 606: Earth Unknown"
 MAX_TURN_WORDS = 75
 TONES = {
     "casual": "relaxed and playful, lots of banter, but still accurate",
