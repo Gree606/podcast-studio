@@ -123,3 +123,25 @@ def test_failed_episode_shows_friendly_message_and_resume_finishes_it(client, mo
     assert r.status_code == 200
     ep = wait(client, eid, finished)
     assert ep["status"] == "done" and ep["error"] is None and ep["audio_file"]
+
+
+def test_only_the_creator_can_change_an_episode_and_there_is_no_public_list():
+    from backend.main import OWNER_COOKIE
+    with TestClient(app) as owner:
+        eid = new_episode(owner)
+        ep = wait(owner, eid, finished)
+        seg = ep["segments"][0]["id"]
+        assert owner.get(f"/api/episodes/{eid}").json()["can_edit"] is True
+        assert owner.get("/api/episodes").json() == []  # nobody can list everyone's episodes
+        assert [e["id"] for e in owner.get(f"/api/episodes?ids={eid}").json()] == [eid]
+        assert "secrets_path" not in owner.get("/api/config").json()
+        visitor = TestClient(app)  # opened the shared link in another browser
+        view = visitor.get(f"/api/episodes/{eid}").json()
+        assert view["can_edit"] is False and "owner" not in view
+        for path, body in ((f"/api/episodes/{eid}/segments/{seg}/regenerate", {"instruction": "x"}),
+                           (f"/api/episodes/{eid}/segments/{seg}/activate", {"version": 1}),
+                           (f"/api/episodes/{eid}/restart", None), (f"/api/episodes/{eid}/resume", None)):
+            assert visitor.post(path, json=body).status_code == 403, path
+        visitor.cookies.set(OWNER_COOKIE, "guessed")
+        assert visitor.post(f"/api/episodes/{eid}/restart").status_code == 403
+        assert owner.post(f"/api/episodes/{eid}/restart").status_code == 200  # done: nothing to do, but allowed

@@ -7,7 +7,9 @@ once share the LLM/TTS rate limits); extra jobs wait in a visible queue.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import time
 from typing import Awaitable, Callable
 
 from .config import get_settings
@@ -19,6 +21,8 @@ _tasks: set[asyncio.Task] = set()
 _sem: asyncio.Semaphore | None = None
 _waiting: list[str] = []
 _active: dict[str, str] = {}  # episode id -> kind of job running
+_by_episode: dict[str, asyncio.Task] = {}
+_started: dict[str, float] = {}  # episode id -> when its current job started running
 
 
 def _semaphore() -> asyncio.Semaphore:
@@ -43,15 +47,33 @@ def submit(eid: str, kind: str, fn: Callable[[], Awaitable[None]]) -> None:
             async with _semaphore():
                 _waiting.remove(eid)
                 _active[eid] = kind
+                _started[eid] = time.monotonic()
                 await fn()
         finally:
             if eid in _waiting:
                 _waiting.remove(eid)
             _active.pop(eid, None)
+            _started.pop(eid, None)
 
     task = asyncio.create_task(runner(), name=f"{kind}:{eid}")
     _tasks.add(task)
+    _by_episode[eid] = task
     task.add_done_callback(_tasks.discard)
+    task.add_done_callback(lambda t: _by_episode.pop(eid, None) if _by_episode.get(eid) is t else None)
+
+
+async def cancel(eid: str) -> None:
+    """Stop an episode's running job (its finished work is already saved, so it can be resumed)."""
+    task = _by_episode.get(eid)
+    if task and not task.done():
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await asyncio.wait_for(asyncio.shield(task), timeout=5)
+
+
+def running_for(eid: str) -> float | None:
+    """Seconds the episode's current job has been running (None when idle or still queued)."""
+    return round(time.monotonic() - _started[eid], 1) if eid in _started else None
 
 
 def active_jobs() -> dict[str, str]:

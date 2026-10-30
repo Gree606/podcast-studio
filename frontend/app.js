@@ -74,13 +74,15 @@ function openDrawer(open) {
   const d = $("#drawer"); d.classList.toggle("open", open); d.setAttribute("aria-hidden", String(!open));
   $("#menuBtn").setAttribute("aria-expanded", String(open));
 }
+let sheetOpen = null;
 const SHEET_TITLES = {script: "Script", ask: "Ask Gree", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
 const wide = () => matchMedia("(min-width: 1100px)").matches;
 function openSheet(name) {
   const sh = $("#sheet"); if (!sh) return;
   if (!name && wide()) return;
-  if (!name) { sh.classList.remove("open"); sh.setAttribute("aria-hidden", "true"); $$(".dock-btn").forEach(b => b.classList.remove("on")); return; }
-  if (name === "agent" && !document.body.classList.contains("teacher")) setTeacher(true);
+  if (!name) { sheetOpen = null; sh.classList.remove("open"); sh.setAttribute("aria-hidden", "true"); $$(".dock-btn").forEach(b => b.classList.remove("on")); return; }
+  sheetOpen = name;
+  if (name === "agent" && epState) renderTeacher(epState);
   $$("[data-pane-sheet]", sh).forEach(p => p.classList.toggle("on", p.dataset.paneSheet === name));
   $$(".dock-btn").forEach(b => b.classList.toggle("on", b.dataset.sheet === name));
   $("#sheetTitle").textContent = SHEET_TITLES[name] || "";
@@ -240,7 +242,7 @@ function showConfigure() {
   const upd = () => {
     const k = $("input[name=length]:checked").value, sel = $$("#sections input:checked").length, est = L[k];
     $("#estimate").innerHTML = sel === 0 ? `<span class="pill warn">👆 Pick at least one part of the chapter</span>`
-      : est ? `≈ ${Math.max(1, Math.round(est.audio_minutes))} min episode · ${($("input[name=mode]:checked") || {}).value === "agent" ? "the deep agent takes a few minutes" : "starts playing in about a minute"}` : "";
+      : est ? `≈ ${Math.max(1, Math.round(est.audio_minutes))} min episode · ${($("input[name=mode]:checked") || {}).value === "agent" ? "the deep agent takes a few minutes" : "usually starts playing within 1-2 minutes"}` : "";
     $("#generate").disabled = sel === 0;
   };
   const syncMode = () => {
@@ -313,6 +315,12 @@ async function renderEpisode(id) {
     try { await navigator.clipboard.writeText(location.href); toast("🔗 Link copied! Share it with a friend."); }
     catch { prompt("Copy this link:", location.href); }
   };
+  $("#restartBtn").onclick = async () => {
+    $("#restartBtn").disabled = true;
+    try { await postJSON(`/api/episodes/${epState.id}/restart`); toast("🔁 Starting that step again…"); $("#slowNote").classList.add("hidden"); stopPoll(); poll(epState.id); }
+    catch (e) { toast(e.message, "err"); }
+    finally { $("#restartBtn").disabled = false; }
+  };
   $("#resumeBtn").onclick = async () => {
     $("#resumeBtn").disabled = true;
     try { await api(`/api/episodes/${epState.id}/resume`, {method: "POST"}); toast("🔁 Trying again…"); stopPoll(); poll(epState.id); }
@@ -347,7 +355,7 @@ async function poll(id, view = viewId) {
   if (live.on && live.waiting && partReady(ep, live.k + 1)) { live.waiting = false; playLivePart(live.k + 1); }
   if (live.on) liveTitle(ep);
   renderTrust(ep);
-  if (document.body.classList.contains("teacher")) renderTeacher(ep, ep.trace);
+  if (document.body.classList.contains("teacher") || sheetOpen === "agent") renderTeacher(ep, ep.trace);
   if (ep.status === "done" && quizLoadedFor !== ep.id) loadQuiz(ep);
   askAvailable(ep);
   if (prev && prev.status !== "done" && ep.status === "done") { toast("🎉 Your podcast is ready! Press play."); confetti(40); }
@@ -416,7 +424,11 @@ function renderMake(ep) {
   $("#epWait").textContent = working ? `${fmtT(elapsed)} elapsed${est ? ` · usually about ${Math.ceil(est.wait_minutes)} min` : ""}` : "";
   // the speech bubble already says what the crew is doing; repeat it here only when something needs attention
   $("#makeCard").classList.toggle("quiet", working && !ep.queue_position);
-  $("#resumeBtn").classList.toggle("hidden", !(["failed", "interrupted"].includes(ep.status) && !ep.busy));
+  $("#resumeBtn").classList.toggle("hidden", !(["failed", "interrupted"].includes(ep.status) && !ep.busy && ep.can_edit));
+  // a call that hangs: say so (never a frozen-looking screen) and offer a restart
+  const slowAfter = ep.pipeline === "agent" ? 600 : 100;
+  $("#slowNote").classList.toggle("hidden", !(working && ep.can_edit && !ep.audio_file && !live.on && (ep.running_for || 0) > slowAfter));
+  document.body.classList.toggle("readonly", !ep.can_edit);
   $("#makeCard").classList.toggle("hidden", ep.status === "done");
   journey(ep.status === "done" ? "listen" : "make");
 }
@@ -453,18 +465,31 @@ function setAudio(ep) {
 }
 
 const ICON_CHECK = '<svg class="ico-check" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".18"/><path d="M6 10.4l2.6 2.6L14.2 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// What the fact-check really did. Quick mode checks every spoken line ("lines"); the deep agent checks
+// the claims it extracts from the script ("claims"). Before any check, say only where it came from.
+function factCheck(claims) {
+  const lines = claims.some(c => c.line != null), unit = lines ? "lines" : "claims";
+  const corrected = claims.filter(c => !c.supported && c.corrected).length, flagged = claims.filter(c => !c.supported && !c.corrected).length;
+  return {unit, n: claims.length, ok: claims.length - corrected - flagged, corrected, flagged};
+}
+function factBadge(done) {
+  const f = factCheck(done.flatMap(s => currentVersion(s).claims || []));
+  const open = `role="button" tabindex="0" data-open-sheet="agent"`;
+  if (!f.n) return `<span class="badge plain" ${open}>📖 Based on your chapter · see sources</span>`;
+  const extra = [f.corrected && `${f.corrected} corrected`, f.flagged && `${f.flagged} flagged`].filter(Boolean).join(" · ");
+  return `<span class="badge${f.flagged ? " warn" : ""}" ${open} title="${f.unit === "lines" ? "Every spoken line that states a fact was checked against the chapter" : "Claims in the script were checked against the chapter"}">${ICON_CHECK} ${f.ok}/${f.n} ${f.unit} supported by your chapter${extra ? ` · ${extra}` : ""}</span>`;
+}
 function renderTrust(ep) {
   const done = ep.segments.filter(s => currentVersion(s));
   if (!done.length) { $("#trustBadge").innerHTML = ""; return; }
-  const claims = done.flatMap(s => currentVersion(s).claims || []), bad = claims.filter(c => !c.supported).length;
   const failed = ep.segments.filter(s => s.status === "failed").length;
-  const parts = [];
-  if (claims.length) parts.push(bad ? `<span class="badge warn">${ICON_CHECK} ${claims.length - bad}/${claims.length} facts checked · ${bad} corrected</span>`
-    : `<span class="badge">${ICON_CHECK} ${claims.length}/${claims.length} facts checked against your chapter</span>`);
+  const parts = [factBadge(done)];
+  if (!ep.can_edit) parts.push(`<span class="badge plain" title="Only the person who made this episode can rewrite its parts">👀 Shared episode</span>`);
   parts.push(`<span class="badge plain">🧩 ${ep.segments.length} parts</span>`);
   if (ep.duration) parts.push(`<span class="badge plain">⏱️ ${fmtT(ep.duration)}</span>`);
   if (failed) parts.push(`<span class="badge warn">⚠️ ${failed} part${failed > 1 ? "s" : ""} didn't finish: tap a “Make this part…” button under ${failed > 1 ? "them" : "it"} to redo</span>`);
   $("#trustBadge").innerHTML = parts.join("");
+  $$("[data-open-sheet]", $("#trustBadge")).forEach(b => { b.onclick = () => { openSheet("agent"); const t = $('[data-tab="claims"]'); if (t) t.click(); }; });
 }
 
 const sentences = text => (text.match(/[^.!?\u0964\u0965]+[.!?\u0964\u0965]+["')]*|[^.!?\u0964\u0965]+$/g) || [text]).map(x => x.trim()).filter(Boolean);
@@ -489,10 +514,11 @@ function renderSegments(ep) {
     const busy = ["writing", "synthesizing", "checking"].includes(s.status) && (ep.busy || ep.status === "running");
     const label = {writing: "✍️ Writing…", synthesizing: "🎙️ Recording…", checking: "🔎 Fact-checking…"}[s.status] || "";
     const status = s.status === "failed" ? `<span class="pill bad">needs a redo</span>` : busy ? `<span class="pill"><span class="spinner" role="img" aria-label="Working"></span> ${label}</span>` : s.status === "pending" ? `<span class="pill">⏳ waiting</span>` : "";
-    const bad = v ? v.claims.filter(c => !c.supported) : [];
+    const bad = v ? v.claims.filter(c => !c.supported && !c.corrected) : [];
+    const fc = v ? factCheck(v.claims) : null;
     const score = v && v.scores ? `<span class="pill teacher-only ${v.scores.overall >= 4 ? "ok" : v.scores.overall >= 3.3 ? "" : "warn"}" title="Critic score (1-5)">★ ${v.scores.overall.toFixed(1)}</span>` : "";
-    const facts = v && v.claims.length ? `<span class="pill teacher-only ${bad.length ? "warn" : "ok"}">✓ ${v.claims.length - bad.length}/${v.claims.length} claims</span>` : "";
-    const diff = `<span class="pill teacher-only" title="Difficulty predicted by the planner">difficulty ${s.difficulty}/5</span>`;
+    const facts = fc && fc.n ? `<span class="pill teacher-only ${bad.length ? "warn" : "ok"}">✓ ${fc.ok}/${fc.n} ${fc.unit}${fc.corrected ? ` · ${fc.corrected} fixed` : ""}</span>` : "";
+    const diff = ep.pipeline === "agent" ? `<span class="pill teacher-only" title="Difficulty predicted by the planner">difficulty ${s.difficulty}/5</span>` : "";
     const lines = v ? v.turns.map((t, ti) => {
       lineIndex.push({start: t.start, end: t.end, ss: t.seg_start, se: t.seg_end, speaker: t.speaker, text: t.text, seg: s.id, si});
       const key = `${s.id}:${v.version}:${ti}`, fresh = !seenLines.has(key);
@@ -503,7 +529,7 @@ function renderSegments(ep) {
     }).join("") : s.error ? `<div class="notice err">😕 ${esc(s.error)}</div>` : `<p class="muted small">${s.status === "pending" ? "⏳ Waiting for its turn…" : "✍️ Being written…"}</p>`;
     const versions = s.versions.length > 1 ? `<div class="versions small"><b>Versions:</b>${s.versions.map(x => `<button type="button" class="chip ${x.version === s.active_version ? "on" : ""}" data-act="ver" data-seg="${s.id}" data-v="${x.version}" aria-pressed="${x.version === s.active_version}" title="${esc(x.instruction || "first version")}" ${ep.busy ? "disabled" : ""}>v${x.version}${x.instruction && x.instruction !== "regenerate" ? ` · ${esc(FIXES.find(f => f.instruction === x.instruction)?.label || "✏️ yours")}` : ""}</button>`).join("")}
       <button type="button" class="chip" data-act="preview" data-seg="${s.id}">▶ Hear another version</button><audio class="hidden" data-prev="${s.id}" controls></audio></div>` : "";
-    const fix = ep.status === "done" ? `<div class="fixit">
+    const fix = ep.status === "done" && ep.can_edit ? `<div class="fixit">
         ${versions}
         <div class="chips"><b class="small">Make this part…</b>${FIXES.map((f, k) => `<button type="button" class="chip" data-act="fix" data-k="${k}" data-seg="${s.id}" ${ep.busy ? "disabled" : ""}>${f.label}</button>`).join("")}</div>
         <div class="own"><label class="sr" for="own-${s.id}">Your own idea for part ${si + 1}</label>
@@ -921,19 +947,14 @@ function renderTeacher(ep, newEvents) {
 
 function renderQuality(ep) {
   const m = ep.metrics, segs = ep.segments, done = segs.filter(s => currentVersion(s));
-  const claims = done.flatMap(s => currentVersion(s).claims), sup = claims.filter(c => c.supported).length;
+  const claims = done.flatMap(s => currentVersion(s).claims);
   const turns = done.flatMap(s => currentVersion(s).turns);
   const wers = turns.filter(t => t.wer != null).map(t => t.wer), retried = turns.filter(t => t.tts_attempts > 1).length;
   const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
   const sc = avg(done.map(s => currentVersion(s).scores?.overall).filter(x => x != null));
   const k = (v, l) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`;
-  $("#teacherQuality").innerHTML = `<div class="kpis">
-    ${k(sc != null ? `${sc.toFixed(2)}/5` : "–", "average critic score")}
-    ${k(claims.length ? `${Math.round(100 * sup / claims.length)}%` : "–", `claims supported by the chapter (${sup}/${claims.length})`)}
-    ${k(wers.length ? `${(100 * avg(wers)).toFixed(1)}%` : "–", `audio self-check WER · ${retried} line(s) re-recorded`)}
-    ${k(m.llm_calls, "LLM calls")}${k(`${((m.prompt_tokens + m.completion_tokens) / 1000).toFixed(1)}k`, "tokens")}
-    ${k(m.tts_calls, "TTS calls")}${k(`${Object.values(m.stage_seconds).reduce((a, b) => a + b, 0).toFixed(0)}s`, "agent time")}</div>
-    <h3>Adaptive test-time compute (policy: ${esc(ep.settings.policy)})</h3>
+  const deep = ep.pipeline === "agent", f = factCheck(claims);
+  const how = deep ? `<h3>Adaptive test-time compute (policy: ${esc(ep.settings.policy)})</h3>
     <p class="small muted">Each part's writer budget comes from its predicted difficulty, then leftover budget goes to parts the critic still scores below the bar (after Snell et al. 2024). Easy parts stop early; hard ones get more drafts.</p>
     <div class="scroll-x"><table><thead><tr><th>Part</th><th>Difficulty</th><th>Writer calls</th><th>Draft scores (★ chosen)</th><th>Lessons in memory (Reflexion)</th></tr></thead><tbody>
     ${segs.map(s => {
@@ -941,18 +962,30 @@ function renderQuality(ep) {
       return `<tr><td>${s.index + 1}. ${esc(s.title)}</td><td>${s.difficulty}/5</td><td>${s.budget || s.candidates.length}</td>
         <td>${s.candidates.map(c => `<span class="${best && c.index === best.index ? "pill ok" : ""}" title="${esc(c.feedback || "")}">${c.round ? "rev" : "draft"} ${c.scores ? c.scores.overall.toFixed(2) : "–"}${best && c.index === best.index ? " ★" : ""}</span>`).join(" · ") || "–"}</td>
         <td class="small">${s.reflections.slice(-2).map(esc).join("<br>") || "–"}</td></tr>`;
-    }).join("")}</tbody></table></div>
+    }).join("")}</tbody></table></div>`
+    : `<h3>Quick mode: 2 model calls</h3>
+    <p class="small muted">Call 1 writes the whole episode from the chapter's passages. Call 2 fact-checks every spoken line against those passages and rewrites only the lines it can't support. The planner, critic, best-of-N drafts and Reflexion memory run only in <b>Deep agent</b> mode (pick it on the launch screen).</p>
+    <div class="scroll-x"><table><thead><tr><th>Part</th><th>Lines spoken</th><th>Lines with a fact</th><th>Supported</th><th>Corrected</th><th>Flagged</th></tr></thead><tbody>
+    ${done.map(s => { const v = currentVersion(s), g = factCheck(v.claims);
+      return `<tr><td>${s.index + 1}. ${esc(s.title)}</td><td>${v.turns.length}</td><td>${g.n}</td><td>${g.ok}</td><td>${g.corrected}</td><td>${g.flagged}</td></tr>`; }).join("")}</tbody></table></div>`;
+  $("#teacherQuality").innerHTML = `<div class="kpis">
+    ${deep ? k(sc != null ? `${sc.toFixed(2)}/5` : "–", "average critic score") : k("Quick", "pipeline (write + fact-check)")}
+    ${k(f.n ? `${f.ok}/${f.n}` : "–", `${f.unit} supported by the chapter${f.corrected ? ` · ${f.corrected} corrected` : ""}${f.flagged ? ` · ${f.flagged} flagged` : ""}`)}
+    ${k(wers.length ? `${(100 * avg(wers)).toFixed(1)}%` : "–", `audio self-check WER · ${retried} line(s) re-recorded`)}
+    ${k(m.llm_calls, "LLM calls")}${k(`${((m.prompt_tokens + m.completion_tokens) / 1000).toFixed(1)}k`, "tokens")}
+    ${k(m.tts_calls, "TTS calls")}${k(`${Object.values(m.stage_seconds).reduce((a, b) => a + b, 0).toFixed(0)}s`, "agent time")}</div>
+    ${how}
     <h3>Time per stage</h3><p class="small">${Object.entries(m.stage_seconds).map(([k2, v]) => `${esc(k2)}: ${v}s`).join(" · ") || "–"}</p>`;
 }
 
 function renderClaims(ep) {
   const rows = ep.segments.map(s => {
     const v = currentVersion(s);
-    const facts = s.key_facts.map(f => `<div class="claim-row">${f.verified === true ? "✅" : f.verified === false ? "❌" : "◻️"} <b>key fact</b> ${esc(f.fact)} <span class="muted small">[${esc(f.chunk_id || "no citation")}]${f.verify_note ? ` · ${esc(f.verify_note)}` : ""}</span></div>`).join("");
-    const claims = v ? v.claims.map(c => `<div class="claim-row">${c.supported ? "✅" : "⚠️"} ${esc(c.claim)} <span class="muted small">${c.evidence_chunk_id ? `[${esc(c.evidence_chunk_id)}]` : ""}${c.note ? ` · ${esc(c.note)}` : ""}</span></div>`).join("") : "";
-    return `<h3>${s.index + 1}. ${esc(s.title)}</h3>${facts || `<p class="small muted">No key facts.</p>`}${claims || `<p class="small muted">Claims are checked after writing.</p>`}`;
+    const facts = ep.pipeline !== "agent" ? "" : s.key_facts.map(f => `<div class="claim-row">${f.verified === true ? "✅" : f.verified === false ? "❌" : "◻️"} <b>key fact</b> ${esc(f.fact)} <span class="muted small">[${esc(f.chunk_id || "no citation")}]${f.verify_note ? ` · ${esc(f.verify_note)}` : ""}</span></div>`).join("");
+    const claims = v ? v.claims.map(c => `<div class="claim-row">${c.supported ? "✅" : c.corrected ? "✏️" : "⚠️"} ${c.line ? `<b>line ${c.line}</b> ` : ""}${esc(c.claim)} <span class="muted small">${c.evidence_chunk_id ? `[${esc(c.evidence_chunk_id)}]` : ""}${c.note ? ` · ${esc(c.note)}` : ""}</span></div>`).join("") : "";
+    return `<h3>${s.index + 1}. ${esc(s.title)}</h3>${facts || (ep.pipeline === "agent" ? `<p class="small muted">No key facts.</p>` : "")}${claims || `<p class="small muted">Claims are checked after writing.</p>`}`;
   }).join("");
-  $("#teacherClaims").innerHTML = `<p class="muted small">Planner key facts pass a two-layer check (rule-based lexical support, then a model judge, after ToolACE). After writing, every claim in the script is matched to BM25 evidence and judged; unsupported claims get one targeted rewrite and are flagged if they remain.</p>${rows || "–"}`;
+  $("#teacherClaims").innerHTML = ep.pipeline !== "agent" ? `<p class="muted small">Quick mode: the fact-check reads every spoken line. Each line that states a fact is listed with the passage that supports it (✅), or was rewritten because the chapter didn't support it (✏️), or is flagged (⚠️). Greetings, questions and jokes make no claim and aren't listed.</p>${rows || "–"}` : `<p class="muted small">Planner key facts pass a two-layer check (rule-based lexical support, then a model judge, after ToolACE). After writing, every claim in the script is matched to BM25 evidence and judged; unsupported claims get one targeted rewrite and are flagged if they remain.</p>${rows || "–"}`;
 }
 
 async function renderTeacherSources() {

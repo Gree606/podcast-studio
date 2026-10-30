@@ -2,7 +2,11 @@
 being built, and a trace emitter that the UI renders live."""
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
+import math
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -55,6 +59,25 @@ class AgentContext:
         if progress is not None:
             self.episode.progress = max(self.episode.progress, min(1.0, progress))
         self.on_change()
+
+    @contextlib.asynccontextmanager
+    async def creeping(self, start: float, end: float, expected_s: float):
+        """Move the progress bar from ``start`` towards ``end`` while one long call runs, so the
+        screen never looks frozen: it covers ~63% of the way in ``expected_s``, then slows down."""
+        t0 = time.monotonic()
+
+        async def tick():
+            while True:
+                await asyncio.sleep(1.5)
+                p = start + (end - start) * (1 - math.exp(-(time.monotonic() - t0) / expected_s))
+                self.episode.progress = max(self.episode.progress, min(end, p))
+                self.on_change()
+
+        task = asyncio.create_task(tick())
+        try:
+            yield
+        finally:
+            task.cancel()
 
     def passages_text(self, chunk_ids: list[str], limit_words: int = 1400) -> str:
         out, words = [], 0

@@ -3,7 +3,19 @@
 Bump PROMPT_VERSION whenever any prompt changes; it's stored in every episode's trace.
 """
 
-PROMPT_VERSION = "2026-10-31.1"
+PROMPT_VERSION = "2026-10-31.2"
+
+
+# Teach, don't just name: shared by every writer prompt (fast write, rewrite, agent writer).
+TEACHING_RULES = (
+    "Teach, don't just name: when the chapter teaches a method (balancing an equation, a classification, "
+    "an experiment's steps), walk through ONE worked example from the passages step by step. "
+    "Chemical equations: say whether an equation is balanced; an equation whose atom counts are not yet equal is "
+    "a skeletal (unbalanced) equation and must never be presented as correct or finished (e.g. say \"Mg plus O2 "
+    "gives MgO is only the skeletal equation; we still have to balance it\"); give the balanced form only if the "
+    "passages give it. Keep cause and effect the right way round (an equation is called skeletal because its atoms "
+    "don't balance yet; we balance it because mass is conserved)."
+)
 
 # ---------------------------------------------------------------------------
 # Planner (ReAct). The model emits one JSON action per turn; we execute the tool
@@ -71,7 +83,8 @@ Style rules:
 - Do not read activities or exercises aloud; at most say "the book has a neat experiment where...".
 - Plain text only: no markdown, no emojis, no stage directions like [laughs], no sound effects.
 - Write formulas and units as you would say them aloud when natural ("H two O", "five metres per second").
-- Never say "in this segment" or "as an AI"."""
+- Never say "in this segment" or "as an AI".
+- """ + TEACHING_RULES
 
 WRITER_USER = """Write segment {index} of {total}: "{title}"
 Goal: {goal}
@@ -212,6 +225,7 @@ Structure: exactly 3 parts.
 Rules:
 - Every fact must come from the passages below; analogies are fine, but no new facts, numbers, dates or names. Use the chapter's exact terms.
 - Do not read activities or exercises aloud. Plain spoken text only: no markdown, bullet points, emojis or stage directions.
+- """ + TEACHING_RULES + """
 - For each part, list the passage ids you used.
 - {language_rule}
 
@@ -231,17 +245,20 @@ Passages:
 Script:
 {script}
 
-For each part: list its factual claims about the subject (ignore greetings, jokes and clearly-marked analogies) and mark each supported or not.
-"Supported" means a passage states it or it follows directly; any added specific (number, name, mechanism) not in the passages is NOT supported.
-If a part has an unsupported claim, fix ONLY the lines that contain it: return "fixes", a list of {{"line": <the line number shown in that part>, "text": "<the corrected line>"}}. Keep the speaker, voice and length of the line; just remove or correct the unsupported statement (use "" to drop a line that is nothing but the unsupported claim). Never move, merge or add lines. Write each corrected line in the same language as the script. If nothing needs fixing, "fixes" is [].
+Go through EVERY numbered line of every part, in order:
+- If the line states something about the subject (a fact, definition, cause, process, equation, number or name), write that statement as "claim" in a few words and judge it. If it states several things, check them all: it is supported only if all are.
+- If the line makes no claim about the subject (a greeting, a question, a reaction, a joke, a clearly-marked analogy), give "claim": "" and nothing else.
+- The alien sometimes says something wrong on purpose so the astronaut can correct it. If the very next line corrects it, that wrong line is teaching, not a claim: give "claim": "" and do not fix it.
+"Supported" means a passage states it or it follows directly. NOT supported: any added specific (number, name, mechanism) not in the passages; cause and effect reversed; an unbalanced (skeletal) chemical equation presented as correct or complete; a definition stated more broadly or narrowly than the book.
+If a part has an unsupported line, fix ONLY those lines: return "fixes", a list of {{"line": <the line number shown in that part>, "text": "<the corrected line>"}}. Keep the speaker, voice and length of the line; just correct or remove the unsupported statement (use "" to drop a line that is nothing but the unsupported claim). Never move, merge or add lines. Write each corrected line in the same language as the script. If nothing needs fixing, "fixes" is [].
 
-Reply with ONLY JSON:
-{{"parts": [{{"part": 1, "claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixes": []}}]}}"""
+Reply with ONLY JSON (one entry in "lines" per line of the part):
+{{"parts": [{{"part": 1, "lines": [{{"line": 1, "claim": ""}}, {{"line": 2, "claim": "...", "supported": true, "evidence": "c3", "note": ""}}], "fixes": []}}]}}"""
 
 FAST_REWRITE = """Rewrite part {index} of {total} ("{title}") of this "{show}" podcast episode.
 The listener asked: "{instruction}"
 
-Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one: real reactions to what was just said, turns of very different lengths, none over 35 words, no clichés like \"Great question\" or \"Exactly!\". Every fact from the passages only; plain spoken text. {language_rule}
+Hosts: {host} (speaker "host", a curious alien learning about Earth) and {expert} (speaker "expert", the astronaut from Earth who explains). Keep about {words} words. Keep it a natural conversation that flows from the previous part and into the next one: real reactions to what was just said, turns of very different lengths, none over 35 words, no clichés like \"Great question\" or \"Exactly!\". Every fact from the passages only; plain spoken text. """ + TEACHING_RULES.replace("{", "{{").replace("}", "}}") + """ {language_rule}
 
 Cover every topic the current version covers (introduce each before referring to it). {role}
 Do not repeat the previous part's last line: start right after it.

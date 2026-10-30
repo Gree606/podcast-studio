@@ -83,9 +83,10 @@ async def write_episode(ctx: AgentContext) -> list[Segment]:
                                minutes=round(words / WPM, 1), tone=TONES[st.tone], title=ctx.source.title,
                                passages=ctx.passages_text(pids, limit_words=PASSAGE_WORDS + 200), extra="",
                                language_rule=languages.writing_rule(st.language))
-    ctx.status(STAGE_WRITE, "Writing the whole episode (1 model call)", 0.15)
-    data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
-                           temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
+    ctx.status(STAGE_WRITE, "Writing the whole episode (1 model call)", 0.08)
+    async with ctx.creeping(0.08, 0.38, expected_s=25):
+        data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
+                               temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
     parts = data.get("parts") if isinstance(data, dict) else None
     if not isinstance(parts, list) or not parts:
         raise ServiceError("Language model", "did not return the episode in the expected format")
@@ -127,8 +128,9 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
     prompt = FAST_VERIFY.format(passages=ctx.passages_text(cids, limit_words=PASSAGE_WORDS + 200), script=script)
     ctx.status(STAGE_VERIFY, "Fact-checking against the chapter (1 model call)", 0.4)
     try:
-        data = await chat_json([{"role": "user", "content": prompt}], task="verify_episode", expect=dict,
-                               temperature=0.0, max_tokens=4000, thinking=get_settings().llm_check_thinking or None)
+        async with ctx.creeping(0.4, 0.6, expected_s=15):
+            data = await chat_json([{"role": "user", "content": prompt}], task="verify_episode", expect=dict,
+                                   temperature=0.0, max_tokens=6000, thinking=get_settings().llm_check_thinking or None)
     except ServiceError as e:
         ctx.emit(STAGE_VERIFY, "warning", f"Fact-check unavailable ({e.user_message}); the script is kept as written.")
         return {s.id: [] for s in targets}
@@ -143,13 +145,7 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
     for k, s in enumerate(targets):
         # match by part number; fall back to position (a lone part is often renumbered "1")
         p = by_part.get(s.index + 1) or (returned[k] if len(returned) == len(targets) else {})
-        claims = []
-        for c in p.get("claims") or []:
-            if not isinstance(c, dict) or not str(c.get("claim", "")).strip():
-                continue
-            ev = str(c.get("evidence") or "")
-            claims.append(Claim(claim=str(c["claim"]), supported=bool(c.get("supported", True)),
-                                evidence_chunk_id=ev if ev in ctx.by_id else None, note=c.get("note") or None))
+        claims = parse_claims(p, s.candidates[-1].turns, ctx.by_id)
         bad = [c for c in claims if not c.supported]
         fixed = apply_line_fixes(s.candidates[-1].turns, p.get("fixes")) if bad else None
         if fixed is None and bad and p.get("fixed_turns"):  # older answer shape: a whole corrected part
@@ -161,6 +157,7 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
                 ctx.emit(STAGE_VERIFY, "action", f"Part {s.index + 1}: corrected {len(bad)} unsupported claim(s): "
                          + " | ".join(c.claim[:80] for c in bad[:3]), s.id)
                 for c in bad:  # the corrected version no longer makes these claims
+                    c.corrected = True
                     c.note = (c.note or "") + " (removed/corrected in the final script)"
             except WriterError:
                 ctx.emit(STAGE_VERIFY, "warning", f"Part {s.index + 1}: fix was unusable; flagging the claims instead.", s.id)
@@ -169,9 +166,30 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
         s.key_facts = [KeyFact(fact=c.claim, chunk_id=c.evidence_chunk_id, verified=True)
                        for c in claims if c.supported and c.evidence_chunk_id]
     every = [c for cl in out.values() for c in cl]
-    ctx.emit(STAGE_VERIFY, "observation", f"Fact-check (1 call): {sum(c.supported for c in every)}/{len(every)} "
-             "claims supported by the chapter.", data={"unsupported": [c.claim for c in every if not c.supported]})
+    n_lines = sum(len(s.candidates[0].turns) for s in targets)
+    ctx.emit(STAGE_VERIFY, "observation", f"Fact-check (1 call): checked all {n_lines} spoken lines; "
+             f"{len(every)} make a claim about the subject, {sum(c.supported for c in every)} supported by the chapter, "
+             f"{sum(c.corrected for c in every)} corrected.", data={"unsupported": [c.claim for c in every if not c.supported]})
     return out
+
+
+def parse_claims(p: dict, turns: list[Turn], by_id: dict) -> list[Claim]:
+    """The checker's verdicts for one part: one per spoken line that makes a claim ("lines"), or the
+    older free-form "claims" list. Lines with no claim (greetings, questions, jokes) are skipped."""
+    claims: list[Claim] = []
+    for c in p.get("lines") or p.get("claims") or []:
+        if not isinstance(c, dict) or not str(c.get("claim", "")).strip():
+            continue
+        try:
+            line = int(c["line"]) if "line" in c else None
+        except (TypeError, ValueError):
+            line = None
+        if line is not None and not 1 <= line <= len(turns):
+            line = None
+        ev = str(c.get("evidence") or "")
+        claims.append(Claim(claim=str(c["claim"]).strip(), supported=bool(c.get("supported", True)), line=line,
+                            evidence_chunk_id=ev if ev in by_id else None, note=c.get("note") or None))
+    return claims
 
 
 def apply_line_fixes(turns: list[Turn], fixes) -> list[Turn] | None:

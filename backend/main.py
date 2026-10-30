@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import logging
+import secrets
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -15,16 +16,16 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from . import ask, jobs
 from .agent import fast
 from .languages import LANGUAGES
 from .agent.context import LENGTHS
-from .agent.orchestrator import regenerate_segment, run_episode, switch_version
+from .agent.orchestrator import fast_mode, regenerate_segment, run_episode, switch_version
 from .clients.base import ServiceError, close_http_client
-from .config import ROOT, get_settings, secrets_path
+from .config import ROOT, get_settings
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
 from .photos import MAX_PAGES, MAX_PHOTO_BYTES, ingest_photos
 from .prompts import PROMPT_VERSION
@@ -167,7 +168,7 @@ async def config(request: Request):
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
             "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS},
-            "presets": PRESETS, "secrets_path": str(secrets_path()), "configured": s.configured(),
+            "presets": PRESETS, "configured": s.configured(),
             "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()],
             "locked": bool(s.access_code), "unlocked": gate_unlocked(request)}
 
@@ -248,8 +249,26 @@ class CreateEpisode(BaseModel):
     settings: EpisodeSettings = Field(default_factory=EpisodeSettings)
 
 
+# --- ownership: the browser that made an episode is the only one that may change it ----
+OWNER_COOKIE = "m606_owner"
+
+
+def _owner_hash(request: Request) -> str | None:
+    tok = request.cookies.get(OWNER_COOKIE, "")
+    return hashlib.sha256(tok.encode()).hexdigest() if tok else None
+
+
+def can_edit(ep: Episode, request: Request) -> bool:
+    return ep.owner is None or hmac.compare_digest(ep.owner, _owner_hash(request) or "")
+
+
+def _require_owner(ep: Episode, request: Request) -> None:
+    if not can_edit(ep, request):
+        raise HTTPException(403, "Only the person who made this episode can change it. Make your own from the same chapter!")
+
+
 @app.post("/api/episodes")
-async def create_episode(body: CreateEpisode, request: Request):
+async def create_episode(body: CreateEpisode, request: Request, response: Response):
     src = store.get_source(body.source_id)
     if not src:
         raise HTTPException(404, "Chapter not found. Please upload it again.")
@@ -265,20 +284,29 @@ async def create_episode(body: CreateEpisode, request: Request):
     st.section_ids = [x for x in st.section_ids if x in valid]
     _, titles = select_chunks(src, st.section_ids, get_settings().max_input_words)
     title = src.title if not st.section_ids or len(st.section_ids) == len(src.sections) else f"{src.title}: {', '.join(titles[:2])}{'...' if len(titles) > 2 else ''}"
-    ep = Episode(id=new_id("ep_"), source_id=src.id, title=title, settings=st)
+    token = request.cookies.get(OWNER_COOKIE) or secrets.token_urlsafe(24)
+    response.set_cookie(OWNER_COOKIE, token, max_age=365 * 86400, httponly=True, samesite="lax")
+    ep = Episode(id=new_id("ep_"), source_id=src.id, title=title, settings=st,
+                 owner=hashlib.sha256(token.encode()).hexdigest())
     store.save_episode(ep)
     jobs.submit(ep.id, "generate", lambda: run_episode(ep.id))
     return {"id": ep.id}
 
 
 @app.get("/api/episodes")
-async def list_episodes():
-    return [{"id": e.id, "title": e.title, "status": e.status, "created_at": e.created_at, "duration": e.duration}
-            for e in store.list_episodes()]
+async def list_episodes(ids: str = ""):
+    """Status of the given episodes (a browser's own recent list). There is no public list of
+    everyone's episodes: an episode is only reachable through its link."""
+    out = []
+    for eid in [x for x in ids.split(",") if x][:30]:
+        e = store.get_episode(eid.strip())
+        if e:
+            out.append({"id": e.id, "title": e.title, "status": e.status, "created_at": e.created_at, "duration": e.duration})
+    return out
 
 
-def episode_view(ep: Episode, since: int) -> dict:
-    d = ep.model_dump(exclude={"trace"})
+def episode_view(ep: Episode, since: int, request: Request | None = None) -> dict:
+    d = ep.model_dump(exclude={"trace", "owner"})
     for seg in d["segments"]:
         seg["candidates"] = [{"index": c["index"], "round": c["round"], "scores": c["scores"], "feedback": c["feedback"],
                               "issues": c["issues"], "words": sum(len(t["text"].split()) for t in c["turns"])}
@@ -287,6 +315,9 @@ def episode_view(ep: Episode, since: int) -> dict:
     d["trace_len"] = len(ep.trace)
     d["queue_position"] = jobs.queue_position(ep.id)
     d["busy"] = jobs.is_busy(ep.id)
+    d["running_for"] = jobs.running_for(ep.id)
+    d["pipeline"] = "fast" if fast_mode(ep) else "agent"  # which pipeline made it (the UI shows only what really ran)
+    d["can_edit"] = can_edit(ep, request) if request is not None else False
     return d
 
 
@@ -298,18 +329,36 @@ def _get_ep(eid: str) -> Episode:
 
 
 @app.get("/api/episodes/{eid}")
-async def get_episode(eid: str, since: int = 0):
-    return episode_view(_get_ep(eid), max(0, since))
+async def get_episode(eid: str, request: Request, since: int = 0):
+    return episode_view(_get_ep(eid), max(0, since), request)
 
 
 @app.post("/api/episodes/{eid}/resume")
-async def resume(eid: str):
+async def resume(eid: str, request: Request):
     ep = _get_ep(eid)
+    _require_owner(ep, request)
+    rate_limit(request, "retry", 20)
     if jobs.is_busy(eid):
         return {"ok": True}
     if ep.status not in ("failed", "interrupted"):
         raise HTTPException(409, "This episode isn't stopped.")
     ep.status, ep.error, ep.message = "queued", None, "Resuming"
+    store.save_episode(ep)
+    jobs.submit(eid, "generate", lambda: run_episode(eid))
+    return {"ok": True}
+
+
+@app.post("/api/episodes/{eid}/restart")
+async def restart(eid: str, request: Request):
+    """"Taking longer than usual · Try again": stop the stuck job and start it again. Work already
+    saved (written parts, recorded lines) is kept; the slow model call is made afresh."""
+    ep = _get_ep(eid)
+    _require_owner(ep, request)
+    rate_limit(request, "retry", 20)
+    if ep.status == "done" and not jobs.is_busy(eid):
+        return {"ok": True}
+    await jobs.cancel(eid)
+    ep.status, ep.error, ep.message = "queued", None, "Trying again"
     store.save_episode(ep)
     jobs.submit(eid, "generate", lambda: run_episode(eid))
     return {"ok": True}
@@ -322,6 +371,7 @@ class RegenBody(BaseModel):
 @app.post("/api/episodes/{eid}/segments/{sid}/regenerate")
 async def regenerate(eid: str, sid: str, body: RegenBody, request: Request):
     ep = _get_ep(eid)
+    _require_owner(ep, request)
     if not any(x.id == sid for x in ep.segments):
         raise HTTPException(404, "Segment not found.")
     if jobs.is_busy(eid):
@@ -340,8 +390,8 @@ class VersionBody(BaseModel):
 
 
 @app.post("/api/episodes/{eid}/segments/{sid}/activate")
-async def activate(eid: str, sid: str, body: VersionBody):
-    _get_ep(eid)
+async def activate(eid: str, sid: str, body: VersionBody, request: Request):
+    _require_owner(_get_ep(eid), request)
     if jobs.is_busy(eid):
         raise HTTPException(409, "Please wait for the current job to finish.")
     if not await switch_version(eid, sid, body.version):

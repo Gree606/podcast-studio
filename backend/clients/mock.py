@@ -129,13 +129,19 @@ def _verify_episode(messages: list[dict]) -> str:
     for m in re.finditer(r"^PART (\d+): .+$", user, re.M):
         n = int(m.group(1))
         body = user[m.end():].split("\nPART ")[0]
-        claims = [{"claim": c, "supported": True, "evidence": evidence(c), "note": ""}
-                  for c in re.findall(r"Think of it like this: (.+?)\. It's", body)[:4]]
-        fixes = []
-        if n == 2 and claims:
-            claims[0]["supported"] = False
-            fixes = [{"line": 2, "text": "Think of it like this: the book explains it step by step. It's like making chai."}]
-        out.append({"part": n, "claims": claims, "fixes": fixes})
+        lines, fixes = [], []
+        for lm in re.finditer(r"^(\d+)\. [^:]+: (.*)$", body, re.M):
+            k, text = int(lm.group(1)), lm.group(2)
+            c = re.search(r"Think of it like this: (.+?)\. It's", text)
+            if not c:
+                lines.append({"line": k, "claim": ""})
+                continue
+            entry = {"line": k, "claim": c.group(1), "supported": True, "evidence": evidence(c.group(1)), "note": ""}
+            if n == 2 and not fixes:  # one unsupported line, corrected
+                entry["supported"] = False
+                fixes = [{"line": k, "text": "Think of it like this: the book explains it step by step. It's like making chai."}]
+            lines.append(entry)
+        out.append({"part": n, "lines": lines, "fixes": fixes})
     return json.dumps({"parts": out})
 
 

@@ -90,6 +90,8 @@ class Claim(BaseModel):
     supported: bool
     evidence_chunk_id: str | None = None
     note: str | None = None
+    line: int | None = None  # 1-based spoken line it was checked on (quick mode checks every line); None = agent claim check
+    corrected: bool = False  # the line was rewritten (or dropped) by the fact-check, so it is no longer said
 
 
 class Scores(BaseModel):
@@ -185,3 +187,6 @@ class Episode(BaseModel):
     audio_file: str | None = None
     duration: float | None = None
     learn_line: str | None = None  # one-line "what you'll learn"
+    # sha256 of the creator's browser cookie: only they can regenerate, switch versions or restart.
+    # None = made before ownership existed (editable, as before). Never sent to the browser.
+    owner: str | None = None

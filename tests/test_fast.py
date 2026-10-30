@@ -184,3 +184,24 @@ def test_mode_is_chosen_per_episode():
         assert any(t["stage"] == "plan" for t in d["trace"]) and not any(t["stage"] == "plan" for t in q["trace"])
         bad = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"mode": "agent", "language": "hi"}})
         assert bad.status_code == 400
+
+
+def test_quick_fact_check_is_per_spoken_line():
+    from backend.agent.fast import parse_claims
+    from backend.schemas import Turn
+    turns = [Turn(speaker="host", text="Hi!"), Turn(speaker="expert", text="Mg plus O2 gives MgO is skeletal."),
+             Turn(speaker="host", text="So it's balanced?"), Turn(speaker="expert", text="No, we balance it.")]
+    claims = parse_claims({"lines": [{"line": 1, "claim": ""}, {"line": 2, "claim": "Mg + O2 -> MgO is skeletal", "supported": True,
+                                                                 "evidence": "c1"},
+                                     {"line": 9, "claim": "out of range", "supported": False}]}, turns, {"c1": object()})
+    assert [(c.line, c.supported, c.evidence_chunk_id) for c in claims] == [(2, True, "c1"), (None, False, None)]
+    assert parse_claims({"claims": [{"claim": "old shape", "supported": True}]}, turns, {})[0].line is None
+    with TestClient(app) as client:
+        sample = client.get("/api/samples").json()[0]["id"]
+        src = client.post("/api/sources", data={"sample_id": sample}).json()
+        eid = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short", "mode": "fast"}}).json()["id"]
+        ep = _wait(client, eid, lambda e: e["status"] in ("done", "failed") and not e["busy"])
+        assert ep["pipeline"] == "fast" and ep["can_edit"] is True
+        claims = [c for s in ep["segments"] for v in s["versions"] if v["version"] == s["active_version"] for c in v["claims"]]
+        assert claims and all(c["line"] for c in claims)
+        assert any(not c["supported"] and c["corrected"] for c in claims)  # the mock flags (and fixes) one line in part 2

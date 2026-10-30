@@ -37,7 +37,7 @@ def test_secrets_file_precedence_and_api_masking(monkeypatch, tmp_path):
             res = client.get("/api/config")
             assert res.status_code == 200
             data = res.json()
-            assert data["secrets_path"] == str(secrets_file)
+            assert "secrets_path" not in data and str(secrets_file) not in res.text  # no server paths in the public API
             assert data["configured"]["llm"] is True
             assert data["configured"]["tts"] is False
             assert secret_key not in res.text

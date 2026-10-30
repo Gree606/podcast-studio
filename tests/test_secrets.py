@@ -1,4 +1,5 @@
 """Secrets live in a file outside the repo; keys are loaded but never exposed (plan criteria 2-5)."""
+import json
 import logging
 import os
 import stat
@@ -129,12 +130,12 @@ def test_init_secrets_creates_owner_only_template_and_never_overwrites(tmp_path)
 
 
 # ---------------------------------------------------------------- criterion 5
-def test_config_reports_path_and_configured_flags_only(settings_from):
+def test_config_reports_configured_flags_only_never_paths(settings_from):
     placeholders = "LLM_API_KEY=DUMMY_REPLACE_WITH_GEMINI_KEY\nTTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY\nASR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY\n"
     settings_from(secrets=placeholders)
     with TestClient(main_mod.app) as c:
         cfg = c.get("/api/config").json()
-    assert cfg["secrets_path"] == os.environ["PODCAST_SECRETS_FILE"]
+    assert "secrets_path" not in cfg and os.environ["PODCAST_SECRETS_FILE"] not in json.dumps(cfg)
     assert cfg["configured"] == {"llm": False, "tts": False, "asr": False, "ocr": False}
 
     settings_from(secrets="LLM_API_KEY=AIzaSyRealLooking123\nTTS_API_KEY=sk_real_looking_456\nASR_API_KEY=bodhan_real_789\n"
