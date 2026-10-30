@@ -40,7 +40,6 @@ def terms(text: str) -> list[str]:
 class BM25Index:
     def __init__(self, chunks: list[Chunk], k1: float = 1.4, b: float = 0.75):
         self.chunks = chunks
-        self.by_id = {c.id: c for c in chunks}
         self.k1, self.b = k1, b
         self.docs = [Counter(terms(c.section + " " + c.text)) for c in chunks]
         self.lens = [sum(d.values()) for d in self.docs]

@@ -17,14 +17,22 @@ from .context import AgentContext
 OBS_CHARS = 1800  # keep observations short: the served context is ~20k tokens
 
 
-def tool_list_sections(ctx: AgentContext, _: dict) -> str:
+def sections_in_scope(ctx: AgentContext) -> list[tuple[str, list[str]]]:
+    """(section title, its in-scope chunk ids) for every section with at least one passage in scope."""
     in_scope = {c.id for c in ctx.chunks}
-    lines = []
+    out = []
     for s in ctx.source.sections:
         ids = [c for c in s.chunk_ids if c in in_scope]
         if ids:
-            first = ctx.by_id[ids[0]].text[:90].replace("\n", " ")
-            lines.append(f"- {s.title} | passages {ids[0]}..{ids[-1]} ({len(ids)}) | starts: \"{first}...\"")
+            out.append((s.title, ids))
+    return out
+
+
+def tool_list_sections(ctx: AgentContext, _: dict) -> str:
+    lines = []
+    for title, ids in sections_in_scope(ctx):
+        first = ctx.by_id[ids[0]].text[:90].replace("\n", " ")
+        lines.append(f"- {title} | passages {ids[0]}..{ids[-1]} ({len(ids)}) | starts: \"{first}...\"")
     return "\n".join(lines)
 
 
@@ -35,9 +43,7 @@ def tool_search(ctx: AgentContext, inp: dict) -> str:
     hits = ctx.index.search(q, k=4)
     if not hits:
         return f"No passages match '{q}'. Try other words, or list_sections."
-    out = []
-    for c, _score in hits:
-        out.append(f"[{c.id}] ({c.section}) {c.text[:380]}{'...' if len(c.text) > 380 else ''}")
+    out = [f"[{c.id}] ({c.section}) {c.text[:380]}{'...' if len(c.text) > 380 else ''}" for c, _ in hits]
     return "\n".join(out)[:OBS_CHARS]
 
 
@@ -74,15 +80,16 @@ def tool_define(ctx: AgentContext, inp: dict) -> str:
     term = str(inp.get("term") or "").strip()
     if not term:
         return "Error: define needs a 'term'."
-    t = re.escape(term.lower())
+    low = term.lower()
+    patterns = [re.compile(p.format(t=re.escape(low))) for p in _DEF_PATTERNS]  # compiled once, not per sentence
     best: list[tuple[int, str, str]] = []
     for c in ctx.source.chunks:
         for sent in re.split(r"(?<=[.!?])\s+", c.text):
             sl = sent.lower()
-            if term.lower() not in sl:
+            if low not in sl:
                 continue
-            for rank, pat in enumerate(_DEF_PATTERNS):
-                if re.search(pat.format(t=t), sl):
+            for rank, pat in enumerate(patterns):
+                if pat.search(sl):
                     best.append((rank, c.id, sent.strip()))
                     break
     if not best:
@@ -112,8 +119,7 @@ def rule_check_fact(ctx: AgentContext, kf: KeyFact) -> KeyFact:
     cited = ctx.by_id.get(kf.chunk_id or "")
     if cited and overlap(kf.fact, cited.text) >= 0.5:
         return kf
-    hits = ctx.full_index.search(kf.fact, k=3)
-    for c, _ in hits:
+    for c, _ in ctx.full_index.search(kf.fact, k=3):
         if overlap(kf.fact, c.text) >= 0.5:
             return kf.model_copy(update={"chunk_id": c.id, "verify_note": f"citation corrected {kf.chunk_id}->{c.id}"})
     return kf.model_copy(update={"verified": False, "verify_note": "no passage lexically supports this fact"})
@@ -138,7 +144,7 @@ async def model_check_facts(ctx: AgentContext, facts: list[KeyFact]) -> list[Key
     for n, (i, f) in enumerate(todo, 1):
         v = verdicts.get(n)
         if v is None:
-            out[i] = f.model_copy(update={"verified": True if f.chunk_id in ctx.by_id else False,
+            out[i] = f.model_copy(update={"verified": f.chunk_id in ctx.by_id,
                                           "verify_note": f.verify_note or "rule-checked only"})
         else:
             ok = bool(v.get("supported"))

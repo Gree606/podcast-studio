@@ -1,9 +1,8 @@
 """Writer: turns one outline segment into a two-host dialogue (JSON list of turns)."""
 from __future__ import annotations
 
-import re
-
 import logging
+import re
 
 from ..clients.llm import chat_json
 from ..prompts import (POSITION_FIRST, POSITION_LAST, POSITION_MIDDLE, REGEN_INSTRUCTION, REVISE_USER, WRITER_SYSTEM,

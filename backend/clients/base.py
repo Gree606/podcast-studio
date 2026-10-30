@@ -8,6 +8,7 @@ a stack trace in the UI.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 import re
@@ -88,10 +89,7 @@ async def request_with_retry(
     server_wait: float | None = None
     for attempt in range(1, attempts + 1):
         try:
-            if semaphore is not None:
-                async with semaphore:
-                    resp = await http_client().request(method, url, timeout=timeout, **kwargs)
-            else:
+            async with semaphore if semaphore is not None else contextlib.nullcontext():
                 resp = await http_client().request(method, url, timeout=timeout, **kwargs)
         except httpx.TimeoutException as e:
             last = e

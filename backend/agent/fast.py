@@ -13,20 +13,21 @@ made 25-40 LLM calls per episode, which free-tier quotas cannot sustain and whic
 added little over a single thinking-model call for a 2-minute script. The parts
 that a single call cannot do (checking against the book, hearing its own audio,
 OCR, per-part regeneration) are kept as tool steps. The old pipeline remains
-available as PIPELINE_MODE=agent for comparison.
+available for comparison ("Deep agent" on the launch screen, or PIPELINE_MODE=agent).
 """
 from __future__ import annotations
 
 import logging
 import re
 
+from .. import languages
 from ..clients.base import ServiceError
 from ..clients.llm import chat_json
 from ..config import get_settings
 from ..prompts import FAST_REWRITE, FAST_VERIFY, FAST_WRITE
 from ..schemas import Candidate, Claim, KeyFact, Segment, SegmentVersion, Turn, new_id
-from .. import languages
 from .context import AgentContext
+from .planner import assign_kinds
 from .writer import SHOW, TONES, WriterError, parse_turns, script_text
 
 log = logging.getLogger("podcast.fast")
@@ -34,7 +35,10 @@ log = logging.getLogger("podcast.fast")
 STAGE_WRITE, STAGE_VERIFY = "write", "verify"
 PASSAGE_WORDS = 2400  # enough for a 2-minute episode; keeps the single prompt small and fast
 WPM = 120  # measured: the Bodhan voices speak ~120 words per minute (348 words -> 175 s)
-WORDS = {"short": 160, "medium": 220, "long": 250}  # quick back-and-forth runs longer per word than monologue  # capped at ~2 minutes
+# target words per episode, capped at ~2 minutes (quick back-and-forth runs longer per word than monologue)
+WORDS = {"short": 160, "medium": 220, "long": 250}
+# "1. Arjun: ..." / "Riya: ..." - a number and/or speaker label the checker sometimes puts in front of a fixed line
+_LINE_LABEL = re.compile(r"^(?:\d+[.)]\s*)?[A-Za-z0-9 ]{1,20}:\s+")
 
 
 def target_words(ctx: AgentContext) -> int:
@@ -107,8 +111,7 @@ async def write_episode(ctx: AgentContext) -> list[Segment]:
         segments.append(seg)
     if not segments:
         raise ServiceError("Language model", "returned no usable dialogue")
-    for k, seg in enumerate(segments):
-        seg.kind = "intro" if k == 0 else ("recap" if k == len(segments) - 1 and len(segments) > 1 else "body")
+    assign_kinds(segments)
     total = sum(len(t.text.split()) for s in segments for t in s.candidates[0].turns)
     ctx.emit(STAGE_WRITE, "action", f"Wrote the whole episode in one call: {len(segments)} parts, "
              f"{sum(len(s.candidates[0].turns) for s in segments)} lines, {total} words (~{total / WPM:.1f} min).",
@@ -147,10 +150,9 @@ async def verify_segments(ctx: AgentContext, segments: list[Segment], only: list
         p = by_part.get(s.index + 1) or (returned[k] if len(returned) == len(targets) else {})
         claims = parse_claims(p, s.candidates[-1].turns, ctx.by_id)
         bad = [c for c in claims if not c.supported]
-        fixed = apply_line_fixes(s.candidates[-1].turns, p.get("fixes")) if bad else None
-        if fixed is None and bad and p.get("fixed_turns"):  # older answer shape: a whole corrected part
-            fixed = p.get("fixed_turns")
-        if bad and fixed:
+        # per-line fixes; else the older answer shape: a whole corrected part
+        fixed = (apply_line_fixes(s.candidates[-1].turns, p.get("fixes")) or p.get("fixed_turns")) if bad else None
+        if fixed:
             try:
                 turns = fixed if isinstance(fixed, list) and fixed and isinstance(fixed[0], Turn) else _part_turns(fixed, names)
                 s.candidates.append(Candidate(index=len(s.candidates), round=1, turns=turns))
@@ -206,16 +208,20 @@ def apply_line_fixes(turns: list[Turn], fixes) -> list[Turn] | None:
             continue
         if not 0 <= i < len(out) or out[i] is None:
             continue
-        text = str(fx.get("text") or "").strip()
-        text = re.sub(r"^(?:\d+[.)]\s*)?[A-Za-z0-9 ]{1,20}:\s*", "", text) if re.match(r"^(?:\d+[.)]\s*)?[A-Za-z0-9 ]{1,20}:\s", text) else text
+        text = _LINE_LABEL.sub("", str(fx.get("text") or "").strip(), count=1)
         out[i] = Turn(speaker=out[i].speaker, text=text) if text else None
         changed = True
     kept = [t for t in out if t is not None]
     return kept if changed and kept else None
 
 
+def next_version_number(seg: Segment) -> int:
+    return max((v.version for v in seg.versions), default=0) + 1
+
+
 def new_version(seg: Segment, claims: list[Claim], instruction: str | None = None) -> SegmentVersion:
-    return SegmentVersion(version=max((v.version for v in seg.versions), default=0) + 1, instruction=instruction,
+    """The segment's final (fact-checked) turns as its next version, ready to record."""
+    return SegmentVersion(version=next_version_number(seg), instruction=instruction,
                           turns=[t.model_copy() for t in seg.candidates[-1].turns], claims=claims)
 
 

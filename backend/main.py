@@ -21,16 +21,16 @@ from pydantic import BaseModel, Field
 
 from . import ask, jobs
 from .agent import fast
-from .languages import LANGUAGES
 from .agent.context import LENGTHS
 from .agent.orchestrator import fast_mode, regenerate_segment, run_episode, switch_version
 from .clients.base import ServiceError, close_http_client
 from .config import ROOT, get_settings
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
+from .languages import LANGUAGES
 from .photos import MAX_PAGES, MAX_PHOTO_BYTES, ingest_photos
 from .prompts import PROMPT_VERSION
 from .quiz import build_quiz
-from .schemas import Episode, EpisodeSettings, new_id
+from .schemas import Episode, EpisodeSettings, Source, new_id
 from .store import store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -138,14 +138,13 @@ async def health():
     return {"ok": True, "mock": get_settings().effective_mock(), "version": PROMPT_VERSION, "active_jobs": len(jobs.active_jobs())}
 
 
-def estimate_minutes(length: str, words: int) -> dict:
+def estimate_minutes(length: str) -> dict:
     if get_settings().pipeline_mode != "agent":  # 2 LLM calls, then recording; episodes are capped at ~2 minutes
         audio = fast.WORDS[length] / fast.WPM
         return {"audio_minutes": round(audio, 1), "wait_minutes": round(1.5 + 0.5 * audio, 1)}
     n_seg, wps = LENGTHS[length]
     audio = n_seg * wps / 150 + 0.3
-    wait = 1.0 + n_seg * 0.6
-    return {"audio_minutes": round(audio, 1), "wait_minutes": round(wait, 1)}
+    return {"audio_minutes": round(audio, 1), "wait_minutes": round(1.0 + n_seg * 0.6, 1)}
 
 
 # Kid-facing names for the episode settings; ``value`` is what EpisodeSettings accepts.
@@ -167,7 +166,7 @@ PRESETS = {
 async def config(request: Request):
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
-            "lengths": {k: estimate_minutes(k, 0) for k in LENGTHS},
+            "lengths": {k: estimate_minutes(k) for k in LENGTHS},
             "presets": PRESETS, "configured": s.configured(),
             "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()],
             "locked": bool(s.access_code), "unlocked": gate_unlocked(request)}
@@ -185,9 +184,9 @@ async def samples():
 
 
 # --- sources -----------------------------------------------------------------------
-def source_summary(src) -> dict:
+def source_summary(src: Source) -> dict:
     return {"id": src.id, "title": src.title, "origin": src.origin, "word_count": src.word_count, "notes": src.notes,
-            "ocr_pages": src.ocr_pages, "page_texts": getattr(src, "page_texts", []),
+            "ocr_pages": src.ocr_pages, "page_texts": src.page_texts,
             "sections": [{"id": x.id, "title": x.title, "word_count": x.word_count} for x in src.sections]}
 
 
@@ -221,7 +220,7 @@ async def create_source(request: Request, file: UploadFile | None = File(None), 
             if len(data) > MAX_UPLOAD:
                 raise HTTPException(413, "That file is too large (max 25 MB). Try uploading just one chapter.")
             name = (file.filename or "").lower()
-            if name.endswith(".txt") or name.endswith(".md"):
+            if name.endswith((".txt", ".md")):
                 src = ingest_text(data.decode("utf-8", errors="ignore"), s.max_input_words, origin="upload", title=title)
             else:
                 src = await ingest_pdf(data, s.max_input_words)
@@ -253,9 +252,13 @@ class CreateEpisode(BaseModel):
 OWNER_COOKIE = "m606_owner"
 
 
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 def _owner_hash(request: Request) -> str | None:
     tok = request.cookies.get(OWNER_COOKIE, "")
-    return hashlib.sha256(tok.encode()).hexdigest() if tok else None
+    return _hash_token(tok) if tok else None
 
 
 def can_edit(ep: Episode, request: Request) -> bool:
@@ -286,8 +289,7 @@ async def create_episode(body: CreateEpisode, request: Request, response: Respon
     title = src.title if not st.section_ids or len(st.section_ids) == len(src.sections) else f"{src.title}: {', '.join(titles[:2])}{'...' if len(titles) > 2 else ''}"
     token = request.cookies.get(OWNER_COOKIE) or secrets.token_urlsafe(24)
     response.set_cookie(OWNER_COOKIE, token, max_age=365 * 86400, httponly=True, samesite="lax")
-    ep = Episode(id=new_id("ep_"), source_id=src.id, title=title, settings=st,
-                 owner=hashlib.sha256(token.encode()).hexdigest())
+    ep = Episode(id=new_id("ep_"), source_id=src.id, title=title, settings=st, owner=_hash_token(token))
     store.save_episode(ep)
     jobs.submit(ep.id, "generate", lambda: run_episode(ep.id))
     return {"id": ep.id}
@@ -372,12 +374,12 @@ class RegenBody(BaseModel):
 async def regenerate(eid: str, sid: str, body: RegenBody, request: Request):
     ep = _get_ep(eid)
     _require_owner(ep, request)
-    if not any(x.id == sid for x in ep.segments):
+    seg = next((x for x in ep.segments if x.id == sid), None)
+    if not seg:
         raise HTTPException(404, "Segment not found.")
     if jobs.is_busy(eid):
         raise HTTPException(409, "This episode is still being worked on. Please wait for it to finish.")
     rate_limit(request, "regenerate", 30)
-    seg = next(x for x in ep.segments if x.id == sid)
     seg.status = "writing"
     store.save_episode(ep)
     instr = (body.instruction or "").strip() or None
@@ -534,29 +536,28 @@ async def classic():
     return FileResponse(FRONTEND / "classic.html", media_type="text/html", headers=NO_CACHE)
 
 
+def _asset(folder: str, name: str, types: dict[str, str], max_age: int) -> FileResponse:
+    """A file from frontend/<folder>/, if its extension is one of ``types`` (extension -> media type)."""
+    kind = next((t for ext, t in types.items() if name.endswith(ext)), None)
+    p = FRONTEND / folder / name
+    if kind is None or "/" in name or ".." in name or not p.is_file():
+        raise HTTPException(404, "Not found.")
+    return FileResponse(p, media_type=kind, headers={"Cache-Control": f"public, max-age={max_age}"})
+
+
 @app.get("/fonts/{name}")
 async def font(name: str):
-    p = FRONTEND / "fonts" / name
-    if not name.endswith(".woff2") or "/" in name or ".." in name or not p.is_file():
-        raise HTTPException(404, "Not found.")
-    return FileResponse(p, media_type="font/woff2", headers={"Cache-Control": "public, max-age=31536000"})
+    return _asset("fonts", name, {".woff2": "font/woff2"}, max_age=365 * 86400)
 
 
 @app.get("/sprites/{name}")
 async def sprite(name: str):
-    p = FRONTEND / "sprites" / name
-    if not name.endswith(".png") or "/" in name or ".." in name or not p.is_file():
-        raise HTTPException(404, "Not found.")
-    return FileResponse(p, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return _asset("sprites", name, {".png": "image/png"}, max_age=86400)
 
 
 @app.get("/sounds/{name}")
 async def sound(name: str):
-    p = FRONTEND / "sounds" / name
-    if not name.endswith((".wav", ".mp3")) or "/" in name or ".." in name or not p.is_file():
-        raise HTTPException(404, "Not found.")
-    kind = "audio/mpeg" if name.endswith(".mp3") else "audio/wav"
-    return FileResponse(p, media_type=kind, headers={"Cache-Control": "public, max-age=86400"})
+    return _asset("sounds", name, {".wav": "audio/wav", ".mp3": "audio/mpeg"}, max_age=86400)
 
 
 @app.get("/favicon.ico")

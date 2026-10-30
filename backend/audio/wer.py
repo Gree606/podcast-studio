@@ -31,18 +31,20 @@ def _strip_punct(text: str) -> str:
     """Punctuation and symbols (any script, incl. the Devanagari danda) become spaces; letters and
     their combining vowel signs stay together, so Indic words are not cut apart."""
     return "".join(" " if unicodedata.category(ch)[0] in "PSZ" and ch != "'" else ch for ch in text)
+
+
 _SPECIAL = {"won't": "will not", "can't": "can not", "cannot": "can not", "shan't": "shall not", "let's": "let us", "ain't": "is not"}
 # "'s" is only expanded after words where it can't be a possessive ("Riya's book" stays as is).
 _IS_WORDS = "it|that|what|there|here|he|she|who|where|how|when|why|this"
 _CONTRACTIONS = [
     (re.compile(r"\b(" + "|".join(re.escape(k) for k in _SPECIAL) + r")\b"), lambda m: _SPECIAL[m.group(1)]),
-    (re.compile(r"n't\b"), lambda m: " not"),
-    (re.compile(r"'re\b"), lambda m: " are"),
-    (re.compile(r"'ve\b"), lambda m: " have"),
-    (re.compile(r"'ll\b"), lambda m: " will"),
-    (re.compile(r"'d\b"), lambda m: " would"),
-    (re.compile(r"\bi'm\b"), lambda m: "i am"),
-    (re.compile(rf"\b({_IS_WORDS})'s\b"), lambda m: m.group(1) + " is"),
+    (re.compile(r"n't\b"), " not"),
+    (re.compile(r"'re\b"), " are"),
+    (re.compile(r"'ve\b"), " have"),
+    (re.compile(r"'ll\b"), " will"),
+    (re.compile(r"'d\b"), " would"),
+    (re.compile(r"\bi'm\b"), "i am"),
+    (re.compile(rf"\b({_IS_WORDS})'s\b"), r"\1 is"),
 ]
 
 

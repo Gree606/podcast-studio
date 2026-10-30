@@ -18,12 +18,14 @@ import math
 
 
 def _largest_remainder(weights: list[float], total: int, caps: list[int]) -> list[int]:
+    """Split ``total`` in proportion to ``weights`` (largest-remainder rounding), never exceeding ``caps``;
+    whatever a capped entry cannot take is redistributed among the others."""
     out = [0] * len(weights)
     remaining = total
     active = [i for i in range(len(weights)) if caps[i] > 0]
     while remaining > 0 and active:
-        wsum = sum(weights[i] for i in active) or float(len(active))
-        raw = {i: remaining * ((weights[i] / wsum) if wsum else 1 / len(active)) for i in active}
+        wsum = sum(weights[i] for i in active) or float(len(active))  # all-zero weights: remainders go round-robin
+        raw = {i: remaining * weights[i] / wsum for i in active}
         floors = {i: min(int(math.floor(raw[i])), caps[i] - out[i]) for i in active}
         given = sum(floors.values())
         for i, f in floors.items():
@@ -38,8 +40,6 @@ def _largest_remainder(weights: list[float], total: int, caps: list[int]) -> lis
                     out[i] += 1
                     remaining -= 1
         active = [i for i in active if out[i] < caps[i]]
-        if given == 0 and all(out[i] >= caps[i] for i in range(len(weights))):
-            break
     return out
 
 
@@ -80,7 +80,7 @@ def reallocate(remaining: int, best_scores: list[float], difficulties: list[int]
     caps = []
     for s, d, used in zip(best_scores, difficulties, spent):
         gap = max(0.0, accept - s)
-        weights.append(gap * (0.5 + d / 5) if gap > 0 else 0.0)
+        weights.append(gap * (0.5 + d / 5))
         caps.append(max(0, max_per - used) if gap > 0 else 0)
     if remaining <= 0 or not any(c > 0 for c in caps):
         return [0] * len(best_scores)

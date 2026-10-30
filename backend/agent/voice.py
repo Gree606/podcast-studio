@@ -43,12 +43,17 @@ def _lang(ctx: AgentContext) -> str:
     return getattr(getattr(ep, "settings", None), "language", None) or "en"
 
 
+def _cache_key(ctx: AgentContext, turn: Turn) -> tuple[str, str]:
+    """Recordings are shared by speaker and spoken (normalised) text."""
+    return turn.speaker, normalize_for_tts(turn.text, _lang(ctx))
+
+
 def prefetch(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> None:
     """Start recording (TTS + listen-back) these lines now, in the background. A later
     synthesize_version reuses a finished take for any line whose text is unchanged; lines the
     fact-check rewrote simply miss the cache and are recorded fresh."""
     for i, t in enumerate(turns):
-        key = (t.speaker, normalize_for_tts(t.text, _lang(ctx)))
+        key = _cache_key(ctx, t)
         if key not in ctx.tts_cache:
             task = asyncio.create_task(_record_line(ctx, seg, i, t.model_copy()))
             task.add_done_callback(lambda tk: tk.cancelled() or tk.exception())  # failures are retried later, not logged twice
@@ -56,8 +61,7 @@ def prefetch(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> None:
 
 
 async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np.ndarray:
-    key = (turn.speaker, normalize_for_tts(turn.text, _lang(ctx)))
-    task = getattr(ctx, "tts_cache", {}).pop(key, None)  # (test doubles may not carry a cache)
+    task = getattr(ctx, "tts_cache", {}).pop(_cache_key(ctx, turn), None)  # (test doubles may not carry a cache)
     if task is not None:
         try:
             clip, done = await task

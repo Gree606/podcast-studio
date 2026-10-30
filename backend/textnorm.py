@@ -101,6 +101,12 @@ _SYMBOLS = [
 
 
 _DIGITS = ["oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+_GLUED_DIGITS = re.compile(r"(?<=[A-Za-z])\d{1,4}\b")
+
+
+def _spell_glued_digits(t: str) -> str:
+    """Digits glued to a word are a name/code, read digit by digit: "Error606" -> "Error six oh six"."""
+    return _GLUED_DIGITS.sub(lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)
 
 
 def normalize_for_tts(text: str, language: str | None = None) -> str:
@@ -108,8 +114,7 @@ def normalize_for_tts(text: str, language: str | None = None) -> str:
     the voice reads digits itself, so only markdown and names like "Error606" are handled."""
     t = re.sub(r"\bMission\s*606\b", "Mission six oh six", text)  # the show's name
     if language not in (None, "en"):
-        t = re.sub(r"[*_#`]+", "", t)
-        t = re.sub(r"(?<=[A-Za-z])\d{1,4}\b", lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)
+        t = _spell_glued_digits(re.sub(r"[*_#`]+", "", t))
         return re.sub(r"\s+", " ", t).strip()
     t = re.sub(r"[*_#`]+", "", t)  # stray markdown
     t = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", t)
@@ -131,9 +136,7 @@ def normalize_for_tts(text: str, language: str | None = None) -> str:
     for pat, rep in _SYMBOLS:
         t = re.sub(pat, rep, t)
     t = re.sub(r"(\d)\s*-\s*(\d)", r"\1 to \2", t)  # ranges "5-10"
-    # digits glued to a word are a name/code, read digit by digit: "Error606" -> "Error six oh six"
-    t = re.sub(r"(?<=[A-Za-z])\d{1,4}\b", lambda m: " " + " ".join(_DIGITS[int(c)] for c in m.group(0)), t)
-    # (the number must end in a digit, so "606," keeps its comma)
+    t = _spell_glued_digits(t)
+    # remaining numbers (a number must end in a digit, so "606," keeps its comma)
     t = re.sub(r"\d(?:[\d,]*\d)?(?:\.\d+)?", lambda m: number_to_words(m.group(0)), t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
+    return re.sub(r"\s+", " ", t).strip()

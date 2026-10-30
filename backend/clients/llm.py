@@ -3,6 +3,7 @@
 * ``gemini``: Google Generative Language API,
   POST {base}/v1beta/models/{model}:generateContent with an X-goog-api-key header.
 * ``openai``: any OpenAI-compatible /v1/chat/completions server (e.g. vLLM serving Gemma).
+* ``openrouter``: the same OpenAI wire format against OpenRouter, plus its reasoning/JSON options.
 
 The rest of the app always speaks OpenAI-style messages
 ([{"role": "system"|"user"|"assistant", "content": str | parts}]); this module
@@ -41,6 +42,13 @@ def _semaphore() -> asyncio.Semaphore:
 
 def clean_output(text: str) -> str:
     return _THOUGHT_RE.sub("", text or "").strip()
+
+
+def _json_body(resp) -> Any:
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -113,11 +121,7 @@ async def _gemini_call(messages, *, temperature, max_tokens, json_mode, base_url
         json=body, headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
         timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(), retry_timeouts=False,
     )
-    try:
-        data = resp.json()
-    except ValueError as e:
-        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
-    return from_gemini(data)
+    return from_gemini(_json_body(resp))
 
 
 async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url, api_key, model, attempts=None, thinking=None) -> tuple[str, dict]:
@@ -137,10 +141,7 @@ async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url
         "Language model", "POST", base_url.rstrip("/") + "/v1/chat/completions", json=body, headers=headers,
         timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(), retry_timeouts=False,
     )
-    try:
-        data = resp.json()
-    except ValueError as e:
-        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
+    data = _json_body(resp)
     if isinstance(data.get("error"), dict):  # OpenRouter can report an upstream failure inside a 200
         err = data["error"]
         code = err.get("code") if isinstance(err.get("code"), int) else 502

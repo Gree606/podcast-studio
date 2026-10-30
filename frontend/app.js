@@ -29,9 +29,9 @@ const STATION_OF = {queued: "plan", start: "plan", plan: "plan", write: "write",
 let CONFIG = {lengths: {}, presets: DEFAULT_PRESETS};
 let SOURCE = null, epState = null, pollTimer = null, traceLen = 0, traceEvents = [];
 let sourcesCache = null, currentAudioFile = null, lineIndex = [], quiz = null, quizLoadedFor = null, viewId = 0;
-let seenLines = new Set(), launched = false;
+let seenLines = new Set(), launched = false;  // bubbles already popped in; ships already flown in
 // Live mode: play part by part while later parts are still being recorded (k = part playing, waiting = part k+1 not ready yet)
-let live = {on: false, k: 0, waiting: false};  // bubbles already popped in; ships already flown in
+let live = {on: false, k: 0, waiting: false};
 
 // ------------------------------------------------------------------ helpers
 async function api(path, opts = {}) {
@@ -126,13 +126,14 @@ function renderSetup() {
   const c = CONFIG.configured, box = $("#setup");
   const items = [["llm", "LLM_API_KEY", "Google Gemini: writes and checks the script"], ["tts", "TTS_API_KEY", "Sarvam AI: the two voices"],
     ["asr", "ASR_API_KEY", "Bodhan: listens back to check the audio"], ["ocr", "OCR_API_KEY", "Bodhan Indic-OCR: reads scanned PDF pages"]];
-  if (c && items.some(([k]) => k in c && !c[k])) {
+  const missing = !!c && items.some(([k]) => k in c && !c[k]);
+  if (missing) {
     box.classList.remove("hidden");
     $("#setupTitle").textContent = items.some(([k]) => c[k]) ? "🔑 Almost there: some keys are still missing" : "🔑 Grown-up setup needed";
     $("#setupPath").textContent = CONFIG.secrets_path || "~/.config/podcast-studio/secrets.env";
     $("#setupList").innerHTML = items.filter(([k]) => k in c).map(([k, name, what]) => `<li>${c[k] ? "✅" : "⬜"} <code>${name}</code> ${esc(what)}${c[k] ? " · working" : " · demo placeholder until set"}</li>`).join("");
   } else box.classList.add("hidden");
-  $("#demoNote").innerHTML = CONFIG.mock && !(c && items.some(([k]) => k in c && !c[k]))
+  $("#demoNote").innerHTML = CONFIG.mock && !missing
     ? `<div class="notice info small">🧪 Demo mode: scripts and voices are placeholders.</div>` : "";
 }
 
@@ -275,7 +276,8 @@ async function createEpisode() {
 
 // ------------------------------------------------------------------ episode
 function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
-const htmlLang = ep => ((CONFIG.languages || []).find(l => l.code === (ep && ep.settings.language)) || {}).html || "en";
+const langHtml = code => ((CONFIG.languages || []).find(l => l.code === code) || {}).html || "en";
+const htmlLang = ep => langHtml(ep && ep.settings.language);
 const names = ep => ({host: ep.settings.host_name || "Error606", expert: ep.settings.expert_name || "Gree"});
 const currentVersion = s => s.versions.find(v => v.version === s.active_version);
 
@@ -287,26 +289,31 @@ async function renderEpisode(id) {
   const app = $("#app"); app.className = "ep-layout"; app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   if (wide()) openSheet("script");  // on monitors the panel is a permanent sidebar
   journey("make");
-  const a = $("#audio");
-  $("#playBtn").classList.add("waiting");
+  const a = $("#audio"), pb = $("#playBtn");
+  pb.classList.add("waiting");
   $$(".dock-btn").forEach(b => { b.onclick = () => openSheet(b.dataset.sheet); });
   $("#askForm").onsubmit = e => { e.preventDefault(); askGree($("#askInput").value); };
   $$("[data-close-sheet]").forEach(b => { b.onclick = () => openSheet(null); });
   const seek = $("#seek");
   seek.oninput = () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; };
   a.addEventListener("timeupdate", onTime);
-  a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); $("#playBtn").classList.remove("waiting"); drawWave.peaks = null; loadWave(a.getAttribute("src")); });
-  addEventListener("resize", () => drawWave());
-  a.addEventListener("play", startMeter);
-  a.addEventListener("play", stopIntro);
-  a.addEventListener("play", () => { ambient.podcast = true; updateAmbient(0.6); });
-  a.addEventListener("pause", () => { ambient.podcast = false; updateAmbient(1.5); });
-  a.addEventListener("ended", () => { ambient.podcast = false; updateAmbient(1.5); });
-  a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
-  a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
-  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz, or ask Gree a doubt."); $("#quizBtn").classList.add("nudge"); }
-    else { toast("🙋 Any doubts? Ask Gree!"); $("#askBtn").classList.add("nudge"); } });
-  $("#playBtn").onclick = () => { if (live.on && !a.src) { playLivePart(0); return; } if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
+  a.addEventListener("loadedmetadata", () => { $("#tDur").textContent = fmtT(a.duration); pb.classList.remove("waiting"); drawWave.peaks = null; loadWave(a.getAttribute("src")); });
+  a.addEventListener("play", () => {
+    startMeter(); stopStings(); ambient.podcast = true; updateAmbient(0.6);  // the hum dips under the hosts
+    if (a.currentTime < 1) launch();
+    $("#stage").classList.add("playing"); pb.classList.remove("ready"); pb.classList.add("is-playing"); pb.setAttribute("aria-label", "Pause"); onTime();
+  });
+  a.addEventListener("pause", () => {
+    ambient.podcast = false; updateAmbient(1.5);
+    $("#stage").classList.remove("playing"); pb.classList.remove("is-playing"); pb.setAttribute("aria-label", "Play"); setSpeaking(null);
+  });
+  a.addEventListener("ended", () => {
+    ambient.podcast = false; updateAmbient(1.5);
+    if (live.on) { nextLivePart(); return; }
+    if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz, or ask Gree a doubt."); $("#quizBtn").classList.add("nudge"); }
+    else { toast("🙋 Any doubts? Ask Gree!"); $("#askBtn").classList.add("nudge"); }
+  });
+  pb.onclick = () => { if (live.on && !a.src) { playLivePart(0); return; } if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
   $("#speedBtn").onclick = () => {
     const speeds = [1, 1.25, 1.5, 0.75], next = speeds[(speeds.indexOf(a.playbackRate) + 1) % speeds.length] || 1;
     a.playbackRate = next; $("#speedBtn").textContent = `${next}×`;
@@ -315,18 +322,16 @@ async function renderEpisode(id) {
     try { await navigator.clipboard.writeText(location.href); toast("🔗 Link copied! Share it with a friend."); }
     catch { prompt("Copy this link:", location.href); }
   };
-  $("#restartBtn").onclick = async () => {
-    $("#restartBtn").disabled = true;
-    try { await postJSON(`/api/episodes/${epState.id}/restart`); toast("🔁 Starting that step again…"); $("#slowNote").classList.add("hidden"); stopPoll(); poll(epState.id); }
-    catch (e) { toast(e.message, "err"); }
-    finally { $("#restartBtn").disabled = false; }
+  const retry = (btn, call, msg) => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try { await call(); toast(msg); $("#slowNote").classList.add("hidden"); stopPoll(); poll(epState.id); }
+      catch (e) { toast(e.message, "err"); }
+      finally { btn.disabled = false; }
+    };
   };
-  $("#resumeBtn").onclick = async () => {
-    $("#resumeBtn").disabled = true;
-    try { await api(`/api/episodes/${epState.id}/resume`, {method: "POST"}); toast("🔁 Trying again…"); stopPoll(); poll(epState.id); }
-    catch (e) { toast(e.message, "err"); }
-    finally { $("#resumeBtn").disabled = false; }
-  };
+  retry($("#restartBtn"), () => postJSON(`/api/episodes/${epState.id}/restart`), "🔁 Starting that step again…");
+  retry($("#resumeBtn"), () => api(`/api/episodes/${epState.id}/resume`, {method: "POST"}), "🔁 Trying again…");
   await poll(id, viewId);
 }
 
@@ -454,8 +459,7 @@ function setAudio(ep) {
   $("#player").classList.remove("hidden");
   if (!launched) { launched = true; launch(true); }
   if (!wasPlaying) {
-    $("#playBtn").classList.add("ready"); const cap = $("#nowLine"); cap.dataset.say = "";
-    cap.classList.remove("from-host", "from-expert"); cap.innerHTML = "<span>🎧 Ready. Press play!</span>";
+    $("#playBtn").classList.add("ready"); stageNote("🎧 Ready. Press play!");
   }
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
@@ -566,6 +570,10 @@ function renderSegments(ep) {
   onTime();
 }
 
+async function activateVersion(ep, segId, v) {
+  await postJSON(`/api/episodes/${ep.id}/segments/${segId}/activate`, {version: +v});
+  toast(`🔀 Switched to version ${v}.`); stopPoll(); poll(ep.id);
+}
 async function regenerate(segId, instruction) {
   const ep = epState, s = ep.segments.find(x => x.id === segId);
   await postJSON(`/api/episodes/${ep.id}/segments/${segId}/regenerate`, {instruction});
@@ -589,10 +597,7 @@ async function segAction(b) {
       const input = $(`input[data-own="${seg}"]`), text = input.value.trim();
       if (!text) { toast("✏️ Type your idea first, then press Rewrite it."); b.disabled = false; input.focus(); return; }
       await regenerate(seg, text); input.value = "";
-    } else if (act === "ver") {
-      await postJSON(`/api/episodes/${ep.id}/segments/${seg}/activate`, {version: +b.dataset.v});
-      toast(`🔀 Switched to version ${b.dataset.v}.`); stopPoll(); poll(ep.id);
-    }
+    } else if (act === "ver") await activateVersion(ep, seg, b.dataset.v);
   } catch (e) { b.disabled = false; toast(e.message, "err"); }
 }
 
@@ -607,6 +612,12 @@ async function fillSources(segId) {
   catch (e) { box.textContent = e.message; }
 }
 
+// a plain note in the stage's speech bubble (not a line of the script)
+function stageNote(text) {
+  const cap = $("#nowLine");
+  cap.classList.remove("from-host", "from-expert"); cap.innerHTML = `<span>${text}</span>`; cap.dataset.say = "";
+}
+
 // ------------------------------------------------------------------ live listening (part by part)
 const partReady = (ep, k) => { const s = ep && ep.segments[k], v = s && currentVersion(s); return !!(v && v.audio_file && s.status === "done"); };
 function startLive(ep) {
@@ -615,8 +626,7 @@ function startLive(ep) {
   if (!launched) { launched = true; launch(true); }
   const n = names(ep);
   $("#nameHost").textContent = n.host; $("#nameExpert").textContent = n.expert;
-  $("#nowLine").classList.remove("from-host", "from-expert");
-  $("#nowLine").innerHTML = "<span>📡 Part 1 has landed. Press play!</span>"; $("#nowLine").dataset.say = "";
+  stageNote("📡 Part 1 has landed. Press play!");
   $("#playBtn").classList.remove("waiting"); $("#playBtn").classList.add("ready");
   liveTitle(ep);
   toast("🎧 Part 1 is ready. Start listening now!");
@@ -641,8 +651,7 @@ function nextLivePart() {
   }
   if (partReady(ep, k)) { playLivePart(k); return; }
   live.waiting = true; setSpeaking(null);
-  const cap = $("#nowLine"); cap.classList.remove("from-host", "from-expert");
-  cap.innerHTML = `<span>📡 Receiving part ${k + 1}… it plays by itself the moment it lands.</span>`;
+  stageNote(`📡 Receiving part ${k + 1}… it plays by itself the moment it lands.`);
 }
 
 // "Incoming transmission": the two ships fly in and the banner flashes
@@ -805,7 +814,7 @@ function renderAsk() {
   const n = names(epState);
   const hello = askBubble("gree", `Hi! I'm ${esc(n.expert)}. Stuck on something from this episode? Ask me anything about the chapter, in any language.`);
   log.innerHTML = hello + ask.items.map(it => {
-    const lang = ((CONFIG.languages || []).find(l => l.code === it.language) || {}).html || "en";
+    const lang = langHtml(it.language);
     const src = it.sources.length ? `<details class="ask-src"><summary>📖 ${it.sources.map(c => `${esc(c.section)}${c.page ? `, p. ${c.page}` : ""}`).filter((x, i, a) => a.indexOf(x) === i).join(" · ")}</summary>
       ${it.sources.map(c => `<blockquote>${esc(c.text)}</blockquote>`).join("")}</details>` : "";
     const flag = it.grounded ? "" : `<span class="pill warn ask-flag">Not covered in this chapter</span>`;
@@ -1008,7 +1017,7 @@ function renderVersions(ep) {
   $$("[data-tver]", $("#teacherVersions")).forEach(b => {
     b.onclick = async () => {
       b.disabled = true;
-      try { await postJSON(`/api/episodes/${ep.id}/segments/${b.dataset.tseg}/activate`, {version: +b.dataset.tver}); toast(`🔀 Switched to version ${b.dataset.tver}.`); stopPoll(); poll(ep.id); }
+      try { await activateVersion(ep, b.dataset.tseg, b.dataset.tver); }
       catch (e) { b.disabled = false; toast(e.message, "err"); }
     };
   });
@@ -1037,11 +1046,10 @@ function sfxLevel() {
   const a = $("#audio");
   return a && !a.paused ? 0.45 : 1;  // stay under the hosts' voices
 }
-// Soft voices for the two sounds. Each takes (ctx, start time, output node, level) so the same code
-// plays live and renders the preview files in scripts/render_sfx.py. SFX_STYLE picks the variant.
-// Hover: "soft8bit", chosen by blind listening test (5/5). Click: a real recorded mouse click
-// (frontend/sounds/click.wav, Pixabay; see CREDITS.md), since the synthesised ones were all rejected.
-const SFX_STYLE = {hover: "soft8bit", click: "sample"};
+// The two sounds. Each takes (ctx, start time, output node, level) so the same code plays live and
+// renders preview files in scripts/render_sfx.py. Hover: "soft8bit", chosen by blind listening test (5/5).
+// Click: a real recorded mouse click (frontend/sounds/click.wav, Pixabay; see CREDITS.md), since the
+// synthesised ones were all rejected.
 function sfxEnv(ctx, t, peak, attack, decay) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
@@ -1049,31 +1057,8 @@ function sfxEnv(ctx, t, peak, attack, decay) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
   return g;
 }
-function sfxNoise(ctx, seconds, grains) {  // noise made of a few soft "grains": paper fibres rubbing, not a hiss
-  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds)), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
-  const at = Array.from({length: grains}, (_, i) => (i + Math.random() * 0.6) / grains);
-  for (let i = 0; i < len; i++) {
-    const x = i / len;
-    let env = 0;
-    for (const c of at) env += Math.exp(-Math.pow((x - c) * grains * 3.2, 2));
-    d[i] = (Math.random() * 2 - 1) * env * (1 - x * 0.6);
-  }
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  return src;
-}
 const SFX_VOICES = {
   hover: {
-    bubble(ctx, t, out, lvl) {  // a soft sine "bip" gliding up, like a bubble
-      const o = ctx.createOscillator(), g = sfxEnv(ctx, t, 0.05 * lvl, 0.008, 0.09);
-      o.type = "sine"; o.frequency.setValueAtTime(560, t); o.frequency.exponentialRampToValueAtTime(840, t + 0.05);
-      o.connect(g).connect(out); o.start(t); o.stop(t + 0.12);
-    },
-    glass(ctx, t, out, lvl) {  // a tiny, very quiet glassy tick
-      for (const [f, a] of [[1568, 1], [3136, 0.25]]) {
-        const o = ctx.createOscillator(), g = sfxEnv(ctx, t, 0.022 * a * lvl, 0.003, 0.06);
-        o.type = "sine"; o.frequency.value = f; o.connect(g).connect(out); o.start(t); o.stop(t + 0.08);
-      }
-    },
     soft8bit(ctx, t, out, lvl) {  // the game blip, rounded off: triangle wave, filtered, gentle envelope
       const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = sfxEnv(ctx, t, 0.07 * lvl, 0.006, 0.1);
       o.type = "triangle"; o.frequency.setValueAtTime(523, t); o.frequency.setValueAtTime(784, t + 0.04);
@@ -1091,25 +1076,6 @@ const SFX_VOICES = {
       src.buffer = sfx.clickBuf; src.playbackRate.value = 0.97 + Math.random() * 0.06; g.gain.value = 0.6 * lvl;
       src.connect(g).connect(out); src.start(t);
     },
-    paper(ctx, t, out, lvl) {  // a light paper "tk": three soft grains, warm band, no thump
-      const n = sfxNoise(ctx, 0.045, 3), bp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-      bp.type = "bandpass"; bp.frequency.value = 1500 * (0.92 + Math.random() * 0.16); bp.Q.value = 0.8;
-      lp.type = "lowpass"; lp.frequency.value = 3800; g.gain.value = 0.5 * lvl;
-      n.connect(bp).connect(lp).connect(g).connect(out); n.start(t);
-    },
-    softkey(ctx, t, out, lvl) {  // a muted linear-switch key: a dull tick and a small round body
-      const n = sfxNoise(ctx, 0.018, 1), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-      lp.type = "lowpass"; lp.frequency.value = 2200; g.gain.value = 0.32 * lvl;
-      n.connect(lp).connect(g).connect(out); n.start(t);
-      const o = ctx.createOscillator(), og = sfxEnv(ctx, t, 0.06 * lvl, 0.003, 0.035);
-      o.type = "sine"; o.frequency.setValueAtTime(330 * (0.95 + Math.random() * 0.1), t); o.frequency.exponentialRampToValueAtTime(220, t + 0.035);
-      o.connect(og).connect(out); o.start(t); o.stop(t + 0.05);
-    },
-    pencil(ctx, t, out, lvl) {  // a short grainy pencil-on-paper scratch
-      const n = sfxNoise(ctx, 0.075, 7), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-      hp.type = "highpass"; hp.frequency.value = 900; lp.type = "lowpass"; lp.frequency.value = 4200; g.gain.value = 0.38 * lvl;
-      n.connect(hp).connect(lp).connect(g).connect(out); n.start(t);
-    },
   },
 };
 function sfxLoadClick(ctx) {  // fetched and decoded once, the first time audio is unlocked
@@ -1121,16 +1087,16 @@ function sfxLoadClick(ctx) {  // fetched and decoded once, the first time audio 
 function sfxHover() {
   const ctx = sfx.ctx && sfx.on ? sfx.ctx : null;
   if (!ctx || ctx.state !== "running") return;
-  SFX_VOICES.hover[SFX_STYLE.hover](ctx, ctx.currentTime, ctx.destination, sfxLevel());
+  SFX_VOICES.hover.soft8bit(ctx, ctx.currentTime, ctx.destination, sfxLevel());
 }
 function sfxClick() {
   const ctx = sfxContext();  // still unlocks audio for the hover sound
-  if (!ctx || !SFX_STYLE.click) return;
-  SFX_VOICES.click[SFX_STYLE.click](ctx, ctx.currentTime, ctx.destination, sfxLevel());
+  if (!ctx) return;
+  SFX_VOICES.click.sample(ctx, ctx.currentTime, ctx.destination, sfxLevel());
 }
 function setSfx(on) {
   sfx.on = on;
-  if (!on && typeof stopIntro === "function") stopIntro();
+  if (!on) stopStings();
   try { localStorage.setItem("sfx", on ? "1" : "0"); } catch { /* ignore */ }
   const b = $("#soundToggle");
   b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "🔊 Sound: on" : "🔇 Sound: off";
@@ -1139,13 +1105,13 @@ function setSfx(on) {
     x.setAttribute("aria-pressed", String(on)); x.setAttribute("aria-label", on ? "Sound on (tap to mute)" : "Sound off (tap to unmute)");
     x.classList.toggle("muted", !on);
   }
-  if (typeof updateAmbient === "function") { if (on) sfxContext(); updateAmbient(on ? 1.2 : 0.4); }
+  if (on) sfxContext();
+  updateAmbient(on ? 1.2 : 0.4);
 }
 function initSfx() {
   setSfx(sfx.on);
   sfx.clickBytes = fetch("/sounds/click.wav").then(r => r.arrayBuffer());  // downloaded now, decoded when audio unlocks
-  $("#soundToggle").addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
-  for (const id of ["#soundBtn", "#gateSound"]) $(id).addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
+  for (const id of ["#soundToggle", "#soundBtn", "#gateSound"]) $(id).addEventListener("click", () => { setSfx(!sfx.on); if (sfx.on) sfxClick(); });
   document.addEventListener("pointerdown", e => {
     if (e.button === 0 && e.target.closest(SFX_TARGETS) && !e.target.closest(":disabled, [aria-disabled=true]")) sfxClick();
     else sfxContext();  // any first tap unlocks audio for the hover blips
@@ -1237,7 +1203,6 @@ function stopStings() {  // e.g. when the episode starts playing: never talk ove
 }
 const playIntro = () => playSting("intro", 0.55);      // Alien Song (Dragon Studio): the entry screen
 const playLanding = () => playSting("landing", 0.6);   // Futuristic Spaceship Landing (Epic Stock Media): ships arriving
-const stopIntro = stopStings;
 function gateSay(text, mood = "") {
   const say = $("#gateSay"), alien = $("#gateAlien");
   say.textContent = text; say.classList.remove("pop-in"); void say.offsetWidth; say.classList.add("pop-in");
@@ -1304,6 +1269,7 @@ function route() {
   initSfx();
   $$("[data-close-drawer]").forEach(b => { b.onclick = () => openDrawer(false); });
   addEventListener("keydown", e => { if (e.key === "Escape") { openDrawer(false); openSheet(null); } });
+  addEventListener("resize", () => drawWave());
   $("#teacherToggle").onclick = () => setTeacher(!document.body.classList.contains("teacher"));
   let teacher = false; try { teacher = localStorage.getItem("teacherView") === "1"; } catch { /* ignore */ }
   setTeacher(teacher);

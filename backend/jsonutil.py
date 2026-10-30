@@ -47,8 +47,7 @@ def _balanced_span(text: str, start: int) -> str | None:
 
 def _repair(s: str) -> str:
     s = s.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
-    s = re.sub(r",\s*([}\]])", r"\1", s)  # trailing commas
-    return s
+    return re.sub(r",\s*([}\]])", r"\1", s)  # trailing commas
 
 
 def _close_truncated(s: str) -> str:

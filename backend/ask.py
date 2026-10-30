@@ -17,6 +17,7 @@ import asyncio
 import json
 import logging
 import time
+from pathlib import Path
 
 from . import languages
 from .agent.writer import SHOW
@@ -26,7 +27,7 @@ from .config import get_settings
 from .prompts import ASK_GREE, ASK_KEYWORDS
 from .retrieval import BM25Index
 from .schemas import Chunk, Episode, Source, new_id
-from .store import _atomic_write, store
+from .store import atomic_write, store
 from .textnorm import normalize_for_tts
 
 log = logging.getLogger("podcast.ask")
@@ -154,13 +155,13 @@ async def answer(ep: Episode, src: Source, question: str, *, segment_id: str | N
     async with _lock(ep.id):
         asks = load_asks(ep.id)
         asks.append(item)
-        _atomic_write(store.episode_dir(ep.id) / "asks.json", json.dumps(asks[-200:], ensure_ascii=False))
+        atomic_write(store.episode_dir(ep.id) / "asks.json", json.dumps(asks[-200:], ensure_ascii=False))
     log.info("ep=%s ask %s: %d passages, cited %s, grounded=%s, %.1fs", ep.id, item["id"], len(passages),
              [c["id"] for c in item["sources"]], item["grounded"], item["seconds"])
     return item
 
 
-async def answer_audio(ep: Episode, aid: str):
+async def answer_audio(ep: Episode, aid: str) -> Path | None:
     """Gree speaking the answer (WAV), synthesised once and cached. None if there's no such answer."""
     if not aid.replace("_", "").isalnum():
         return None
@@ -175,11 +176,5 @@ async def answer_audio(ep: Episode, aid: str):
             sr = get_settings().sample_rate
             wav = await tts.synthesize(normalize_for_tts(item["a"], item["language"]), "expert", language=item["language"])
             path.parent.mkdir(exist_ok=True)
-            _atomic_write_bytes(path, to_wav_bytes(prepare_clip(wav, sr), sr))
+            atomic_write(path, to_wav_bytes(prepare_clip(wav, sr), sr))
     return path
-
-
-def _atomic_write_bytes(path, data: bytes) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_bytes(data)
-    tmp.replace(path)

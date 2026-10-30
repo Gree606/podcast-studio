@@ -8,6 +8,8 @@ unsupported is surfaced in the UI rather than hidden.
 """
 from __future__ import annotations
 
+import json
+
 from ..clients.llm import chat_json
 from ..prompts import CLAIM_EXTRACT, CLAIM_FIX, CLAIM_JUDGE
 from ..schemas import Claim, Segment, Turn
@@ -28,14 +30,11 @@ async def check_claims(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> li
         return []
     if not claims:
         return []
-    evid: list[list[str]] = []
+    evid: list[list[str]] = []  # per claim: the passages shown to the judge (BM25 hits + the segment's first passage)
     items = []
     for i, cl in enumerate(claims, 1):
-        hits = ctx.full_index.search(cl, k=2)
-        ids = [c.id for c, _ in hits]
-        for cid in seg.chunk_ids[:1]:
-            if cid not in ids:
-                ids.append(cid)
+        ids = [c.id for c, _ in ctx.full_index.search(cl, k=2)]
+        ids += [cid for cid in seg.chunk_ids[:1] if cid not in ids]
         evid.append(ids)
         passages = "\n".join(f"   [{cid}] {ctx.by_id[cid].text[:550]}" for cid in ids)
         items.append(f"{i}. CLAIM: {cl}\n{passages}")
@@ -84,6 +83,4 @@ async def verify_and_fix(ctx: AgentContext, seg: Segment, segments: list[Segment
 
 
 def _turns_json(turns: list[Turn]) -> str:
-    import json
-
     return json.dumps([{"speaker": t.speaker, "text": t.text} for t in turns], ensure_ascii=False)

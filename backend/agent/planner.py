@@ -18,7 +18,7 @@ from ..jsonutil import JSONExtractError, extract_json
 from ..prompts import PLANNER_START, PLANNER_SYSTEM
 from ..schemas import KeyFact, Segment, new_id
 from .context import AgentContext
-from .tools import TOOLS, model_check_facts, rule_check_fact
+from .tools import TOOLS, model_check_facts, rule_check_fact, sections_in_scope
 
 STAGE = "plan"
 
@@ -37,12 +37,7 @@ async def run_planner(ctx: AgentContext) -> list[Segment]:
     s = get_settings()
     st = ctx.episode.settings
     n_seg = ctx.n_segments
-    section_titles: list[str] = []
-    in_scope = {c.id for c in ctx.chunks}
-    for sec in ctx.source.sections:
-        ids = [c for c in sec.chunk_ids if c in in_scope]
-        if ids:
-            section_titles.append(f"- {sec.title} ({len(ids)} passages: {ids[0]}..{ids[-1]})")
+    section_titles = [f"- {title} ({len(ids)} passages: {ids[0]}..{ids[-1]})" for title, ids in sections_in_scope(ctx)]
     messages = [
         {"role": "system", "content": PLANNER_SYSTEM.replace("{n_segments}", str(n_seg)).replace("{max_steps}", str(s.planner_max_steps))},
         {"role": "user", "content": PLANNER_START.format(
@@ -132,9 +127,9 @@ async def _outline_to_segments(ctx: AgentContext, outline: dict, read_ids: set[s
     # --- dual-layer verification -------------------------------------------
     ctx.status(STAGE, "Verifying the outline against the chapter", 0.13)
     checked = [rule_check_fact(ctx, f) for f in all_facts]
-    n_rule_fail = sum(1 for f in checked if f.verified is False)
+    n_rule_fail = sum(f.verified is False for f in checked)
     checked = await model_check_facts(ctx, checked)
-    n_model_fail = sum(1 for f in checked if f.verified is False) - n_rule_fail
+    n_model_fail = sum(f.verified is False for f in checked) - n_rule_fail
     for seg in segments:
         seg.key_facts = []
     dropped = []
@@ -160,11 +155,12 @@ async def _outline_to_segments(ctx: AgentContext, outline: dict, read_ids: set[s
     segments = [s for s in segments if s.key_facts or s.chunk_ids]
     if not segments:
         return fallback_outline(ctx)
-    _assign_kinds(segments)
+    assign_kinds(segments)
     return segments
 
 
-def _assign_kinds(segments: list[Segment]) -> None:
+def assign_kinds(segments: list[Segment]) -> None:
+    """Renumber the segments in order and mark the first as the intro and the last (if any) as the recap."""
     for i, seg in enumerate(segments):
         seg.index = i
         seg.kind = "intro" if i == 0 else ("recap" if i == len(segments) - 1 and len(segments) > 1 else "body")
@@ -189,7 +185,7 @@ def fallback_outline(ctx: AgentContext) -> list[Segment]:
         segments.append(Segment(id=new_id("seg_"), index=i, title=sec_title[:80], goal=f"Explain {sec_title}.",
                                 key_facts=facts, chunk_ids=[c.id for c in group],
                                 difficulty=int(round(heuristic_difficulty(text)))))
-    _assign_kinds(segments)
+    assign_kinds(segments)
     return segments
 
 

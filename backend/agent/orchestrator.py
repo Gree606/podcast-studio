@@ -46,6 +46,8 @@ def make_context(ep: Episode) -> AgentContext:
 
 
 class _Timer:
+    """Context manager adding the wall-clock time of a stage to ``ep.metrics.stage_seconds``."""
+
     def __init__(self, ep: Episode, stage: str):
         self.ep, self.stage = ep, stage
 
@@ -63,7 +65,7 @@ async def _finalize_segment(ctx: AgentContext, seg: Segment, segments: list[Segm
         raise ServiceError("Writer", "could not produce a script for this segment")
     seg.status = "checking"
     turns, claims = await verify_and_fix(ctx, seg, segments, [t.model_copy() for t in best.turns])
-    ver = SegmentVersion(version=(max((v.version for v in seg.versions), default=0) + 1), instruction=instruction,
+    ver = SegmentVersion(version=fast.next_version_number(seg), instruction=instruction,
                          turns=turns, scores=best.scores, claims=claims)
     await _record(ctx, seg, ver)
 
@@ -196,8 +198,9 @@ async def run_episode(eid: str) -> None:
             ctx = make_context(ep)
             ctx.emit("start", "info", f"Agent started (prompts {PROMPT_VERSION}, policy {ep.settings.policy}, "
                      f"{len(ctx.chunks)} passages in scope).")
+            quick = fast_mode(ep)
 
-            if fast_mode(ep):
+            if quick:
                 await _run_fast(ctx)
             # ---- Perceive + Plan ---------------------------------------------------
             elif not ep.segments:
@@ -210,7 +213,7 @@ async def run_episode(eid: str) -> None:
             todo = [x for x in segments if not (x.status == "done" and x.current)]
 
             # ---- Act + Observe: write with compute-optimal allocation ----------------
-            need_write = [] if fast_mode(ep) else [x for x in todo if best_candidate(x) is None]
+            need_write = [] if quick else [x for x in todo if best_candidate(x) is None]
             if need_write:
                 with _Timer(ep, "write"):
                     await write_segments(ctx, segments, need_write)
@@ -218,7 +221,7 @@ async def run_episode(eid: str) -> None:
 
             # ---- Verify claims + synthesise + ASR self-check -----------------------
             claims: dict[str, list[Claim]] = {}
-            if fast_mode(ep) and todo:
+            if quick and todo:
                 # Record while the fact-check runs (part 1 first). Nothing is released to listeners until
                 # the check is done; any line it changes misses the cache and is recorded again.
                 for x in todo:
@@ -229,13 +232,13 @@ async def run_episode(eid: str) -> None:
                 with _Timer(ep, "verify"):
                     claims = await fast.verify_segments(ctx, segments, only=todo)
                 store.save_episode(ep)
-            ctx.status("voice", "Fact-checking and recording the hosts" if not fast_mode(ep) else "Recording the hosts", 0.62)
+            ctx.status("voice", "Recording the hosts" if quick else "Fact-checking and recording the hosts", 0.62)
             finished = 0
             with _Timer(ep, "voice"):
                 async def finish(seg: Segment) -> None:
                     nonlocal finished
                     try:
-                        if fast_mode(ep):
+                        if quick:
                             await _record(ctx, seg, fast.new_version(seg, claims.get(seg.id, [])))
                         else:
                             await _finalize_segment(ctx, seg, segments)
@@ -276,11 +279,10 @@ async def regenerate_segment(eid: str, seg_id: str, instruction: str | None) -> 
     ep = store.get_episode(eid)
     if ep is None:
         return
-    token = current_metrics.set(ep.metrics)
-    s = get_settings()
     seg = next((x for x in ep.segments if x.id == seg_id), None)
     if seg is None:
         return
+    token = current_metrics.set(ep.metrics)
     try:
         async with store.lock(eid):
             ctx = make_context(ep)
@@ -290,15 +292,13 @@ async def regenerate_segment(eid: str, seg_id: str, instruction: str | None) -> 
             if fast_mode(ep):  # 2 LLM calls: rewrite this part, then fact-check it
                 claims = await fast.rewrite_part(ctx, seg, ep.segments, instruction)
                 await _record(ctx, seg, fast.new_version(seg, claims, instruction or "regenerate"))
-                await assemble(ctx)
-                ctx.emit("regenerate", "info", f"'{seg.title}' is now version {seg.active_version}; episode re-stitched.", seg.id)
-                return
-            current = seg.current.turns if seg.current else None
-            seg.candidates = []  # fresh search; memory (reflections) is kept across versions
-            budget = 2 if ep.settings.policy in ("adaptive", "uniform") else 1
-            await run_search(ctx, seg, ep.segments, budget, policy=ep.settings.policy, accept=s.accept_score,
-                             instruction=instruction, current=current)
-            await _finalize_segment(ctx, seg, ep.segments, instruction=instruction or "regenerate")
+            else:
+                current = seg.current.turns if seg.current else None
+                seg.candidates = []  # fresh search; memory (reflections) is kept across versions
+                budget = 2 if ep.settings.policy in ("adaptive", "uniform") else 1
+                await run_search(ctx, seg, ep.segments, budget, policy=ep.settings.policy, accept=get_settings().accept_score,
+                                 instruction=instruction, current=current)
+                await _finalize_segment(ctx, seg, ep.segments, instruction=instruction or "regenerate")
             await assemble(ctx)
             ctx.emit("regenerate", "info", f"'{seg.title}' is now version {seg.active_version}; episode re-stitched.", seg.id)
     except Exception as e:

@@ -77,10 +77,10 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
     def topicality(term: str) -> float | None:
         """Words the chapter keeps coming back to (its key terms) score high; words seen in only
         one passage or in nearly all of them are not worth a question. Numbers always qualify."""
-        low = term.lower()
-        df = sum(1 for t in lowered if low in t)
         if _kind(term) == "num":
             return 2.0
+        low = term.lower()
+        df = sum(1 for t in lowered if low in t)
         if df < 2 or df > max(2, 0.6 * n_chunks):
             return None
         tf = sum(len(re.findall(rf"\b{re.escape(low)}\b", t)) for t in lowered)
@@ -98,9 +98,9 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
     # 2. the term to blank in each fact: the most chapter-specific one that the passage contains
     picked, used_answers = [], set()
     for seg, kf in facts:
-        passage = by_id[kf.chunk_id].text.lower()
         if kf.fact.rstrip().endswith("?"):
             continue
+        passage = by_id[kf.chunk_id].text.lower()
         scored = [(topicality(t), t) for t in _terms(kf.fact) if t.lower() in passage]
         terms = [t for sc, t in sorted((x for x in scored if x[0] is not None), key=lambda x: (-x[0], x[1].lower()))]
         if not terms:

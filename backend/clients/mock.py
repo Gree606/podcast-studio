@@ -49,8 +49,8 @@ def _planner(messages: list[dict]) -> str:
     if n_assist == len(queries) + 1:
         return json.dumps({"thought": "Let me check how the book defines its key term.", "action": "define",
                            "input": {"term": (sections[0].split()[-1] if sections else "energy")}})
-    observations = [_text_of(m) for m in messages if m["role"] == "user" and _text_of(m).startswith("Observation:\nError") is False
-                    and _text_of(m).startswith("Observation:")]
+    observations = [_text_of(m) for m in messages if m["role"] == "user" and _text_of(m).startswith("Observation:")
+                    and not _text_of(m).startswith("Observation:\nError")]
     search_obs = observations[1: 1 + len(queries)]
     segs = []
     for i in range(n_seg):
@@ -64,7 +64,7 @@ def _planner(messages: list[dict]) -> str:
                        "input": {"outline": {"learn_line": "the big ideas of this chapter, step by step", "segments": segs}}})
 
 
-def _writer(messages: list[dict], task: str, temperature: float) -> str:
+def _writer(messages: list[dict], task: str) -> str:
     user = "\n".join(_text_of(m) for m in messages if m["role"] == "user")
     facts = re.findall(r"^- (.+?) \[c\d+\]$", user, re.M) or ["the main idea of the passage"]
     title = (re.search(r'segment \d+ of \d+: "(.+?)"', user) or re.search(r"(.+)", user)).group(1)
@@ -107,7 +107,7 @@ def _episode(messages: list[dict]) -> str:
         mine = ps[i::3] or ps[:1]
         turns = [{"speaker": "host", "text": f"Welcome to Mission 606! Today: {title}. So what's first?" if i == 0
                   else "Okay, so what comes next?"}]
-        for cid, txt in mine[:2]:
+        for _, txt in mine[:2]:
             turns.append({"speaker": "expert", "text": f"Think of it like this: {_first_sentence(txt).rstrip('.')}. It's like making chai."})
             turns.append({"speaker": "host", "text": "Oh, that's neat."})
         if i == 2:
@@ -175,9 +175,9 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
         return _ask(messages)
     if task == "rewrite_part":
         return json.dumps({"title": "Rewritten part", "chunk_ids": [c for c, _ in _passages(_text_of(messages[-1]))[:2]],
-                           "turns": json.loads(_writer(messages, "revise", 0.7))["turns"]})
+                           "turns": json.loads(_writer(messages, "revise"))["turns"]})
     if task in ("write", "revise", "claim_fix"):
-        return _writer(messages, task, temperature)
+        return _writer(messages, task)
     if task == "critic":
         return _critic(messages)
     if task == "reflect":
