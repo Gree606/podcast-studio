@@ -168,3 +168,19 @@ def test_episode_in_hindi_end_to_end_in_mock_mode():
         eid = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"language": "hi"}}).json()["id"]
         ep = _wait(client, eid, lambda e: e["status"] in ("done", "failed") and not e["busy"])
         assert ep["status"] == "done" and ep["settings"]["language"] == "hi"
+
+
+def test_mode_is_chosen_per_episode():
+    with TestClient(app) as client:
+        sample = client.get("/api/samples").json()[0]["id"]
+        src = client.post("/api/sources", data={"sample_id": sample}).json()
+        deep = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short", "mode": "agent"}}).json()["id"]
+        quick = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short", "mode": "fast"}}).json()["id"]
+        d = _wait(client, deep, lambda e: e["status"] in ("done", "failed") and not e["busy"])
+        q = _wait(client, quick, lambda e: e["status"] in ("done", "failed") and not e["busy"])
+        assert d["status"] == "done" and q["status"] == "done"
+        assert q["metrics"]["llm_calls"] == 2
+        assert d["metrics"]["llm_calls"] > 2  # planner steps, drafts, critic, claim checks
+        assert any(t["stage"] == "plan" for t in d["trace"]) and not any(t["stage"] == "plan" for t in q["trace"])
+        bad = client.post("/api/episodes", json={"source_id": src["id"], "settings": {"mode": "agent", "language": "hi"}})
+        assert bad.status_code == 400

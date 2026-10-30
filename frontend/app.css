@@ -931,6 +931,11 @@ body.gated { overflow: hidden; }
 .brand-name b, .brand-name small { white-space: nowrap; }
 @media (max-width: 480px) { .brand-name b { font-size: .62rem; } .brand-name small { font-size: .8rem; } .logo { width: 44px; height: 44px; } .topnav { gap: 6px; } }
 
+/* mode picker: the language row is locked to English while the deep agent is chosen */
+.langs.locked label { opacity: .45; }
+.langs.locked input:checked + label { opacity: 1; }
+#modeChoices label .small { display: block !important; font-size: .78rem; font-weight: 600; opacity: .8; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .confetti { display: none; }

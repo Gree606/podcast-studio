@@ -58,6 +58,9 @@ class EpisodeSettings(BaseModel):
     expert_name: str = "Gree"  # the astronaut who explains
     section_ids: list[str] = Field(default_factory=list)  # empty = whole chapter
     language: str = "en"  # a key of backend.languages.LANGUAGES: the episode's spoken language
+    # "fast" = 2 LLM calls (write, then fact-check); "agent" = planner + best-of-N + critic loop;
+    # "" = the server's PIPELINE_MODE
+    mode: Literal["", "fast", "agent"] = ""
 
 
 class Turn(BaseModel):

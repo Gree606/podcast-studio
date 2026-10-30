@@ -239,9 +239,16 @@ function showConfigure() {
   const upd = () => {
     const k = $("input[name=length]:checked").value, sel = $$("#sections input:checked").length, est = L[k];
     $("#estimate").innerHTML = sel === 0 ? `<span class="pill warn">👆 Pick at least one part of the chapter</span>`
-      : est ? `≈ ${Math.max(1, Math.round(est.audio_minutes))} min episode · starts playing in about a minute` : "";
+      : est ? `≈ ${Math.max(1, Math.round(est.audio_minutes))} min episode · ${($("input[name=mode]:checked") || {}).value === "agent" ? "the deep agent takes a few minutes" : "starts playing in about a minute"}` : "";
     $("#generate").disabled = sel === 0;
   };
+  const syncMode = () => {
+    const deep = ($("input[name=mode]:checked") || {}).value === "agent";
+    $$("#langChoices input").forEach(i => { i.disabled = deep && i.value !== "en"; if (deep && i.value === "en") i.checked = true; });
+    $("#langChoices").classList.toggle("locked", deep);
+    $("#langChoices").title = deep ? "The deep agent writes in English only for now" : "";
+  };
+  $$("input[name=mode]").forEach(i => i.addEventListener("change", syncMode)); syncMode();
   $$("#configure input").forEach(i => i.addEventListener("change", upd)); upd();
   $("#selAll").onclick = () => { $$("#sections input").forEach(i => { i.checked = true; }); upd(); };
   $("#selNone").onclick = () => { $$("#sections input").forEach(i => { i.checked = false; }); upd(); };
@@ -253,8 +260,9 @@ async function createEpisode() {
   if (!reducedMotion()) { document.body.classList.add("warp"); setTimeout(() => document.body.classList.remove("warp"), 1600); }
   const btn = $("#generate"); btn.disabled = true; btn.innerHTML = `<span class="spinner" role="img" aria-label="Starting"></span> Launching…`;
   const all = $$("#sections input"), sel = all.filter(i => i.checked).map(i => i.value);
-  const language = ($("input[name=language]:checked") || {}).value || "en"; CONFIG.lastLang = language;
-  const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value, language,
+  const mode = ($("input[name=mode]:checked") || {}).value || "fast";
+  const language = mode === "agent" ? "en" : (($("input[name=language]:checked") || {}).value || "en"); CONFIG.lastLang = language;
+  const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value, language, mode,
     host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
   try {
     const r = await postJSON("/api/episodes", {source_id: SOURCE.id, settings});

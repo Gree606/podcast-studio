@@ -170,8 +170,9 @@ async def write_segments(ctx: AgentContext, segments: list[Segment], need_write:
         x.budget += sp
 
 
-def fast_mode() -> bool:
-    return get_settings().pipeline_mode != "agent"
+def fast_mode(ep: Episode) -> bool:
+    """The episode's own choice (made on the launch screen), else the server default."""
+    return (ep.settings.mode or get_settings().pipeline_mode) != "agent"
 
 
 async def _run_fast(ctx: AgentContext) -> None:
@@ -196,7 +197,7 @@ async def run_episode(eid: str) -> None:
             ctx.emit("start", "info", f"Agent started (prompts {PROMPT_VERSION}, policy {ep.settings.policy}, "
                      f"{len(ctx.chunks)} passages in scope).")
 
-            if fast_mode():
+            if fast_mode(ep):
                 await _run_fast(ctx)
             # ---- Perceive + Plan ---------------------------------------------------
             elif not ep.segments:
@@ -209,7 +210,7 @@ async def run_episode(eid: str) -> None:
             todo = [x for x in segments if not (x.status == "done" and x.current)]
 
             # ---- Act + Observe: write with compute-optimal allocation ----------------
-            need_write = [] if fast_mode() else [x for x in todo if best_candidate(x) is None]
+            need_write = [] if fast_mode(ep) else [x for x in todo if best_candidate(x) is None]
             if need_write:
                 with _Timer(ep, "write"):
                     await write_segments(ctx, segments, need_write)
@@ -217,7 +218,7 @@ async def run_episode(eid: str) -> None:
 
             # ---- Verify claims + synthesise + ASR self-check -----------------------
             claims: dict[str, list[Claim]] = {}
-            if fast_mode() and todo:
+            if fast_mode(ep) and todo:
                 # Record while the fact-check runs (part 1 first). Nothing is released to listeners until
                 # the check is done; any line it changes misses the cache and is recorded again.
                 for x in todo:
@@ -228,13 +229,13 @@ async def run_episode(eid: str) -> None:
                 with _Timer(ep, "verify"):
                     claims = await fast.verify_segments(ctx, segments, only=todo)
                 store.save_episode(ep)
-            ctx.status("voice", "Fact-checking and recording the hosts" if not fast_mode() else "Recording the hosts", 0.62)
+            ctx.status("voice", "Fact-checking and recording the hosts" if not fast_mode(ep) else "Recording the hosts", 0.62)
             finished = 0
             with _Timer(ep, "voice"):
                 async def finish(seg: Segment) -> None:
                     nonlocal finished
                     try:
-                        if fast_mode():
+                        if fast_mode(ep):
                             await _record(ctx, seg, fast.new_version(seg, claims.get(seg.id, [])))
                         else:
                             await _finalize_segment(ctx, seg, segments)
@@ -286,7 +287,7 @@ async def regenerate_segment(eid: str, seg_id: str, instruction: str | None) -> 
             seg.status, seg.error = "writing", None
             label = f' with instruction "{instruction}"' if instruction else ""
             ctx.emit("regenerate", "info", f"Regenerating '{seg.title}'{label}.", seg.id)
-            if fast_mode():  # 2 LLM calls: rewrite this part, then fact-check it
+            if fast_mode(ep):  # 2 LLM calls: rewrite this part, then fact-check it
                 claims = await fast.rewrite_part(ctx, seg, ep.segments, instruction)
                 await _record(ctx, seg, fast.new_version(seg, claims, instruction or "regenerate"))
                 await assemble(ctx)

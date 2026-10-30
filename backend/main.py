@@ -257,6 +257,8 @@ async def create_episode(body: CreateEpisode, request: Request):
     st = body.settings
     if st.language not in LANGUAGES:
         raise HTTPException(400, "That language isn't supported yet.")
+    if st.mode == "agent" and st.language != "en":
+        raise HTTPException(400, "The deep agent writes in English only for now. Pick Quick mode for other languages.")
     st.host_name = (st.host_name or "Error606").strip()[:20] or "Error606"
     st.expert_name = (st.expert_name or "Gree").strip()[:20] or "Gree"
     valid = {x.id for x in src.sections}
