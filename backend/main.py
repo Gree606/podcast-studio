@@ -18,12 +18,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import jobs
+from . import ask, jobs
 from .agent import fast
 from .languages import LANGUAGES
 from .agent.context import LENGTHS
 from .agent.orchestrator import regenerate_segment, run_episode, switch_version
-from .clients.base import close_http_client
+from .clients.base import ServiceError, close_http_client
 from .config import ROOT, get_settings, secrets_path
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks
 from .photos import MAX_PAGES, MAX_PHOTO_BYTES, ingest_photos
@@ -416,6 +416,47 @@ async def episode_quiz(eid: str):
     """Fill-in-the-blank questions built only from the episode's verified key facts ([] = no quiz)."""
     ep = _get_ep(eid)
     return build_quiz(ep, store.get_source(ep.source_id))
+
+
+class AskTurn(BaseModel):
+    q: str = Field(default="", max_length=500)
+    a: str = Field(default="", max_length=1500)
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    segment_id: str | None = Field(default=None, max_length=40)  # the part the student was listening to
+    history: list[AskTurn] = Field(default_factory=list, max_length=6)
+
+
+@app.post("/api/episodes/{eid}/ask")
+async def ask_gree(eid: str, body: AskIn, request: Request):
+    """A student's doubt, answered by Gree from the chapter's passages (with citations)."""
+    ep = _get_ep(eid)
+    src = store.get_source(ep.source_id)
+    if not src:
+        raise HTTPException(404, "This episode's chapter is missing.")
+    rate_limit(request, "question", 40)
+    try:
+        return await ask.answer(ep, src, body.question, segment_id=body.segment_id,
+                                history=[h.model_dump() for h in body.history])
+    except ask.AskError as e:
+        raise HTTPException(400, str(e)) from e
+    except ServiceError as e:
+        raise HTTPException(503, f"Gree can't answer right now ({e.user_message}). Please try again in a minute.") from e
+
+
+@app.get("/api/episodes/{eid}/ask/{aid}/audio")
+async def ask_gree_audio(eid: str, aid: str):
+    """Gree speaking one answer (made on first request, then cached)."""
+    ep = _get_ep(eid)
+    try:
+        path = await ask.answer_audio(ep, aid)
+    except ServiceError as e:
+        raise HTTPException(503, f"Gree's voice isn't available right now ({e.user_message}).") from e
+    if not path:
+        raise HTTPException(404, "That answer wasn't found.")
+    return FileResponse(path, media_type="audio/wav")
 
 
 # --- frontend ----------------------------------------------------------------------

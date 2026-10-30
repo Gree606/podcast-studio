@@ -257,6 +257,7 @@
 
   <nav class="dock" aria-label="Episode">
     <button type="button" class="dock-btn" data-sheet="script"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Script</title><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v10H9l-5 4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 9h8M8 12h5"/></svg><span>Script</span></button>
+    <button type="button" class="dock-btn hidden" id="askBtn" data-sheet="ask"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Ask Gree</title><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3c5 0 9 3.4 9 7.6s-4 7.6-9 7.6c-1 0-2-.1-2.9-.4L4 20l1.4-4.1C4 14.5 3 12.7 3 10.6 3 6.4 7 3 12 3z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M10 8.6a2.1 2.1 0 1 1 2.9 1.9c-.6.3-.9.8-.9 1.4M12 14.3v.1"/></svg><span>Ask Gree</span></button>
     <button type="button" class="dock-btn hidden" id="quizBtn" data-sheet="quiz"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Quiz</title><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 18h6M10 21h4"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg><span>Quiz</span></button>
     <button type="button" class="dock-btn" data-sheet="agent"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Agent</title><circle fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" cx="12" cy="12" r="2.5"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7"/></svg><span>Agent</span></button>
     <button type="button" class="dock-btn" data-sheet="save"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>Save</title><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Save</span></button>
@@ -272,6 +273,17 @@
           <h3 class="sr" id="scriptTitle">Transmission log</h3>
           <p class="muted small" id="scriptHint">Tap a line to hear it.</p>
           <div id="segments"></div>
+        </section>
+        <section class="ask" id="askCard" data-pane-sheet="ask" aria-labelledby="askTitle">
+          <h3 class="sr" id="askTitle">Ask Gree a doubt</h3>
+          <div class="ask-log" id="askLog" aria-live="polite"></div>
+          <div class="ask-chips" id="askChips"></div>
+          <form class="ask-form" id="askForm" autocomplete="off">
+            <label class="sr" for="askInput">Your doubt</label>
+            <input id="askInput" type="text" maxlength="400" placeholder="Type your doubt… (any language)" enterkeyhint="send">
+            <button class="btn primary" id="askGo" type="submit" aria-label="Ask">Ask</button>
+          </form>
+          <p class="small muted ask-note">Gree answers only from this chapter and shows the page she used.</p>
         </section>
         <section class="quiz hidden" id="quizCard" data-pane-sheet="quiz" aria-labelledby="quizTitle">
           <h3 class="sr" id="quizTitle">Quiz</h3>

@@ -74,7 +74,7 @@ function openDrawer(open) {
   const d = $("#drawer"); d.classList.toggle("open", open); d.setAttribute("aria-hidden", String(!open));
   $("#menuBtn").setAttribute("aria-expanded", String(open));
 }
-const SHEET_TITLES = {script: "Script", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
+const SHEET_TITLES = {script: "Script", ask: "Ask Gree", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
 const wide = () => matchMedia("(min-width: 1100px)").matches;
 function openSheet(name) {
   const sh = $("#sheet"); if (!sh) return;
@@ -86,6 +86,7 @@ function openSheet(name) {
   $("#sheetTitle").textContent = SHEET_TITLES[name] || "";
   sh.classList.add("open"); sh.setAttribute("aria-hidden", "false");
   if (name === "quiz") $("#quizBtn").classList.remove("nudge");
+  if (name === "ask") { $("#askBtn").classList.remove("nudge"); askOpened(); }
   if (name === "script") { const now = $("#segments .line.now"); if (now) now.scrollIntoView({block: "center"}); }
 }
 
@@ -279,7 +280,7 @@ const currentVersion = s => s.versions.find(v => v.version === s.active_version)
 async function renderEpisode(id) {
   meter = null; drawWave.peaks = null;
   stopPoll(); viewId += 1;
-  epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null;
+  epState = null; traceLen = 0; traceEvents = []; sourcesCache = null; currentAudioFile = null; lineIndex = []; quiz = null; quizLoadedFor = null; askReset();
   seenLines = new Set(); launched = false; onTime.last = null; onTime.lastKey = null; live = {on: false, k: 0, waiting: false};
   const app = $("#app"); app.className = "ep-layout"; app.innerHTML = ""; app.append($("#tpl-episode").content.cloneNode(true)); tabs(app);
   if (wide()) openSheet("script");  // on monitors the panel is a permanent sidebar
@@ -287,6 +288,7 @@ async function renderEpisode(id) {
   const a = $("#audio");
   $("#playBtn").classList.add("waiting");
   $$(".dock-btn").forEach(b => { b.onclick = () => openSheet(b.dataset.sheet); });
+  $("#askForm").onsubmit = e => { e.preventDefault(); askGree($("#askInput").value); };
   $$("[data-close-sheet]").forEach(b => { b.onclick = () => openSheet(null); });
   const seek = $("#seek");
   seek.oninput = () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; };
@@ -300,7 +302,8 @@ async function renderEpisode(id) {
   a.addEventListener("ended", () => { ambient.podcast = false; updateAmbient(1.5); });
   a.addEventListener("play", () => { if (a.currentTime < 1) launch(); $("#stage").classList.add("playing"); $("#playBtn").classList.remove("ready"); $("#playBtn").classList.add("is-playing"); $("#playBtn").setAttribute("aria-label", "Pause"); onTime(); });
   a.addEventListener("pause", () => { $("#stage").classList.remove("playing"); $("#playBtn").classList.remove("is-playing"); $("#playBtn").setAttribute("aria-label", "Play"); setSpeaking(null); });
-  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz."); $("#quizBtn").classList.add("nudge"); } });
+  a.addEventListener("ended", () => { if (live.on) { nextLivePart(); return; } if (quiz && quiz.questions.length) { toast("🧠 Nice listening! Try the quiz, or ask Gree a doubt."); $("#quizBtn").classList.add("nudge"); }
+    else { toast("🙋 Any doubts? Ask Gree!"); $("#askBtn").classList.add("nudge"); } });
   $("#playBtn").onclick = () => { if (live.on && !a.src) { playLivePart(0); return; } if (!a.src) return; if (a.paused) a.play().catch(() => toast("Tap play again to start the audio.")); else a.pause(); };
   $("#speedBtn").onclick = () => {
     const speeds = [1, 1.25, 1.5, 0.75], next = speeds[(speeds.indexOf(a.playbackRate) + 1) % speeds.length] || 1;
@@ -346,6 +349,7 @@ async function poll(id, view = viewId) {
   renderTrust(ep);
   if (document.body.classList.contains("teacher")) renderTeacher(ep, ep.trace);
   if (ep.status === "done" && quizLoadedFor !== ep.id) loadQuiz(ep);
+  askAvailable(ep);
   if (prev && prev.status !== "done" && ep.status === "done") { toast("🎉 Your podcast is ready! Press play."); confetti(40); }
   const active = ["queued", "running"].includes(ep.status) || ep.busy;
   if (active) pollTimer = setTimeout(() => poll(id, view), ep.status === "queued" ? 2500 : 1500);
@@ -711,6 +715,7 @@ function onTime() {
   });
   setSpeaking(cur && !a.paused ? cur.speaker : null);
   const key = cur ? `${cur.seg}:${cur.ss}` : null;
+  if (cur) ask.seg = cur.seg;
   if (cur && epState) {  // the bubble shows just the sentence being spoken (less text on screen)
     const ss = sentences(cur.text), t0 = live.on ? cur.ss : cur.start, t1 = live.on ? (cur.se ?? cur.ss) : (cur.end ?? cur.start);
     const frac = t1 > t0 ? Math.min(.999, Math.max(0, (t - t0) / (t1 - t0))) : 0, total = ss.reduce((n, x) => n + x.length, 0);
@@ -737,6 +742,97 @@ function onTime() {
     }
   }
 }
+
+// ------------------------------------------------------------------ Ask Gree
+// A student's doubt goes to the server, which finds the chapter passages it's about (BM25), and
+// Gree answers from them only, citing the pages. With sound on she also says the answer out loud.
+let ask = {eid: null, items: [], busy: false, seg: null, player: null, playing: null};
+function askReset() {
+  if (ask.player) ask.player.pause();
+  ask = {eid: null, items: [], busy: false, seg: null, player: null, playing: null};
+}
+function askAvailable(ep) {
+  const ok = ep.segments.some(s => s.versions.length);
+  $("#askBtn").classList.toggle("hidden", !ok);
+  if (ok && ask.eid !== ep.id) {
+    ask.eid = ep.id;
+    try { ask.items = JSON.parse(localStorage.getItem(`ask:${ep.id}`) || "[]"); } catch { ask.items = []; }
+    renderAsk();
+  }
+}
+function askSave() { try { localStorage.setItem(`ask:${ask.eid}`, JSON.stringify(ask.items.slice(-20))); } catch { /* private mode */ } }
+function askOpened() { if (!wide() || document.activeElement === document.body) setTimeout(() => $("#askInput") && $("#askInput").focus(), 250); }
+function askSuggestions() {
+  const last = ask.items[ask.items.length - 1];
+  if (last && last.follow_ups && last.follow_ups.length) return last.follow_ups;
+  const segs = epState ? epState.segments.filter(s => s.versions.length) : [];
+  const cur = segs.find(s => s.id === ask.seg) || segs[0];
+  return [cur && `Explain “${cur.title}” again, more simply`, "Give me a real-life example", "What's the one thing I must remember?"].filter(Boolean);
+}
+function askBubble(who, html, extra = "", lang = "en") {
+  const n = names(epState), mine = who === "me";
+  return `<div class="line ${mine ? "me" : "expert"} fresh">${mine ? "" : `<svg class="mini" viewBox="0 0 120 120" aria-hidden="true"><use href="#av-expert"/></svg>`}
+    <div class="bubble" lang="${lang}"><span class="who">${mine ? "You" : esc(n.expert)}</span>${html}${extra}</div></div>`;
+}
+function renderAsk() {
+  const log = $("#askLog"); if (!log) return;
+  const n = names(epState);
+  const hello = askBubble("gree", `Hi! I'm ${esc(n.expert)}. Stuck on something from this episode? Ask me anything about the chapter, in any language.`);
+  log.innerHTML = hello + ask.items.map(it => {
+    const lang = ((CONFIG.languages || []).find(l => l.code === it.language) || {}).html || "en";
+    const src = it.sources.length ? `<details class="ask-src"><summary>📖 ${it.sources.map(c => `${esc(c.section)}${c.page ? `, p. ${c.page}` : ""}`).filter((x, i, a) => a.indexOf(x) === i).join(" · ")}</summary>
+      ${it.sources.map(c => `<blockquote>${esc(c.text)}</blockquote>`).join("")}</details>` : "";
+    const flag = it.grounded ? "" : `<span class="pill warn ask-flag">Not covered in this chapter</span>`;
+    const play = `<button type="button" class="chip ask-play${ask.playing === it.id ? " on" : ""}" data-say="${it.id}" aria-label="Hear ${esc(n.expert)} say it">${ask.playing === it.id ? "⏸ Stop" : "🔊 Hear it"}</button>`;
+    return askBubble("me", esc(it.q)) + askBubble("gree", esc(it.a), `<div class="ask-meta">${flag}${src}${play}</div>`, lang);
+  }).join("");
+  $$(".line", log).slice(0, -2).forEach(l => l.classList.remove("fresh"));  // only the newest exchange pops in
+  $$("[data-say]", log).forEach(b => { b.onclick = () => askSpeak(b.dataset.say); });
+  $("#askChips").innerHTML = ask.busy ? "" : askSuggestions().map(q => `<button type="button" class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join("");
+  $$("[data-q]", $("#askChips")).forEach(b => { b.onclick = () => askGree(b.dataset.q); });
+  $("#askGo").disabled = ask.busy;
+  const body = log.closest(".sheet-body"); if (body) body.scrollTop = body.scrollHeight;
+}
+async function askGree(question) {
+  question = (question || "").trim();
+  if (!question || ask.busy || !epState) return;
+  const eid = epState.id;
+  ask.busy = true; $("#askInput").value = "";
+  renderAskPending(question);
+  try {
+    const history = ask.items.slice(-3).map(it => ({q: it.q, a: it.a}));
+    const it = await postJSON(`/api/episodes/${eid}/ask`, {question, segment_id: ask.seg, history});
+    if (ask.eid !== eid) return;
+    ask.items.push(it); askSave();
+    ask.busy = false; renderAsk();
+    if (sfx.on) askSpeak(it.id);
+  } catch (e) {
+    if (ask.eid !== eid) return;
+    ask.busy = false; renderAsk(); $("#askInput").value = question;
+    toast(e.message, "err");
+  }
+}
+function renderAskPending(question) {  // show the student's bubble and Gree "typing" right away
+  ask.busy = false; renderAsk(); ask.busy = true; $("#askGo").disabled = true;
+  $("#askLog").insertAdjacentHTML("beforeend", askBubble("me", esc(question)) + askBubble("gree", `<span class="typing" aria-label="Thinking"><i></i><i></i><i></i></span>`));
+  $("#askChips").innerHTML = "";
+  const body = $("#askLog").closest(".sheet-body"); if (body) body.scrollTop = body.scrollHeight;
+}
+function askSpeak(id) {
+  if (ask.player) { ask.player.pause(); ask.player = null; }
+  if (ask.playing === id) { ask.playing = null; askVoiceDone(); renderAsk(); return; }
+  const main = $("#audio"); if (main && !main.paused) main.pause();  // never two voices at once
+  const p = new Audio(`/api/episodes/${ask.eid}/ask/${id}/audio`);
+  ask.player = p; ask.playing = id; renderAsk();
+  ambient.podcast = true; updateAmbient(0.6); stopStings();
+  p.onplaying = () => setSpeaking("expert");
+  p.onended = p.onerror = () => {
+    if (p.error) toast("Gree's voice isn't reachable right now. You can still read her answer.", "err");
+    if (ask.player === p) { ask.player = null; ask.playing = null; askVoiceDone(); renderAsk(); }
+  };
+  p.play().catch(() => { if (ask.player === p) { ask.player = null; ask.playing = null; askVoiceDone(); renderAsk(); } });
+}
+function askVoiceDone() { setSpeaking(null); ambient.podcast = false; updateAmbient(1.5); }
 
 // ------------------------------------------------------------------ quiz
 async function loadQuiz(ep) {
@@ -776,10 +872,12 @@ function answer(b) {
   fb.className = "q-feedback";
   fb.innerHTML = `<p><b>${right ? ["🎉 Yes! Spot on!", "🌟 Brilliant!", "🙌 You got it!"][quiz.i % 3] : `🤔 Not quite. The answer is “${esc(q.answer)}”.`}</b></p>
     <p class="small">📖 The book says (${where}): “${esc(q.fact)}”</p>
-    <button type="button" class="btn primary" data-next="1">${quiz.i + 1 < quiz.questions.length ? "Next question ➡️" : "See my score 🏁"}</button>`;
+    ${right ? "" : `<button type="button" class="btn" data-why="1">🙋 Ask Gree why</button> `}<button type="button" class="btn primary" data-next="1">${quiz.i + 1 < quiz.questions.length ? "Next question ➡️" : "See my score 🏁"}</button>`;
   $(".q-options", $("#quizBody")).after(fb);
   $(".q-progress", $("#quizBody")).outerHTML = quizProgress();
   if (right) confetti(18);
+  const why = $("[data-why]", fb);
+  if (why) why.onclick = () => { openSheet("ask"); askGree(`In the quiz, why is the answer “${q.answer}” for: ${q.question.replace("_____", "___")}`); };
   const next = $("[data-next]", fb);
   next.onclick = () => { quiz.i += 1; quiz.answered = false; renderQuiz(); $("#quizCard").scrollIntoView({block: "nearest"}); };
   next.focus();

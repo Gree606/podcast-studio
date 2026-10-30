@@ -139,6 +139,20 @@ def _verify_episode(messages: list[dict]) -> str:
     return json.dumps({"parts": out})
 
 
+def _ask(messages: list[dict]) -> str:
+    """Ask Gree: answer from the first passage found, or admit the chapter doesn't cover it."""
+    user = _text_of(messages[-1])
+    src = _passages(user)
+    q = re.search(r'Student\'s doubt: "(.+)"', user)
+    off = q and re.search(r"cricket|pizza|movie", q.group(1), re.I)
+    if not src or off:
+        return json.dumps({"answer": "This chapter doesn't talk about that, but here is what it does say about our topic.",
+                           "chunk_ids": [], "grounded": False, "language": "en", "follow_ups": ["What is this chapter about?"]})
+    cid, txt = src[0]
+    return json.dumps({"answer": f"Good doubt! {_first_sentence(txt)}", "chunk_ids": [cid], "grounded": True, "language": "en",
+                       "follow_ups": ["Can you give an example?", "Why does that happen?"]})
+
+
 async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> str:
     await asyncio.sleep(0.01)
     if "capital of India" in _text_of(messages[-1]):  # scripts/check_apis.py
@@ -149,6 +163,10 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
         return _episode(messages)
     if task == "verify_episode":
         return _verify_episode(messages)
+    if task == "ask_keywords":
+        return json.dumps({"keywords": "plants food leaves sunlight"})
+    if task == "ask_gree":
+        return _ask(messages)
     if task == "rewrite_part":
         return json.dumps({"title": "Rewritten part", "chunk_ids": [c for c, _ in _passages(_text_of(messages[-1]))[:2]],
                            "turns": json.loads(_writer(messages, "revise", 0.7))["turns"]})
