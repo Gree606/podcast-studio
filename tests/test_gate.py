@@ -7,7 +7,7 @@ from backend.main import app
 
 
 def test_gate_blocks_spending_until_the_code_is_entered(monkeypatch):
-    monkeypatch.setattr(get_settings(), "access_code", "Earthling606")
+    monkeypatch.setattr(get_settings(), "access_code", "test-code-606")
     main._hits.clear()
     with TestClient(app) as client:
         assert client.get("/api/config").json()["locked"] is True
@@ -16,14 +16,14 @@ def test_gate_blocks_spending_until_the_code_is_entered(monkeypatch):
         r = client.post("/api/sources", data={"sample_id": sample})
         assert r.status_code == 401 and r.json()["locked"] is True
         assert client.post("/api/unlock", json={"code": "nope"}).status_code == 401
-        ok = client.post("/api/unlock", json={"code": " earthling606 "})  # case and spaces don't matter
+        ok = client.post("/api/unlock", json={"code": " TEST-code-606 "})  # case and spaces don't matter
         assert ok.status_code == 200 and main.GATE_COOKIE in ok.cookies
         assert client.get("/api/config").json()["unlocked"] is True
         assert client.post("/api/sources", data={"sample_id": sample}).status_code == 200
 
 
 def test_gate_slows_down_guessing(monkeypatch):
-    monkeypatch.setattr(get_settings(), "access_code", "Earthling606")
+    monkeypatch.setattr(get_settings(), "access_code", "test-code-606")
     main._hits.clear()
     with TestClient(app) as client:
         codes = [client.post("/api/unlock", json={"code": f"guess{i}"}).status_code for i in range(10)]
@@ -38,10 +38,10 @@ def test_no_code_configured_means_no_gate():
 
 
 def test_lock_forgets_the_code(monkeypatch):
-    monkeypatch.setattr(get_settings(), "access_code", "Earthling606")
+    monkeypatch.setattr(get_settings(), "access_code", "test-code-606")
     main._hits.clear()
     with TestClient(app) as client:
-        client.post("/api/unlock", json={"code": "Earthling606"})
+        client.post("/api/unlock", json={"code": "test-code-606"})
         assert client.get("/api/config").json()["unlocked"] is True
         assert client.post("/api/lock").status_code == 200  # allowed without the code
         assert client.get("/api/config").json()["unlocked"] is False
