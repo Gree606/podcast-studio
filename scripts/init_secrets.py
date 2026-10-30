@@ -26,6 +26,10 @@ TEMPLATE = """\
 # Google Gemini (script writing, fact checks, OCR): https://aistudio.google.com/apikey
 LLM_API_KEY=DUMMY_REPLACE_WITH_GEMINI_KEY
 
+# Optional: OpenRouter (the same Gemini models without free-tier caps; set LLM_PROVIDER=openrouter in .env)
+# https://openrouter.ai/keys
+# OPENROUTER_API_KEY=your-openrouter-key
+
 # Sarvam AI bulbul (the two voices): https://dashboard.sarvam.ai
 TTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY
 

@@ -43,10 +43,15 @@ class Settings(BaseSettings):
 
     # --- LLM ----------------------------------------------------------------
     # "gemini" = Google Generative Language API (generateContent);
-    # "openai" = any OpenAI-compatible /v1/chat/completions server (e.g. vLLM serving Gemma).
+    # "openai" = any OpenAI-compatible /v1/chat/completions server (e.g. vLLM serving Gemma);
+    # "openrouter" = the same models through OpenRouter (https://openrouter.ai/api, model ids like
+    # "google/gemini-3.6-flash"): paid per token, so no free-tier daily caps.
     llm_provider: str = "gemini"
     llm_base_url: str = "https://generativelanguage.googleapis.com"
     llm_api_key: str = ""
+    # OpenRouter's key, kept separate so switching LLM_PROVIDER back to gemini keeps working
+    # (falls back to LLM_API_KEY when empty)
+    openrouter_api_key: str = ""
     llm_model: str = "gemini-3.6-flash"
     # Tried in order when the main model is overloaded (503), rate-limited (429) or retired (404).
     # Measured 2026-10-21: popular models regularly return 503 "high demand" for minutes at a time.
@@ -135,7 +140,12 @@ class Settings(BaseSettings):
         return self.data_dir / "sources"
 
     def llm_ready(self) -> bool:
-        return bool(self.llm_base_url) and (is_set(self.llm_api_key) or self.llm_provider == "openai")
+        return bool(self.llm_base_url) and (is_set(self.llm_key()) or self.llm_provider == "openai")
+
+    def llm_key(self) -> str:
+        if self.llm_provider == "openrouter" and is_set(self.openrouter_api_key):
+            return self.openrouter_api_key
+        return self.llm_api_key
 
     def tts_ready(self) -> bool:
         return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style not in ("sarvam", "bodhan"))

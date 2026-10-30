@@ -125,15 +125,29 @@ async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    body: dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    if s.llm_provider == "openrouter":
+        headers.update({"HTTP-Referer": "https://github.com/Gree606/podcast-studio", "X-Title": "Mission 606: Earth Unknown"})
+        body["max_tokens"] = max_tokens + s.llm_thinking_headroom  # reasoning tokens count against it, as on Gemini
+        if thinking:  # "low" for checking tasks, like Gemini's thinkingLevel
+            body["reasoning"] = {"effort": thinking}
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
     resp = await request_with_retry(
         "Language model", "POST", base_url.rstrip("/") + "/v1/chat/completions", json=body, headers=headers,
         timeout=s.llm_timeout_s, attempts=attempts or s.llm_attempts, semaphore=_semaphore(), retry_timeouts=False,
     )
     try:
         data = resp.json()
+    except ValueError as e:
+        raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
+    if isinstance(data.get("error"), dict):  # OpenRouter can report an upstream failure inside a 200
+        err = data["error"]
+        code = err.get("code") if isinstance(err.get("code"), int) else 502
+        raise ServiceError("Language model", f"returned HTTP {code}", str(err.get("message", ""))[:300], status=code)
+    try:
         text = data["choices"][0]["message"]["content"] or ""
-    except (ValueError, KeyError, IndexError) as e:
+    except (KeyError, IndexError, TypeError) as e:
         raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
     u = data.get("usage") or {}
     return text, {"prompt_tokens": int(u.get("prompt_tokens", 0)), "completion_tokens": int(u.get("completion_tokens", 0))}
@@ -161,7 +175,7 @@ async def chat(
         record(llm_calls=1)
         return await mock.mock_chat(messages, task=task, temperature=temperature)
 
-    base_url, api_key, model = endpoint or (s.llm_base_url, s.llm_api_key, s.llm_model)
+    base_url, api_key, model = endpoint or (s.llm_base_url, s.llm_key(), s.llm_model)
     call = _gemini_call if s.llm_provider == "gemini" else _openai_call
     t0 = time.time()
     text, usage, used = await _call_with_fallback(call, messages, temperature=temperature, max_tokens=max_tokens,

@@ -156,3 +156,35 @@ def test_bodhan_tts_body_and_readiness():
     assert s.tts_ready() is False  # placeholder key -> not ready
     s.tts_api_key = "real-looking-key"
     assert s.tts_ready() is True
+
+
+def test_openrouter_sends_json_mode_reasoning_and_its_own_key(monkeypatch):
+    """LLM_PROVIDER=openrouter: OpenAI-style call with JSON mode, reasoning effort and attribution
+    headers; OPENROUTER_API_KEY wins over LLM_API_KEY; an upstream error inside a 200 falls back."""
+    import asyncio
+
+    from backend.clients import llm
+    from backend.config import Settings
+
+    s = Settings(llm_provider="openrouter", llm_base_url="https://openrouter.ai/api", llm_api_key="gemini-key-123",
+                 openrouter_api_key="or-key-456", llm_model="google/gemini-3.6-flash", mock_mode=False)
+    assert s.llm_ready() and s.llm_key() == "or-key-456"
+    assert Settings(llm_provider="gemini", llm_api_key="gemini-key-123", openrouter_api_key="or-key-456").llm_key() == "gemini-key-123"
+    monkeypatch.setattr(llm, "get_settings", lambda: s)
+    seen = []
+
+    async def fake_request(service, method, url, *, json, headers, **kw):
+        seen.append((url, json, headers))
+        if json["model"] == "google/gemini-3.6-flash":
+            return httpx.Response(200, json={"error": {"code": 503, "message": "upstream overloaded"}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": true}'}}],
+                                         "usage": {"prompt_tokens": 5, "completion_tokens": 3}})
+
+    monkeypatch.setattr(llm, "request_with_retry", fake_request)
+    monkeypatch.setattr(llm, "_exhausted", {})
+    out = asyncio.run(llm.chat_json([{"role": "user", "content": "hi"}], task="t", thinking="low"))
+    assert out == {"ok": True}
+    (url, body, headers), (_, body2, _) = seen
+    assert url == "https://openrouter.ai/api/v1/chat/completions" and headers["Authorization"] == "Bearer or-key-456"
+    assert body["response_format"] == {"type": "json_object"} and body["reasoning"] == {"effort": "low"}
+    assert "X-Title" in headers and body2["model"] != body["model"]
