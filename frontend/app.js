@@ -106,6 +106,9 @@ function rememberEpisode(id, title) {
     localStorage.setItem("myEpisodes", JSON.stringify(l.slice(0, 12)));
   } catch { /* private mode */ }
 }
+function forgetEpisodes(ids) {
+  try { localStorage.setItem("myEpisodes", JSON.stringify(myEpisodes().filter(x => !ids.includes(x.id)))); } catch { /* private mode */ }
+}
 function chapterEmoji(title, subject, i) {
   const t = `${title} ${subject}`.toLowerCase();
   const map = [[/chem|reaction|acid|metal/, "🧪"], [/brain|control|nerv|coordination/, "🧠"], [/crop|farm|agri|soil/, "🌾"],
@@ -169,12 +172,22 @@ async function renderHome() {
   $("#pasteGo").onclick = () => loadSource({text: $("#pasteText").value, title: $("#pasteTitle").value});
   setupPhotos();
 
-  const mine = myEpisodes();
+  renderRecent();
+}
+
+// "Your episodes" in the menu: this browser's list, minus any the server no longer has
+async function renderRecent() {
+  let mine = myEpisodes();
   if (mine.length) {
-    $("#recentCard").classList.remove("hidden");
-    $("#recent").innerHTML = mine.map(x => `<a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>`).join("");
-    $$("#recent a").forEach(a => { a.onclick = () => openDrawer(false); });
+    try {
+      const alive = new Set((await api(`/api/episodes?ids=${mine.map(x => encodeURIComponent(x.id)).join(",")}`)).map(e => e.id));
+      forgetEpisodes(mine.filter(x => !alive.has(x.id)).map(x => x.id));
+      mine = mine.filter(x => alive.has(x.id));
+    } catch { /* offline: show what we remember */ }
   }
+  $("#recentCard").classList.toggle("hidden", !mine.length);
+  $("#recent").innerHTML = mine.map(x => `<a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>`).join("");
+  $$("#recent a").forEach(a => { a.onclick = () => openDrawer(false); });
 }
 
 // ------------------------------------------------------------------ photos of pages (OCR, one page per photo)
@@ -382,6 +395,7 @@ async function poll(id, view = viewId) {
   try { ep = await api(`/api/episodes/${id}?since=${traceLen}`); }
   catch (e) {
     if (/not found/i.test(e.message)) {
+      forgetEpisodes([id]); renderRecent();
       $("#app").innerHTML = `<div class="card"><div class="notice err">😕 ${esc(e.message)}</div><a class="btn primary" href="#/">✨ Make a new episode</a></div>`;
       return;
     }
