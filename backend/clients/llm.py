@@ -150,6 +150,8 @@ async def _openai_call(messages, *, temperature, max_tokens, json_mode, base_url
         text = data["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError) as e:
         raise ServiceError("Language model", "returned an unexpected response", str(e)) from e
+    if (data["choices"][0].get("finish_reason") or "") == "length":
+        log.warning("model=%s stopped at the output limit (%d tokens): the answer is cut off", model, body["max_tokens"])
     u = data.get("usage") or {}
     return text, {"prompt_tokens": int(u.get("prompt_tokens", 0)), "completion_tokens": int(u.get("completion_tokens", 0))}
 

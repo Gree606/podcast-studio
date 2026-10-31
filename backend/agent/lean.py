@@ -23,10 +23,17 @@ from ..clients.base import ServiceError
 from ..clients.llm import chat_json
 from ..config import get_settings
 from ..prompts import CRITIC_ALL, FAST_WRITE
-from ..schemas import Candidate, Scores, Segment, Turn
+from ..schemas import Candidate, Scores, Segment
 from .context import AgentContext
 from .critic import WEIGHTS, _num, deterministic_issues, lesson_from
-from .fast import PASSAGE_WORDS, WPM, _part_turns, select_passages, target_words
+from .fast import (
+    PASSAGE_WORDS,
+    WPM,
+    _part_turns,
+    select_passages,
+    target_words,
+    write_episode_call,
+)
 from .writer import SHOW, TONES, WriterError, revise, script_text
 
 log = logging.getLogger("podcast.lean")
@@ -68,11 +75,7 @@ async def write_from_plan(ctx: AgentContext, segments: list[Segment]) -> None:
                                language_rule=languages.writing_rule(st.language))
     ctx.status(STAGE, "Writing every part from the plan (1 model call)", 0.2)
     async with ctx.creeping(0.2, 0.4, expected_s=25):
-        data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
-                               temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
-    parts = [p for p in (data.get("parts") or []) if isinstance(p, dict)] if isinstance(data, dict) else []
-    if not parts:
-        raise ServiceError("Language model", "did not return the episode in the expected format")
+        data, parts = await write_episode_call(ctx, prompt)
     ctx.episode.learn_line = str(data.get("learn_line") or "").strip() or ctx.episode.learn_line
     for seg, p in zip(segments, parts):
         try:

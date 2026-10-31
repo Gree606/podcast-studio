@@ -76,6 +76,38 @@ def _part_turns(raw: dict | list, names: tuple[str, str]) -> list[Turn]:
 
 
 # ---------------------------------------------------------------- call 1: write
+def find_parts(data) -> list[dict]:
+    """The episode's parts, also when the model nests them one level down ({"episode": {"parts": ...}})."""
+    if isinstance(data, dict):
+        if isinstance(data.get("parts"), list):
+            return [p for p in data["parts"] if isinstance(p, dict)]
+        for v in data.values():
+            if isinstance(v, dict) and isinstance(v.get("parts"), list):
+                return [p for p in v["parts"] if isinstance(p, dict)]
+    if isinstance(data, list) and data and all(isinstance(p, dict) and "turns" in p for p in data):
+        return data
+    return []
+
+
+async def write_episode_call(ctx: AgentContext, prompt: str, *, temperature: float = 0.8) -> tuple[dict, list[dict]]:
+    """The one-call episode writer, with one corrective retry if the reply has no usable parts
+    (seen with Malayalam text: the JSON came back in another shape)."""
+    msgs = [{"role": "user", "content": prompt}]
+    for attempt in (1, 2):
+        data = await chat_json(msgs, task="write_episode", expect=dict, temperature=temperature,
+                               max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
+        parts = find_parts(data)
+        if parts:
+            return (data if isinstance(data, dict) else {}), parts
+        log.warning("write_episode attempt %d: no 'parts' in the reply: %r", attempt, str(data)[:600])
+        if attempt == 1:
+            ctx.emit(STAGE_WRITE, "warning", "The writer's answer came back in the wrong shape; asking it once more.")
+            msgs = msgs + [{"role": "user", "content": "Your reply did not contain the episode. Reply again with ONLY the JSON object "
+                            '{"title": ..., "learn_line": ..., "parts": [{"title": ..., "chunk_ids": [...], "turns": [...]}]}. '
+                            "Escape any double quotes inside the text."}]
+    raise ServiceError("Language model", "did not return the episode in the expected format")
+
+
 async def write_episode(ctx: AgentContext) -> list[Segment]:
     st = ctx.episode.settings
     names = (st.host_name, st.expert_name)
@@ -89,11 +121,7 @@ async def write_episode(ctx: AgentContext) -> list[Segment]:
                                language_rule=languages.writing_rule(st.language))
     ctx.status(STAGE_WRITE, "Writing the whole episode (1 model call)", 0.08)
     async with ctx.creeping(0.08, 0.38, expected_s=25):
-        data = await chat_json([{"role": "user", "content": prompt}], task="write_episode", expect=dict,
-                               temperature=0.8, max_tokens=3500, thinking=get_settings().llm_write_thinking or None)
-    parts = data.get("parts") if isinstance(data, dict) else None
-    if not isinstance(parts, list) or not parts:
-        raise ServiceError("Language model", "did not return the episode in the expected format")
+        data, parts = await write_episode_call(ctx, prompt)
     ctx.episode.learn_line = str(data.get("learn_line") or "").strip() or None
     if data.get("title") and ctx.episode.title == ctx.source.title:
         ctx.episode.title = str(data["title"])[:120]

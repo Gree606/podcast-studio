@@ -205,3 +205,27 @@ def test_quick_fact_check_is_per_spoken_line():
         claims = [c for s in ep["segments"] for v in s["versions"] if v["version"] == s["active_version"] for c in v["claims"]]
         assert claims and all(c["line"] for c in claims)
         assert any(not c["supported"] and c["corrected"] for c in claims)  # the mock flags (and fixes) one line in part 2
+
+
+def test_writer_accepts_nested_parts_and_retries_a_wrong_shape(monkeypatch):
+    """Seen live (Malayalam chapter): the writer's JSON had no top-level "parts"."""
+    import asyncio as _asyncio
+    from backend.agent import fast as _fast
+    part = {"title": "P", "chunk_ids": [], "turns": [{"speaker": "host", "text": "Hi"}]}
+    assert _fast.find_parts({"episode": {"parts": [part]}}) == [part]
+    assert _fast.find_parts([part]) == [part]
+    assert _fast.find_parts({"speaker": "host", "text": "a lone line"}) == []
+
+    replies = iter([{"speaker": "host", "text": "a lone line"}, {"title": "T", "parts": [part]}])
+    calls = []
+
+    async def fake_chat_json(msgs, **kw):
+        calls.append(len(msgs))
+        return next(replies)
+    monkeypatch.setattr(_fast, "chat_json", fake_chat_json)
+
+    class Ctx:
+        def emit(self, *a, **k):
+            pass
+    data, parts = _asyncio.run(_fast.write_episode_call(Ctx(), "prompt"))
+    assert parts == [part] and calls == [1, 2]  # one corrective retry, with the correction appended
