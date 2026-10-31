@@ -140,7 +140,7 @@ async def lock():
 # --- health / config ---------------------------------------------------------------
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "mock": get_settings().effective_mock(), "version": PROMPT_VERSION, "active_jobs": len(jobs.active_jobs())}
+    return {"ok": True, "mock": providers.settings_for().effective_mock(), "version": PROMPT_VERSION, "active_jobs": len(jobs.active_jobs())}
 
 
 def estimate_minutes(length: str) -> dict:
@@ -170,9 +170,10 @@ PRESETS = {
 @app.get("/api/config")
 async def config(request: Request):
     s = get_settings()
-    return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
+    eff = providers.settings_for(base=s)  # with a missing default provider replaced by one that has a key
+    return {"mock": eff.effective_mock(), "max_input_words": s.max_input_words,
             "lengths": {k: estimate_minutes(k) for k in LENGTHS},
-            "presets": PRESETS, "configured": s.configured(), "providers": providers.options(s),
+            "presets": PRESETS, "configured": eff.configured(), "providers": providers.options(s),
             "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()],
             "locked": bool(s.access_code), "unlocked": gate_unlocked(request)}
 

@@ -146,12 +146,12 @@ files under `data/`.
 | Key | Needed for | Where to get it | Required? |
 |---|---|---|---|
 | `OPENROUTER_API_KEY` | writing and checking the script, Ask Gree, quiz, the deep agent's embedding search (Gemini models through OpenRouter) | https://openrouter.ai/keys | **yes** |
-| `TTS_API_KEY` | the two voices (Sarvam bulbul) | https://dashboard.sarvam.ai | yes |
+| `TTS_API_KEY` | the two voices (Sarvam bulbul) | https://dashboard.sarvam.ai | yes, or a Bodhan key: without a Sarvam key the app uses Bodhan's voices |
 | `ASR_API_KEY` | listening back to its own audio (Bodhan) | Bodhan (https://bodhan.ai) | optional: without it the listen-back check is skipped |
 | `OCR_API_KEY` | reading PDF pages and photos (Bodhan Indic-OCR) | Bodhan, usually the same key as ASR | optional: without it PDFs use their own text and photos can't be read |
 | `LLM_API_KEY` | Google Gemini directly, as an alternative to OpenRouter (pick it in Settings, or `LLM_PROVIDER=gemini` in `.env`) | Google AI Studio: https://aistudio.google.com/apikey | optional |
 
-With **only the OpenRouter key**, everything except the voices is real: scripts, fact-checks, Ask Gree, quiz and RAG search; the audio is a placeholder tone and the self-check is skipped. Add the Sarvam key for real voices. With no keys at all the app runs in **demo mode** (placeholder scripts and tones, with a banner saying so), which is enough to click around.
+**If a default provider's key is missing, the app uses the alternative that has one:** no Sarvam key but a Bodhan key (`ASR_API_KEY`) means Bodhan voices; no OpenRouter key but a Google key means Gemini directly. So an **OpenRouter key plus a Bodhan key** is enough for the full app (real scripts, voices, listen-back check and OCR). With only the OpenRouter key, everything except the voices is real (the audio is a placeholder tone). With no keys at all the app runs in **demo mode** (placeholder scripts and tones, with a banner saying so), which is enough to click around.
 
 ### 2. Get the code and install
 

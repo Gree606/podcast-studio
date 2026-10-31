@@ -46,9 +46,14 @@ def default_voices(s: Settings) -> str:
 
 
 def _llm_key(s: Settings, choice: str) -> str:
-    if choice == default_llm(s):
-        return s.llm_key()
-    return s.openrouter_api_key if choice == "openrouter" else s.llm_api_key
+    """The key this choice would use. LLM_API_KEY may hold either kind of key (it is also where an
+    OpenRouter key went before OPENROUTER_API_KEY existed), so tell them apart by their prefixes:
+    a Google key (AIza...) is no use to OpenRouter, and an OpenRouter key (sk-or-...) none to Google."""
+    if choice == "openrouter":
+        if is_set(s.openrouter_api_key):
+            return s.openrouter_api_key
+        return "" if s.llm_api_key.startswith("AIza") else s.llm_api_key
+    return "" if s.llm_api_key.startswith("sk-or-") else s.llm_api_key
 
 
 def _tts_key(s: Settings, choice: str) -> str:
@@ -57,12 +62,35 @@ def _tts_key(s: Settings, choice: str) -> str:
     return s.sarvam_api_key if choice == "sarvam" else (s.bodhan_tts_api_key if is_set(s.bodhan_tts_api_key) else s.asr_api_key)
 
 
+def _ready(s: Settings, kind: str, choice: str) -> bool:
+    return s.mock_mode or is_set(_llm_key(s, choice) if kind == "llm" else _tts_key(s, choice))
+
+
+def effective_llm(s: Settings) -> str:
+    """The .env default, or the other script AI if only that one has a key (e.g. a copy run with a
+    Gemini key but no OpenRouter key)."""
+    d = default_llm(s)
+    return d if _ready(s, "llm", d) else next((k for k in LLM_CHOICES if _ready(s, "llm", k)), d)
+
+
+def effective_voices(s: Settings) -> str:
+    """The .env default, or the other voices if only those have a key (e.g. a copy run with a Bodhan
+    key but no Sarvam key gets Bodhan voices instead of placeholder tones)."""
+    d = default_voices(s)
+    return d if _ready(s, "voices", d) else next((k for k in VOICE_CHOICES if _ready(s, "voices", k)), d)
+
+
 def settings_for(llm: str = "", voices: str = "", base: Settings | None = None) -> Settings:
-    """The server settings with an episode's choices applied ("" or the default = unchanged)."""
+    """The server settings with an episode's choices applied ("" = the effective default)."""
     s = base or _base_settings()
+    llm, voices = llm or effective_llm(s), voices or effective_voices(s)
     update: dict = {}
     if llm in LLM_CHOICES and llm != default_llm(s):
         update |= LLM_CHOICES[llm]["settings"]
+        if llm == "gemini":
+            update["llm_api_key"] = _llm_key(s, "gemini")
+        else:
+            update["openrouter_api_key"] = _llm_key(s, "openrouter")
     if voices in VOICE_CHOICES and voices != default_voices(s):
         update |= VOICE_CHOICES[voices]["settings"] | {"tts_api_key": _tts_key(s, voices)}
     return s.model_copy(update=update) if update else s
@@ -71,12 +99,12 @@ def settings_for(llm: str = "", voices: str = "", base: Settings | None = None) 
 def options(s: Settings | None = None) -> dict:
     """What the Settings panel offers: each choice, whether its key is set, and the default."""
     s = s or _base_settings()
-    ready = lambda key: s.mock_mode or is_set(key)
+    llm, voices = effective_llm(s), effective_voices(s)
     return {
-        "llm": [{"id": k, "label": v["label"], "hint": v["hint"], "ready": ready(_llm_key(s, k)),
-                 "default": k == default_llm(s)} for k, v in LLM_CHOICES.items()],
-        "voices": [{"id": k, "label": v["label"], "hint": v["hint"], "ready": ready(_tts_key(s, k)),
-                    "default": k == default_voices(s)} for k, v in VOICE_CHOICES.items()],
+        "llm": [{"id": k, "label": v["label"], "hint": v["hint"], "ready": _ready(s, "llm", k), "default": k == llm}
+                for k, v in LLM_CHOICES.items()],
+        "voices": [{"id": k, "label": v["label"], "hint": v["hint"], "ready": _ready(s, "voices", k), "default": k == voices}
+                   for k, v in VOICE_CHOICES.items()],
     }
 
 

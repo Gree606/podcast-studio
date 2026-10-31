@@ -71,3 +71,31 @@ def test_api_rejects_an_option_without_a_key_and_records_the_choice():
         assert r.status_code == 200
         ep = client.get(f"/api/episodes/{r.json()['id']}").json()
         assert ep["settings"]["voices"] == "bodhan" and ep["providers"]["voices"] == "Bodhan indic-speak"
+
+
+# A copy run with OpenRouter as the default (as in .env.example)
+OR = dict(llm_provider="openrouter", llm_base_url="https://openrouter.ai/api", llm_model="google/gemini-3.6-flash")
+
+
+def test_tester_with_openrouter_and_bodhan_keys_gets_bodhan_voices_without_a_sarvam_key():
+    s = settings(**OR, openrouter_api_key="sk-or-v1-tester", asr_api_key="bodhan_tester", tts_api_key="DUMMY_REPLACE_WITH_SARVAM_KEY")
+    t = providers.settings_for(base=s)
+    assert (t.llm_provider, t.tts_api_style, t.tts_api_key) == ("openrouter", "bodhan", "bodhan_tester")
+    assert not t.tts_mock() and not t.llm_mock() and not t.effective_mock()  # real script AND real voices
+    opts = providers.options(s)
+    assert [o["id"] for o in opts["voices"] if o["default"]] == ["bodhan"]
+
+
+def test_only_a_google_key_falls_back_to_gemini_and_is_never_sent_to_openrouter():
+    s = settings(**OR, llm_api_key="AIzaSyTesterGoogleKey", tts_api_key="sk_sarvam")
+    t = providers.settings_for(base=s)
+    assert (t.llm_provider, t.llm_key()) == ("gemini", "AIzaSyTesterGoogleKey")
+    assert {o["id"]: o["ready"] for o in providers.options(s)["llm"]} == {"gemini": True, "openrouter": False}
+
+
+def test_defaults_are_kept_when_their_keys_are_there_or_nothing_is_set():
+    full = settings(**OR, openrouter_api_key="sk-or-v1-x", llm_api_key="AIzaY", tts_api_key="sk_s", asr_api_key="b")
+    assert providers.settings_for(base=full) is full  # nothing to change
+    empty = settings(**OR)
+    t = providers.settings_for(base=empty)
+    assert (t.llm_provider, t.tts_api_style) == ("openrouter", "sarvam") and t.effective_mock()  # demo mode
