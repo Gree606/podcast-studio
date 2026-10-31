@@ -47,7 +47,7 @@ code { background: var(--surface-2); padding: 2px 8px; border-radius: 8px; font-
 
 /* ---------------------------------------------------------------- layout + header */
 .wrap { max-width: 760px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) 18px 24px; }
-html, body { overflow-x: hidden; }
+html, body { overflow-x: hidden; overflow-x: clip; }  /* clip, not hidden: hidden makes body a scroll box and breaks position: sticky */
 #app.ep-layout { padding-bottom: 86px; }  /* room for the floating dock, only on the episode page */
 .top { display: flex; align-items: center; gap: 10px; padding: 6px 0 8px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; font-size: 1.05rem; }
@@ -531,7 +531,10 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
   /* home: scene + headline on the left (stays put), picking + launch on the right */
   #app.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: 56px; align-items: start;
     min-height: calc(100vh - 110px); align-content: center; }
-  #app.home-layout > .hero { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 24px; padding-top: 0; text-align: left; align-self: center; }
+  /* one screen tall and pinned to the top, contents centred: it stays in view while the chapter list on the
+     right scrolls (centring it in the whole, much taller, grid row left the top-left empty) */
+  #app.home-layout > .hero { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 16px; padding-top: 0; text-align: left;
+    align-self: start; height: calc(100vh - 130px); display: flex; flex-direction: column; justify-content: center; }
   #app.home-layout > .card { grid-column: 2; }
   #app.home-layout .hero h1 { font-size: clamp(2.8rem, 4.2vw, 4.2rem); }
   #app.home-layout .lede { font-size: 1.2rem; }
