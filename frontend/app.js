@@ -468,15 +468,13 @@ const FACTS = [
 ];
 const fact = {timer: null, i: Math.floor(Math.random() * FACTS.length)};
 function showFact() {
-  const p = $("#factText"); if (!p) return;
+  const p = $("#nowFact"); if (!p) return;  // lives in the stage's speech bubble while nothing can play yet
   fact.i = (fact.i + 1) % FACTS.length;
   p.classList.remove("fact-in"); void p.offsetWidth; p.classList.add("fact-in");
-  p.textContent = FACTS[fact.i];
+  p.innerHTML = `<b>Did you know?</b> ${esc(FACTS[fact.i])}`;
 }
 function syncFacts(on) {
-  const card = $("#factCard"); if (!card) { clearInterval(fact.timer); fact.timer = null; return; }
-  card.classList.toggle("hidden", !on);
-  if (on && !fact.timer) { showFact(); fact.timer = setInterval(showFact, 9000); }
+  if (on && !fact.timer) { showFact(); fact.timer = setInterval(showFact, 3000); }
   if (!on && fact.timer) { clearInterval(fact.timer); fact.timer = null; }
 }
 
@@ -540,7 +538,10 @@ function renderMake(ep) {
     const cap = $("#nowLine");
     if (cap.dataset.say !== say) {
       cap.dataset.say = say; cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth; cap.classList.add("pop-in");
-      cap.innerHTML = `<span>${esc(say)}${working ? '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' : ""}</span>`;
+      cap.classList.toggle("making", working);  // stage line on top, rotating fact underneath
+      cap.innerHTML = `<span>${esc(say)}${working ? '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' : ""}</span>`
+        + (working ? `<span class="now-fact" id="nowFact"></span>` : "");
+      if (working) showFact();  // a fresh bubble starts with a fact straight away
     }
     $("#plTitle").textContent = ep.title;
   }
@@ -745,7 +746,7 @@ async function fillSources(segId) {
 // a plain note in the stage's speech bubble (not a line of the script)
 function stageNote(text) {
   const cap = $("#nowLine");
-  cap.classList.remove("from-host", "from-expert"); cap.innerHTML = `<span>${text}</span>`; cap.dataset.say = "";
+  cap.classList.remove("from-host", "from-expert", "making"); cap.innerHTML = `<span>${text}</span>`; cap.dataset.say = "";
 }
 
 // ------------------------------------------------------------------ live listening (part by part)
@@ -889,7 +890,7 @@ function onTime() {
     const n = names(epState), cap = $("#nowLine");
     if (key !== onTime.lastKey) {  // a new line: pop a fresh comic bubble pointing at the speaker, and that ship hops
       onTime.lastKey = key; onTime.lastSi = -1;
-      cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth;
+      cap.classList.remove("from-host", "from-expert", "pop-in", "making"); void cap.offsetWidth;
       cap.classList.add(`from-${cur.speaker}`, "pop-in");
       const ship = $(cur.speaker === "host" ? "#stageHost" : "#stageExpert");
       ship.classList.remove("hop"); void ship.offsetWidth; ship.classList.add("hop");
