@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     ocr_api_key: str = ""
     ocr_model: str = "indic-ocr"
     ocr_timeout_s: float = 120.0
+    # "all": every PDF page is read with OCR (cleaner than many text layers, e.g. NCERT's Hindi PDFs
+    # repeat vowel signs and scramble picture-heavy pages); a page whose OCR fails keeps its own text.
+    # "scanned": OCR only pages without a text layer.
+    pdf_ocr: str = "all"
+    ocr_requests_per_minute: int = 12  # Bodhan OCR: steady pages, never bursts (see clients/ocr.py); 0 = no pacing
 
     # --- pipeline knobs ------------------------------------------------------
     data_dir: Path = ROOT / "data"

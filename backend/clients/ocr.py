@@ -10,7 +10,9 @@ returning {"text": ...}.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
+import time
 
 from ..config import get_settings
 from .base import ServiceError, request_with_retry
@@ -48,11 +50,35 @@ def bodhan_request(png: bytes, mime: str = "image/png") -> dict:
             "messages": [{"role": "user", "content": [_image_part(png, mime)]}]}
 
 
+_next_slot = 0.0
+_pace_lock: asyncio.Lock | None = None
+_pace_loop: asyncio.AbstractEventLoop | None = None
+
+
+async def _pace() -> None:
+    """Space Bodhan OCR calls evenly. A burst of 3-4 pages gets HTTP 429 and a ~40 s wait (measured
+    2026-10-31: 6 pages at 4 at a time took 192 s); one page every 5 s ran 6 for 6 at ~1 s each."""
+    global _next_slot, _pace_lock, _pace_loop
+    limit = get_settings().ocr_requests_per_minute
+    if limit <= 0:
+        return
+    loop = asyncio.get_running_loop()
+    if _pace_lock is None or _pace_loop is not loop:
+        _pace_lock, _pace_loop = asyncio.Lock(), loop
+    async with _pace_lock:
+        now = time.monotonic()
+        wait = _next_slot - now
+        _next_slot = max(now, _next_slot) + 60.0 / limit
+    if wait > 0:
+        await asyncio.sleep(wait)
+
+
 async def bodhan_ocr(png: bytes, mime: str = "image/png") -> str:
     s = get_settings()
     url = (s.ocr_base_url or BODHAN_BASE).rstrip("/") + "/v1/chat/completions"
     resp = await request_with_retry("OCR service", "POST", url, json=bodhan_request(png, mime),
-                                    headers={"Authorization": f"Bearer {s.ocr_api_key}"}, timeout=s.ocr_timeout_s)
+                                    headers={"Authorization": f"Bearer {s.ocr_api_key}"}, timeout=s.ocr_timeout_s,
+                                    pace=_pace)
     try:
         return resp.json()["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError, ValueError) as e:

@@ -120,7 +120,7 @@ tests/             pytest suite
 | **Gemini** (`gemini-3.6-flash`, with a fallback list) | writing, checking, Ask Gree, quiz | `generateContent`, JSON mode for structured calls. Thought parts are skipped, and thinking tokens are counted. Calls fall back across models on 429/503/404, and a model whose daily quota is used up is skipped. OpenRouter (`OPENROUTER_API_KEY`) can be picked per episode in Settings; `LLM_PROVIDER` sets the default, and `openai` targets any OpenAI-compatible server. |
 | **Sarvam** `bulbul:v4-flash` | the two voices | `dev_en_conversational` (Error606) and `simran_en_conversation` (Gree), with the language set per episode. Turns over 900 characters are split at sentence boundaries. Bodhan indic-speak (Gree = Deepika, Error606 = Amit) can be picked per episode in Settings; it uses `BODHAN_TTS_API_KEY`, or the Bodhan ASR key if that isn't set. `TTS_API_STYLE` sets the default. |
 | **Bodhan** `indic-transcribe` | listen-back self-check | Paced to 14 calls per minute. If it answers in an unexpected script, the self-check stands down instead of re-recording everything. |
-| **Bodhan** Indic-OCR | scanned pages and photos | One page per request. Photos are straightened, downscaled and re-encoded first. |
+| **Bodhan** Indic-OCR | every PDF page (up to 15 pages; longer PDFs: scanned pages only) and photos | One page per request, paced at 12 pages a minute (bursts get rate-limited). A page whose OCR fails keeps the PDF's own text. NCERT print codes and the repeated vowel signs of Hindi text layers are cleaned up. Photos are straightened, downscaled and re-encoded first. |
 
 Every call has a timeout and retries with backoff. 429 responses honour `Retry-After` / `retryDelay`. A bad key produces a plain-language message in the UI.
 

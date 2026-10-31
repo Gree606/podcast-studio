@@ -211,3 +211,19 @@ def test_pdf_lines_in_indian_scripts_are_kept_and_cleaned():
     title, sections = _sections_from_lines(lines, set())
     assert title == "नीमा की दादी"
     assert sum(len(p.split()) for s in sections for p, _ in s.paras) >= 12 * len(body.split())
+
+
+def test_ocr_cleanup_drops_print_codes_but_keeps_maths():
+    from backend.ingest import clean_ocr
+    assert clean_ocr("$$0222CHO1$$\nनीमा की दादी") == "नीमा की दादी"
+    assert clean_ocr("$0222CH01$ text") == "text"
+    assert clean_ocr("0678CH04\nMagnets") == "Magnets"
+    assert clean_ocr("Water is $$H_2O$$.") == "Water is $$H_2O$$."
+    assert clean_ocr("बच्चोंों") == "बच्चों"
+
+
+def test_short_unpunctuated_lines_in_scripts_without_capitals_are_headings():
+    from backend.ingest import ingest_text
+    body = " ".join(["नीमा दोपहर में दो बजे स्कूल से लौटती है।"] * 12)
+    src = ingest_text(f"चित्र और बातचीत\n\n{body}\n\nनीमा की दादी\n\n{body}", 9000)
+    assert src.title == "चित्र और बातचीत" and [s.title for s in src.sections][-1] == "नीमा की दादी"

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from .clients.ocr import ocr_available, ocr_page
+from .config import get_settings
 from .schemas import Chunk, Section, Source, new_id
 
 log = logging.getLogger("podcast.ingest")
@@ -68,6 +69,16 @@ _REPEATED_SIGNS = re.compile(f"([{_SIGN}][{_NASAL}]?)\\1+")
 
 def dedupe_signs(text: str) -> str:
     return _REPEATED_SIGNS.sub(r"\1", text)
+
+
+# NCERT print codes ("0222CH01"), which OCR returns as text, often wrapped in $$...$$ and with O for 0
+# (only the code itself: other $...$ is OCR'd maths, e.g. $$H_2O$$, and stays)
+_PRINT_CODE = re.compile(r"\${1,2}\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*\${1,2}|^\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*$", re.M | re.I)
+
+
+def clean_ocr(text: str) -> str:
+    """OCR text of one page, ready for the section parser."""
+    return dedupe_signs(_PRINT_CODE.sub("", text or "")).strip()
 
 
 def _page_lines(page: pymupdf.Page, pno: int) -> list[Line]:
@@ -243,8 +254,9 @@ def _sections_from_text(text: str) -> tuple[str, list[RawSection]]:
             heading = md.group(1).strip()
         elif NUMBERED_HEADING.match(first) or (len(first.split()) <= 10 and first.isupper() and len(first) > 3):
             heading = first
-        elif len(lines) == 1 and len(first.split()) <= 8 and (first[:1].isupper() or first[:1].isdigit()) and not first.endswith((".", "?", "!", ":", ",")):
-            heading = first
+        elif (len(lines) == 1 and len(first.split()) <= 8 and not first.endswith((".", "?", "!", ":", ",", "।"))
+              and (first[:1].isupper() or first[:1].isdigit() or (first[:1].isalpha() and not first[:1].isascii()))):
+            heading = first  # scripts without capitals (Hindi, Tamil...) count when short and unpunctuated
         if heading is not None:
             if not title and not sections[-1].paras and len(sections) == 1:
                 title = heading.title() if heading.isupper() else heading
@@ -312,6 +324,9 @@ def _build_source(title: str, raw: list[RawSection], origin: str, max_words: int
                   origin=origin, sections=sections, chunks=chunks, word_count=total, notes=notes, ocr_pages=ocr_pages)
 
 
+OCR_ALL_MAX_PAGES = 15  # at ~12 pages/min OCR, longer PDFs would outlast the upload request: OCR only their scanned pages
+
+
 async def ingest_pdf(data: bytes, max_words: int, origin: str = "upload") -> Source:
     try:
         doc = pymupdf.open(stream=data, filetype="pdf")
@@ -324,22 +339,34 @@ async def ingest_pdf(data: bytes, max_words: int, origin: str = "upload") -> Sou
     notes: list[str] = []
     lines_by_page = [_page_lines(p, i + 1) for i, p in enumerate(doc)]
     scanned = [i for i, ls in enumerate(lines_by_page) if sum(len(ln.text) for ln in ls) < 80]
+    s = get_settings()
+    # Read every page with OCR (PDF_OCR=all) when a real OCR service is set up; the offline fake used in
+    # tests can't read a page, and very long uploads would keep the student waiting too long.
+    ocr_all = (s.pdf_ocr == "all" and not s.mock_mode and ocr_available() and doc.page_count <= OCR_ALL_MAX_PAGES)
+    todo = list(range(doc.page_count)) if ocr_all else scanned
     ocr_pages: list[int] = []
     ocr_text: dict[int, str] = {}
-    if scanned:
+    if todo:
         if ocr_available():
             sem = asyncio.Semaphore(4)
 
             async def do(i: int) -> None:
                 async with sem:
                     try:
-                        ocr_text[i] = await ocr_page(render_page_png(doc[i]))
-                        ocr_pages.append(i + 1)
+                        text = clean_ocr(await ocr_page(render_page_png(doc[i], dpi=110)))  # 110 dpi reads as well, half the upload
+                        if text.strip():
+                            ocr_text[i] = text
+                            ocr_pages.append(i + 1)
                     except Exception as e:  # one bad page shouldn't sink the chapter
                         log.warning("OCR failed on page %d: %s", i + 1, e)
 
-            await asyncio.gather(*(do(i) for i in scanned))
-            if ocr_pages:
+            await asyncio.gather(*(do(i) for i in todo))
+            failed = sorted(i + 1 for i in todo if i not in ocr_text)
+            if ocr_all:
+                notes.append(f"Read all {doc.page_count} pages with Indic OCR." if not failed else
+                             f"Read {len(ocr_pages)} of {doc.page_count} pages with Indic OCR; "
+                             f"page(s) {', '.join(map(str, failed))} used the PDF's own text.")
+            elif ocr_pages:
                 notes.append(f"Pages {', '.join(map(str, sorted(ocr_pages)))} were scanned images; text was read with OCR.")
         else:
             notes.append(f"{len(scanned)} page(s) look scanned and OCR is unavailable; they were skipped.")
