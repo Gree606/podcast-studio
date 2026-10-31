@@ -468,7 +468,7 @@ const FACTS = [
 ];
 const fact = {timer: null, i: Math.floor(Math.random() * FACTS.length)};
 function showFact() {
-  const p = $("#nowFact"); if (!p) return;  // lives in the stage's speech bubble while nothing can play yet
+  const p = $("#nowLine .now-fact"); if (!p) return;  // lives in the stage's speech bubble while nothing can play yet
   fact.i = (fact.i + 1) % FACTS.length;
   p.classList.remove("fact-in"); void p.offsetWidth; p.classList.add("fact-in");
   p.innerHTML = `<b>Did you know?</b> ${esc(FACTS[fact.i])}`;
@@ -540,7 +540,7 @@ function renderMake(ep) {
       cap.dataset.say = say; cap.classList.remove("from-host", "from-expert", "pop-in"); void cap.offsetWidth; cap.classList.add("pop-in");
       cap.classList.toggle("making", working);  // stage line on top, rotating fact underneath
       cap.innerHTML = `<span>${esc(say)}${working ? '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' : ""}</span>`
-        + (working ? `<span class="now-fact" id="nowFact"></span>` : "");
+        + (working ? `<span class="now-fact"></span>` : "");
       if (working) showFact();  // a fresh bubble starts with a fact straight away
     }
     $("#plTitle").textContent = ep.title;
