@@ -17,9 +17,9 @@ os.environ.setdefault("MOCK_MODE", "1")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="podcast_smoke_")
 os.environ.setdefault("PODCAST_SECRETS_FILE", os.path.join(tempfile.mkdtemp(), "none.env"))  # never touch the real keys
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from backend.main import app  # noqa: E402
+from backend.main import app
 
 
 def wait(client: TestClient, eid: str, cond, timeout: float = 120) -> dict:

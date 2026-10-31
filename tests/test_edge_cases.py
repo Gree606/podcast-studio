@@ -12,7 +12,15 @@ from fastapi.testclient import TestClient
 from backend.config import get_settings
 from backend.main import app
 from backend.quiz import build_quiz
-from backend.schemas import Chunk, Episode, EpisodeSettings, KeyFact, Section, Segment, Source
+from backend.schemas import (
+    Chunk,
+    Episode,
+    EpisodeSettings,
+    KeyFact,
+    Section,
+    Segment,
+    Source,
+)
 
 
 def test_config_never_exposes_runtime_key_values(monkeypatch):
@@ -98,7 +106,7 @@ def test_quiz_rejects_case_variant_distractors_from_cited_passage():
             if option.lower() != question["answer"].lower():
                 assert option.lower() not in passage
         assert question["question"].count("_____") == 1
-        assert not re.search(rf"\b{re.escape(question['answer'])}\b", question["question"], re.I)
+        assert not re.search(rf"\b{re.escape(question['answer'])}\b", question["question"], re.IGNORECASE)
 
 
 def test_kid_preset_values_remain_valid_episode_settings():

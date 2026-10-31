@@ -30,21 +30,7 @@ def _word(term: str) -> str:
     """Regex for ``term`` as a whole word, in any script."""
     return rf"(?<!{_L}){re.escape(term)}(?!{_L})"
 
-_STOP = set("""
-about above after again against along also among another around because been before being below between both
-called cannot could does doing down during each either every from further have having here into itself just
-known like made make makes many more most much must near never often only other otherwise over same should
-since some such than that their them then there these they thing things this those through thus together
-under until upon very what when where which while whose will with within without would your yours used uses
-using example examples become becomes form forms part parts type types kind kinds take takes way ways
-were went learnt learn first second third different previous following given shown study studied think
-look came come comes find found seen show shows help helps need needs important various several certain
-little large small great good best better well even still again already always sometimes usually really
-है हैं था थे थी और में की के का को से पर यह वह ये वे एक भी लिए तथा होता होती होते करते करता करती जाता जाती जाते
-बहुत वाला वाले वाली सभी अधिक कुछ किसी सकते सकता सकती गया गई गए रहा रही रहे अपने अपनी इसके उसके इसमें उनके हमारे क्या कैसे क्यों जैसे
-ഒരു ഈ ആ എന്ന ഉണ്ട് ആണ് ഇത് അത് എന്നാൽ കൂടാതെ എന്നിവ ചെയ്യുന്നു എന്നും ഇവ അവ നമ്മുടെ നമുക്ക് എങ്ങനെ എന്താണ്
-ஒரு இந்த அந்த என்ற உள்ளது ஆகும் மற்றும் இது அது எனவே நமது எப்படி என்ன
-""".split())
+_STOP = set(["about", "above", "after", "again", "against", "along", "also", "among", "another", "around", "because", "been", "before", "being", "below", "between", "both", "called", "cannot", "could", "does", "doing", "down", "during", "each", "either", "every", "from", "further", "have", "having", "here", "into", "itself", "just", "known", "like", "made", "make", "makes", "many", "more", "most", "much", "must", "near", "never", "often", "only", "other", "otherwise", "over", "same", "should", "since", "some", "such", "than", "that", "their", "them", "then", "there", "these", "they", "thing", "things", "this", "those", "through", "thus", "together", "under", "until", "upon", "very", "what", "when", "where", "which", "while", "whose", "will", "with", "within", "without", "would", "your", "yours", "used", "uses", "using", "example", "examples", "become", "becomes", "form", "forms", "part", "parts", "type", "types", "kind", "kinds", "take", "takes", "way", "ways", "were", "went", "learnt", "learn", "first", "second", "third", "different", "previous", "following", "given", "shown", "study", "studied", "think", "look", "came", "come", "comes", "find", "found", "seen", "show", "shows", "help", "helps", "need", "needs", "important", "various", "several", "certain", "little", "large", "small", "great", "good", "best", "better", "well", "even", "still", "again", "already", "always", "sometimes", "usually", "really", "है", "हैं", "था", "थे", "थी", "और", "में", "की", "के", "का", "को", "से", "पर", "यह", "वह", "ये", "वे", "एक", "भी", "लिए", "तथा", "होता", "होती", "होते", "करते", "करता", "करती", "जाता", "जाती", "जाते", "बहुत", "वाला", "वाले", "वाली", "सभी", "अधिक", "कुछ", "किसी", "सकते", "सकता", "सकती", "गया", "गई", "गए", "रहा", "रही", "रहे", "अपने", "अपनी", "इसके", "उसके", "इसमें", "उनके", "हमारे", "क्या", "कैसे", "क्यों", "जैसे", "ഒരു", "ഈ", "ആ", "എന്ന", "ഉണ്ട്", "ആണ്", "ഇത്", "അത്", "എന്നാൽ", "കൂടാതെ", "എന്നിവ", "ചെയ്യുന്നു", "എന്നും", "ഇവ", "അവ", "നമ്മുടെ", "നമുക്ക്", "എങ്ങനെ", "എന്താണ്", "ஒரு", "இந்த", "அந்த", "என்ற", "உள்ளது", "ஆகும்", "மற்றும்", "இது", "அது", "எனவே", "நமது", "எப்படி", "என்ன"])
 
 
 def _h(s: str) -> int:
@@ -78,7 +64,7 @@ def _similar(a: str, b: str) -> bool:
 
 
 def _blank(fact: str, term: str) -> str:
-    return re.sub(_word(term), "_____", fact, flags=re.I)
+    return re.sub(_word(term), "_____", fact, flags=re.IGNORECASE)
 
 
 def build_quiz(ep: Episode, src: Source | None) -> list[dict]:

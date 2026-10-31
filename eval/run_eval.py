@@ -32,19 +32,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.agent.claims import check_claims  # noqa: E402
-from backend.agent.context import AgentContext  # noqa: E402
-from backend.agent.orchestrator import write_segments  # noqa: E402
-from backend.agent.planner import plan  # noqa: E402
-from backend.agent.search import best_candidate  # noqa: E402
-from backend.agent.voice import synthesize_version  # noqa: E402
-from backend.agent.writer import script_text  # noqa: E402
-from backend.clients.llm import chat_json  # noqa: E402
-from backend.clients.usage import current_metrics  # noqa: E402
-from backend.config import get_settings  # noqa: E402
-from backend.ingest import ingest_pdf, ingest_text, select_chunks  # noqa: E402
-from backend.prompts import EVAL_JUDGE, PROMPT_VERSION  # noqa: E402
-from backend.schemas import Episode, EpisodeSettings, Metrics, Segment, SegmentVersion  # noqa: E402
+from backend.agent.claims import check_claims
+from backend.agent.context import AgentContext
+from backend.agent.orchestrator import write_segments
+from backend.agent.planner import plan
+from backend.agent.search import best_candidate
+from backend.agent.voice import synthesize_version
+from backend.agent.writer import script_text
+from backend.clients.llm import chat_json
+from backend.clients.usage import current_metrics
+from backend.config import get_settings
+from backend.ingest import ingest_pdf, ingest_text, select_chunks
+from backend.prompts import EVAL_JUDGE, PROMPT_VERSION
+from backend.schemas import Episode, EpisodeSettings, Metrics, Segment, SegmentVersion
 
 POLICIES = ["no_critic", "single", "uniform", "adaptive"]
 JUDGE_AXES = ["faithfulness", "naturalness", "engagement", "pedagogy"]

@@ -24,15 +24,17 @@ if not os.environ.get("PODCAST_SECRETS_FILE") and (ROOT / ".env").exists():
         if _line.startswith("PODCAST_SECRETS_FILE="):
             os.environ["PODCAST_SECRETS_FILE"] = _line.split("=", 1)[1].strip().strip("\"'")
 
-from backend.agent.voice import script_mismatch  # noqa: E402
-from backend.audio.stitch import decode_audio, resample, to_wav_bytes  # noqa: E402
-from backend.audio.wer import wer  # noqa: E402
-from backend.clients import asr, llm, ocr, tts  # noqa: E402
-from backend.clients.base import ServiceError  # noqa: E402
-from backend.config import secrets_path  # noqa: E402
-from backend.clients.usage import current_metrics  # noqa: E402
-from backend.config import get_settings  # noqa: E402
-from backend.schemas import Metrics  # noqa: E402
+from backend.agent.voice import script_mismatch
+from backend.audio.stitch import decode_audio, resample, to_wav_bytes
+from backend.audio.wer import wer
+from backend.clients import asr, llm, ocr, tts
+from backend.clients.base import ServiceError
+from backend.clients.usage import current_metrics
+from backend.config import (
+    get_settings,
+    secrets_path,
+)
+from backend.schemas import Metrics
 
 OCR_SAMPLE = "Plants make their own food by photosynthesis using sunlight and water."
 SAMPLE = "Hi, I'm your host. Today we're learning how plants make food using sunlight, water and carbon dioxide."
@@ -108,7 +110,7 @@ async def main() -> int:
     if s.ocr_mode != "bodhan":
         line(None, f"OCR_MODE={s.ocr_mode}: scanned pages are read by {'the LLM' if s.ocr_mode == 'llm' else s.ocr_mode}")
     elif not s.ocr_ready():
-        line(None, f"OCR_API_KEY not set: PDFs will use their own text and photos can't be read (optional)")
+        line(None, "OCR_API_KEY not set: PDFs will use their own text and photos can't be read (optional)")
     else:
         import fitz
 

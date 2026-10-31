@@ -6,7 +6,15 @@ import pytest
 
 from backend.ingest import ingest_text
 from backend.quiz import build_quiz
-from backend.schemas import Chunk, Episode, EpisodeSettings, KeyFact, Section, Segment, Source
+from backend.schemas import (
+    Chunk,
+    Episode,
+    EpisodeSettings,
+    KeyFact,
+    Section,
+    Segment,
+    Source,
+)
 
 SAMPLES = Path(__file__).resolve().parents[1] / "samples"
 
@@ -35,7 +43,7 @@ def check_invariants(quiz: list[dict], ep: Episode, src: Source) -> None:
         assert q["answer"] in q["fact"], "the answer must occur in the fact"
         assert q["answer"] in q["options"] and len(q["options"]) == len(set(o.lower() for o in q["options"])) >= 3
         assert q["question"].count("_____") == 1
-        assert not re.search(rf"\b{re.escape(q['answer'])}\b", q["question"], re.I), "the blank must not give the answer away"
+        assert not re.search(rf"\b{re.escape(q['answer'])}\b", q["question"], re.IGNORECASE), "the blank must not give the answer away"
         passage = by_id[q["chunk_id"]].text.lower()
         for wrong in (o for o in q["options"] if o != q["answer"]):
             assert wrong.lower() != q["answer"].lower()

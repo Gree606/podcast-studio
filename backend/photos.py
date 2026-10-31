@@ -53,9 +53,9 @@ SUBJECT_HEADERS = {"science", "mathematics", "maths", "history", "geography", "e
 _FURNITURE = [
     re.compile(r"^\$*\s*\d{1,3}\s*\$*$"),                      # page numbers, incl. OCR's LaTeX "$$101$$"
     re.compile(r"^\|?[\s:|-]+\|?$"),                             # empty markdown table rules
-    re.compile(r"^re\w{2,6}\s+20\d\d\s*[-–]\s*\d{2,4}$", re.I),  # NCERT "Reprint 2026-27" (often misread "Report")
-    re.compile(r"^\(?[a-z]\)?$", re.I),                           # lone figure labels "(D)"
-    re.compile(r"^(fig\.?|figure)\s*\d+(\.\d+)*\b", re.I),        # figure captions
+    re.compile(r"^re\w{2,6}\s+20\d\d\s*[-–]\s*\d{2,4}$", re.IGNORECASE),  # NCERT "Reprint 2026-27" (often misread "Report")
+    re.compile(r"^\(?[a-z]\)?$", re.IGNORECASE),                           # lone figure labels "(D)"
+    re.compile(r"^(fig\.?|figure)\s*\d+(\.\d+)*\b", re.IGNORECASE),        # figure captions
 ]
 
 

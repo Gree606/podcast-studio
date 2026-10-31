@@ -23,9 +23,9 @@ from .schemas import Chunk, Section, Source, new_id
 log = logging.getLogger("podcast.ingest")
 
 CHUNK_WORDS = 170
-SKIP_SECTION = re.compile(r"^\s*(exercises?|questions?|intext questions|group activity|project work|let us recall|more to know)\b", re.I)
+SKIP_SECTION = re.compile(r"^\s*(exercises?|questions?|intext questions|group activity|project work|let us recall|more to know)\b", re.IGNORECASE)
 NUMBERED_HEADING = re.compile(r"^\s*(\d{1,2}(?:\.\d{1,2}){1,2})\s+[A-Z][^.!?]{2,90}$")
-CHAPTER_LINE = re.compile(r"^\s*(chapter|unit)\s+\d+\b", re.I)
+CHAPTER_LINE = re.compile(r"^\s*(chapter|unit)\s+\d+\b", re.IGNORECASE)
 
 
 @dataclass
@@ -73,7 +73,7 @@ def dedupe_signs(text: str) -> str:
 
 # NCERT print codes ("0222CH01"), which OCR returns as text, often wrapped in $$...$$ and with O for 0
 # (only the code itself: other $...$ is OCR'd maths, e.g. $$H_2O$$, and stays)
-_PRINT_CODE = re.compile(r"\${1,2}\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*\${1,2}|^\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*$", re.M | re.I)
+_PRINT_CODE = re.compile(r"\${1,2}\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*\${1,2}|^\s*\d{3,4}\s*CH\s*[O0]?\d{1,2}\s*$", re.MULTILINE | re.IGNORECASE)
 
 
 def clean_ocr(text: str) -> str:
@@ -131,17 +131,17 @@ def _furniture(lines_by_page: list[list[Line]]) -> set[str]:
     return {k for k, c in cnt.items() if c >= max(3, 0.4 * n)}
 
 
-ACTIVITY = re.compile(r"^\s*(activity|example|box)(\s+\d+(\.\d+)*)?\s*$", re.I)
+ACTIVITY = re.compile(r"^\s*(activity|example|box)(\s+\d+(\.\d+)*)?\s*$", re.IGNORECASE)
 
 
 def _pretty_heading(t: str) -> str:
     t = re.sub(r"^[A-Z](?=[A-Z][a-z])", "", t.strip())  # stray glyph from a margin box: "OWhat you..."
-    if re.fullmatch(r"chapter", t, re.I):
+    if re.fullmatch(r"chapter", t, re.IGNORECASE):
         return "Introduction"
     return t.title() if t.isupper() and len(t) > 4 else t
 
 
-DANGLING = re.compile(r"\b(and|of|in|the|for|from|to|are|—|-|with)$", re.I)
+DANGLING = re.compile(r"\b(and|of|in|the|for|from|to|are|—|-|with)$", re.IGNORECASE)
 
 
 def _guess_title(lines: list[Line], furniture: set[str] = frozenset()) -> str:
@@ -152,7 +152,7 @@ def _guess_title(lines: list[Line], furniture: set[str] = frozenset()) -> str:
         return "#" in k and k in furniture
     first = [ln for ln in lines if ln.text and ln.page == (lines[0].page if lines else 1) and not footer(ln.text)]
     cands = [ln for ln in first if sum(ch.isalpha() for ch in ln.text) >= 4
-             and not CHAPTER_LINE.match(ln.text) and not re.match(r"^\s*unit\s*\d+", ln.text, re.I)]
+             and not CHAPTER_LINE.match(ln.text) and not re.match(r"^\s*unit\s*\d+", ln.text, re.IGNORECASE)]
     if not cands:
         return ""
     top = max(ln.size for ln in cands)
@@ -289,7 +289,7 @@ def _build_source(title: str, raw: list[RawSection], origin: str, max_words: int
         cur_page: int | None = None
         words = 0
 
-        def emit() -> None:  # noqa: B023 - called only within this loop iteration
+        def emit() -> None:
             nonlocal cur, words
             if cur:
                 cid = f"c{len(chunks) + 1}"

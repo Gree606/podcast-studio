@@ -15,7 +15,7 @@ from ..clients.llm import chat_json
 from ..prompts import CLAIM_CHECK, CLAIM_FIX
 from ..schemas import Claim, Segment, Turn
 from .context import AgentContext
-from .writer import build_messages, parse_turns, script_text
+from .writer import build_messages, parse_turns
 
 STAGE = "verify"
 

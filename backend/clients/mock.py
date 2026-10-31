@@ -39,7 +39,7 @@ def _planner(messages: list[dict]) -> str:
     n_assist = sum(1 for m in messages if m["role"] == "assistant")
     first_user = _text_of(messages[1])
     n_seg = int(re.search(r"with (\d+) segments", first_user).group(1))
-    sections = re.findall(r"^- (.+?) \(\d+ passages", first_user, re.M)
+    sections = re.findall(r"^- (.+?) \(\d+ passages", first_user, re.MULTILINE)
     queries = (sections * 3)[: min(n_seg, 6)]
     if n_assist == 0:
         return json.dumps({"thought": "I should see how the chapter is organised first.", "action": "list_sections", "input": {}})
@@ -66,7 +66,7 @@ def _planner(messages: list[dict]) -> str:
 
 def _writer(messages: list[dict], task: str) -> str:
     user = "\n".join(_text_of(m) for m in messages if m["role"] == "user")
-    facts = re.findall(r"^- (.+?) \[c\d+\]$", user, re.M) or ["the main idea of the passage"]
+    facts = re.findall(r"^- (.+?) \[c\d+\]$", user, re.MULTILINE) or ["the main idea of the passage"]
     title = (re.search(r'segment \d+ of \d+: "(.+?)"', user) or re.search(r"(.+)", user)).group(1)
     better = task in ("revise", "claim_fix") or "listener asked" in user
     reactions = ["Wait, really?", "Oh, that's neat.", "Hmm, okay.", "Right, right.", "No way!"]
@@ -93,14 +93,14 @@ def _critic(messages: list[dict]) -> str:
 
 
 def _passages(text: str) -> list[tuple[str, str]]:
-    return re.findall(r"^\[(c\d+)\] \([^)]*\) (.+)$", text, re.M)
+    return re.findall(r"^\[(c\d+)\] \([^)]*\) (.+)$", text, re.MULTILINE)
 
 
 def _episode(messages: list[dict]) -> str:
     """FAST pipeline call 1: the whole episode as 3 parts."""
     user = _text_of(messages[-1])
     ps = _passages(user) or [("c0", "the main idea of the chapter")]
-    title = (re.search(r"^Chapter: (.+)$", user, re.M) or re.search(r"(.+)", user)).group(1)
+    title = (re.search(r"^Chapter: (.+)$", user, re.MULTILINE) or re.search(r"(.+)", user)).group(1)
     names = ["Opening", "The core idea", "Wrapping up"]
     parts = []
     for i in range(3):
@@ -126,11 +126,11 @@ def _verify_episode(messages: list[dict]) -> str:
         return next((cid for cid, txt in src if claim[:40] in txt), src[0][0] if src else "c1")
 
     out = []
-    for m in re.finditer(r"^PART (\d+): .+$", user, re.M):
+    for m in re.finditer(r"^PART (\d+): .+$", user, re.MULTILINE):
         n = int(m.group(1))
         body = user[m.end():].split("\nPART ")[0]
         lines, fixes = [], []
-        for lm in re.finditer(r"^(\d+)\. [^:]+: (.*)$", body, re.M):
+        for lm in re.finditer(r"^(\d+)\. [^:]+: (.*)$", body, re.MULTILINE):
             k, text = int(lm.group(1)), lm.group(2)
             c = re.search(r"Think of it like this: (.+?)\. It's", text)
             if not c:
@@ -150,7 +150,7 @@ def _ask(messages: list[dict]) -> str:
     user = _text_of(messages[-1])
     src = _passages(user)
     q = re.search(r'Student\'s doubt: "(.+)"', user)
-    off = q and re.search(r"cricket|pizza|movie", q.group(1), re.I)
+    off = q and re.search(r"cricket|pizza|movie", q.group(1), re.IGNORECASE)
     if not src or off:
         return json.dumps({"answer": "This chapter doesn't talk about that, but here is what it does say about our topic.",
                            "chunk_ids": [], "grounded": False, "language": "en", "follow_ups": ["What is this chapter about?"]})
@@ -181,7 +181,7 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
     if task == "critic":
         return _critic(messages)
     if task == "critic_all":  # part 2 scores low so tests exercise the revision path
-        n = len(re.findall(r"^PART \d+:", _text_of(messages[-1]), re.M))
+        n = len(re.findall(r"^PART \d+:", _text_of(messages[-1]), re.MULTILINE))
         mid = {"faithfulness": 4, "coverage": 3, "naturalness": 3, "engagement": 3, "clarity": 3}
         good = {k: 5 for k in mid}
         return json.dumps({"parts": [{"part": i, "scores": mid if i == 2 else good, "unsupported": [], "missing_facts": [],
@@ -189,12 +189,12 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
     if task == "reflect":
         return "Break long explanations with a quick question from the host."
     if task == "fact_verify":
-        n = len(re.findall(r"^\d+\. FACT:", _text_of(messages[-1]), re.M))
+        n = len(re.findall(r"^\d+\. FACT:", _text_of(messages[-1]), re.MULTILINE))
         return json.dumps({"results": [{"i": i, "supported": True} for i in range(1, n + 1)]})
     if task == "claim_check":
         text = _text_of(messages[-1])
         sents = re.findall(r"Think of it like this: (.+?)\. It's", text)
-        ev = (re.findall(r"^\[(c\d+)\]", text, re.M) or [""])[0]
+        ev = (re.findall(r"^\[(c\d+)\]", text, re.MULTILINE) or [""])[0]
         return json.dumps({"claims": [{"claim": s, "supported": True, "evidence": ev} for s in sents[:6]]})
     if task == "ocr":
         return "Mock OCR text.\n\nThis page was a scanned image. " * 20

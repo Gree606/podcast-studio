@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import re
 
-_ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
-_TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+_ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+_TENS = ["_", "_", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
 
 
 def _int_words(n: int) -> str:
@@ -118,7 +118,7 @@ def normalize_for_tts(text: str, language: str | None = None) -> str:
         return re.sub(r"\s+", " ", t).strip()
     t = re.sub(r"[*_#`]+", "", t)  # stray markdown
     t = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", t)
-    t = re.sub(r"\(\s*(?:see\s+)?(?:fig(?:ure)?|table|activity)\.?\s*[\d.]+\s*\)", "", t, flags=re.I)
+    t = re.sub(r"\(\s*(?:see\s+)?(?:fig(?:ure)?|table|activity)\.?\s*[\d.]+\s*\)", "", t, flags=re.IGNORECASE)
 
     def unit_sub(m: re.Match) -> str:
         num, unit = m.group(1), m.group(2)

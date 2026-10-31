@@ -22,7 +22,12 @@ from pydantic import BaseModel, Field
 from . import ask, jobs, providers
 from .agent import fast
 from .agent.context import LENGTHS
-from .agent.orchestrator import fast_mode, regenerate_segment, run_episode, switch_version
+from .agent.orchestrator import (
+    fast_mode,
+    regenerate_segment,
+    run_episode,
+    switch_version,
+)
 from .clients.base import ServiceError, close_http_client
 from .config import ROOT, get_settings
 from .ingest import IngestError, ingest_pdf, ingest_text, select_chunks

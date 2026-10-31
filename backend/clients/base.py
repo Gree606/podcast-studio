@@ -12,7 +12,8 @@ import contextlib
 import logging
 import random
 import re
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 

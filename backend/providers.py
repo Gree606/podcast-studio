@@ -8,7 +8,7 @@ when its key is set; keys themselves never leave the server.
 from __future__ import annotations
 
 import contextlib
-from typing import Iterator
+from collections.abc import Iterator
 
 from .config import Settings, _base_settings, _override, is_set
 
@@ -71,7 +71,7 @@ def settings_for(llm: str = "", voices: str = "", base: Settings | None = None) 
 def options(s: Settings | None = None) -> dict:
     """What the Settings panel offers: each choice, whether its key is set, and the default."""
     s = s or _base_settings()
-    ready = lambda key: s.mock_mode or is_set(key)  # noqa: E731
+    ready = lambda key: s.mock_mode or is_set(key)
     return {
         "llm": [{"id": k, "label": v["label"], "hint": v["hint"], "ready": ready(_llm_key(s, k)),
                  "default": k == default_llm(s)} for k, v in LLM_CHOICES.items()],

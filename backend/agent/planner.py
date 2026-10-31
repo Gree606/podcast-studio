@@ -9,7 +9,6 @@ are dropped and logged in the trace.
 from __future__ import annotations
 
 import inspect
-
 import json
 import re
 

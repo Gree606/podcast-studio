@@ -3,7 +3,15 @@ from fastapi.testclient import TestClient
 
 from backend import ask
 from backend.main import app
-from backend.schemas import Chunk, Episode, EpisodeSettings, Segment, SegmentVersion, Source, Turn
+from backend.schemas import (
+    Chunk,
+    Episode,
+    EpisodeSettings,
+    Segment,
+    SegmentVersion,
+    Source,
+    Turn,
+)
 from tests.test_fast import _wait
 
 

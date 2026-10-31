@@ -2,6 +2,7 @@
 Runs offline in mock mode, CPU only, without network dependencies.
 """
 from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from backend.config import get_settings

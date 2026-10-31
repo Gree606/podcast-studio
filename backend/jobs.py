@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from . import providers
 from .config import get_settings

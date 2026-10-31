@@ -26,8 +26,8 @@ from .usage import record
 
 # Gemma 4 emits an (often empty) thought channel before the answer; some servers
 # don't strip it. Also strip generic <think> blocks from other reasoning models.
-_THOUGHT_RE = re.compile(r"<\|channel\>thought.*?<channel\|>|<think>.*?</think>", re.S)
-_DATA_URI = re.compile(r"^data:([\w/+.-]+);base64,(.*)$", re.S)
+_THOUGHT_RE = re.compile(r"<\|channel\>thought.*?<channel\|>|<think>.*?</think>", re.DOTALL)
+_DATA_URI = re.compile(r"^data:([\w/+.-]+);base64,(.*)$", re.DOTALL)
 
 log = logging.getLogger("podcast.llm")
 _sem: asyncio.Semaphore | None = None

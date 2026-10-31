@@ -7,8 +7,8 @@ import contextlib
 import logging
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from ..config import get_settings
 from ..retrieval import BM25Index, HybridIndex

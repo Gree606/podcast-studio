@@ -6,7 +6,14 @@ import pytest
 import soundfile as sf
 
 from backend.agent.allocation import initial_allocation, reallocate, search_shape
-from backend.audio.stitch import concat_segments, decode_audio, encode_mp3, loudness_match, stitch_turns, trim_silence
+from backend.audio.stitch import (
+    concat_segments,
+    decode_audio,
+    encode_mp3,
+    loudness_match,
+    stitch_turns,
+    trim_silence,
+)
 from backend.audio.wer import wer
 from backend.jsonutil import JSONExtractError, extract_json
 from backend.retrieval import BM25Index, overlap

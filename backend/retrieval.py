@@ -20,10 +20,7 @@ log = logging.getLogger("podcast.retrieval")
 _TOKEN = re.compile(r"[a-z0-9]+|[\u0900-\u0963\u0966-\u0D7F\u200c\u200d]+")
 _INDIC_PREFIX = 6  # code points; see terms()
 STOPWORDS = frozenset(
-    "a an the of and or to in on at for from by with is are was were be been being this that these those "
-    "it its as into than then so such can could may might will would shall should do does did not no "
-    "we you they he she i our your their his her them us what which who whom how why when where there here "
-    "also more most very just only about over under between each other some any all".split()
+    ["a", "an", "the", "of", "and", "or", "to", "in", "on", "at", "for", "from", "by", "with", "is", "are", "was", "were", "be", "been", "being", "this", "that", "these", "those", "it", "its", "as", "into", "than", "then", "so", "such", "can", "could", "may", "might", "will", "would", "shall", "should", "do", "does", "did", "not", "no", "we", "you", "they", "he", "she", "i", "our", "your", "their", "his", "her", "them", "us", "what", "which", "who", "whom", "how", "why", "when", "where", "there", "here", "also", "more", "most", "very", "just", "only", "about", "over", "under", "between", "each", "other", "some", "any", "all"]
 )
 
 
@@ -114,7 +111,9 @@ class HybridIndex:
 
     async def _matrix(self):
         if self._mat is None:
-            from .vectors import embed_cached  # local import: vectors -> clients.embed -> retrieval
+            from .vectors import (
+                embed_cached,  # local import: vectors -> clients.embed -> retrieval
+            )
             self._mat = await embed_cached([self._passage_text(c) for c in self.chunks])
         return self._mat
 

@@ -26,12 +26,12 @@ SCALE = 8  # render this many times larger than the sprite, then shrink
 
 
 def symbol(sid: str) -> tuple[str, str]:
-    m = re.search(rf'<symbol id="{sid}" viewBox="([^"]+)">(.*?)</symbol>', SRC, re.S)
+    m = re.search(rf'<symbol id="{sid}" viewBox="([^"]+)">(.*?)</symbol>', SRC, re.DOTALL)
     return m.group(1), re.sub(r"<title>.*?</title>", "", m.group(2))
 
 
 def fleet(cls: str) -> tuple[str, str]:
-    m = re.search(rf'<svg class="fl {re.escape(cls)}" viewBox="([^"]+)">(.*?)</svg>', SRC, re.S)
+    m = re.search(rf'<svg class="fl {re.escape(cls)}" viewBox="([^"]+)">(.*?)</svg>', SRC, re.DOTALL)
     return m.group(1), re.sub(r"<title>.*?</title>", "", m.group(2))
 
 

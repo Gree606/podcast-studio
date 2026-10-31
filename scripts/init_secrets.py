@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.config import secrets_path  # noqa: E402
+from backend.config import secrets_path
 
 TEMPLATE = """\
 # Podcast Studio API keys. Keep this file private: it lives outside the repo on purpose.

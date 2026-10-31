@@ -210,6 +210,7 @@ def test_quick_fact_check_is_per_spoken_line():
 def test_writer_accepts_nested_parts_and_retries_a_wrong_shape(monkeypatch):
     """Seen live (Malayalam chapter): the writer's JSON had no top-level "parts"."""
     import asyncio as _asyncio
+
     from backend.agent import fast as _fast
     part = {"title": "P", "chunk_ids": [], "turns": [{"speaker": "host", "text": "Hi"}]}
     assert _fast.find_parts({"episode": {"parts": [part]}}) == [part]

@@ -42,14 +42,14 @@ os.environ.update({
     "OCR_MODE": "bodhan", "OCR_BASE_URL": BASE, "OCR_API_KEY": "test-bodhan-key",
 })
 
-import uvicorn  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+import uvicorn
+from fastapi.testclient import TestClient
 
-from backend.clients import llm, ocr, tts  # noqa: E402
-from backend.clients.base import ServiceError  # noqa: E402
-from backend.config import get_settings  # noqa: E402
-from backend.main import app  # noqa: E402
-from scripts import fake_providers  # noqa: E402
+from backend.clients import llm, ocr, tts
+from backend.clients.base import ServiceError
+from backend.config import get_settings
+from backend.main import app
+from scripts import fake_providers
 
 
 def start_fake() -> uvicorn.Server:

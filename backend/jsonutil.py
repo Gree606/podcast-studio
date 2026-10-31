@@ -10,7 +10,7 @@ import json
 import re
 from typing import Any
 
-_FENCE = re.compile(r"```(?:json|JSON)?\s*(.*?)```", re.S)
+_FENCE = re.compile(r"```(?:json|JSON)?\s*(.*?)```", re.DOTALL)
 
 
 class JSONExtractError(ValueError):

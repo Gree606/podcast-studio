@@ -5,8 +5,15 @@ import logging
 import re
 
 from ..clients.llm import chat_json
-from ..prompts import (POSITION_FIRST, POSITION_LAST, POSITION_MIDDLE, REGEN_INSTRUCTION, REVISE_USER, WRITER_SYSTEM,
-                       WRITER_USER)
+from ..prompts import (
+    POSITION_FIRST,
+    POSITION_LAST,
+    POSITION_MIDDLE,
+    REGEN_INSTRUCTION,
+    REVISE_USER,
+    WRITER_SYSTEM,
+    WRITER_USER,
+)
 from ..schemas import Segment, Turn
 from .context import AgentContext
 
@@ -78,7 +85,7 @@ def parse_turns(data, host_name: str, expert_name: str, min_turns: int = 4) -> l
         sp, text = sp.strip().lower(), text.strip()
         text = re.sub(r"\[[^\]]{1,30}\]|\*[^*]{1,30}\*", "", text).strip()  # stage directions
         # "2. Arjun: You got it!" - a numbered and/or name-prefixed line inside the text (seen from real Gemini)
-        m = re.match(rf"^(?:\d+[.)]\s*)?({re.escape(host_name)}|{re.escape(expert_name)}|host|expert)\s*:\s*", text, re.I)
+        m = re.match(rf"^(?:\d+[.)]\s*)?({re.escape(host_name)}|{re.escape(expert_name)}|host|expert)\s*:\s*", text, re.IGNORECASE)
         if m:
             sp, text = m.group(1).lower(), text[m.end():].strip()
         if not text:
