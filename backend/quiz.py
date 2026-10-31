@@ -19,7 +19,17 @@ MIN_QUESTIONS = 3
 MAX_QUESTIONS = 5
 MAX_WRONG = 3
 
-_TERM = re.compile(r"\b(?:\d+(?:\.\d+)?|[A-Za-z][A-Za-z-]{3,})\b")
+# Letters of a word in any supported script. \b can't be used for Indian scripts: Python counts
+# their vowel signs as non-word characters, so "चुम्बकों" would have a "boundary" inside it.
+_L = r"[\w\u0900-\u0963\u0966-\u0D7F\u200c\u200d]"
+_INDIC = r"[\u0900-\u0963\u0966-\u0D7F\u200c\u200d]{3,}"
+_TERM = re.compile(rf"(?<!{_L})(?:\d+(?:\.\d+)?|[A-Za-z][A-Za-z-]{{3,}}|{_INDIC})(?!{_L})")
+
+
+def _word(term: str) -> str:
+    """Regex for ``term`` as a whole word, in any script."""
+    return rf"(?<!{_L}){re.escape(term)}(?!{_L})"
+
 _STOP = set("""
 about above after again against along also among another around because been before being below between both
 called cannot could does doing down during each either every from further have having here into itself just
@@ -30,6 +40,10 @@ using example examples become becomes form forms part parts type types kind kind
 were went learnt learn first second third different previous following given shown study studied think
 look came come comes find found seen show shows help helps need needs important various several certain
 little large small great good best better well even still again already always sometimes usually really
+है हैं था थे थी और में की के का को से पर यह वह ये वे एक भी लिए तथा होता होती होते करते करता करती जाता जाती जाते
+बहुत वाला वाले वाली सभी अधिक कुछ किसी सकते सकता सकती गया गई गए रहा रही रहे अपने अपनी इसके उसके इसमें उनके हमारे क्या कैसे क्यों जैसे
+ഒരു ഈ ആ എന്ന ഉണ്ട് ആണ് ഇത് അത് എന്നാൽ കൂടാതെ എന്നിവ ചെയ്യുന്നു എന്നും ഇവ അവ നമ്മുടെ നമുക്ക് എങ്ങനെ എന്താണ്
+ஒரு இந்த அந்த என்ற உள்ளது ஆகும் மற்றும் இது அது எனவே நமது எப்படி என்ன
 """.split())
 
 
@@ -64,7 +78,7 @@ def _similar(a: str, b: str) -> bool:
 
 
 def _blank(fact: str, term: str) -> str:
-    return re.sub(rf"\b{re.escape(term)}\b", "_____", fact, flags=re.I)
+    return re.sub(_word(term), "_____", fact, flags=re.I)
 
 
 def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
@@ -83,7 +97,7 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
         df = sum(1 for t in lowered if low in t)
         if df < 2 or df > max(2, 0.6 * n_chunks):
             return None
-        tf = sum(len(re.findall(rf"\b{re.escape(low)}\b", t)) for t in lowered)
+        tf = sum(len(re.findall(_word(low), t)) for t in lowered)
         return math.log1p(tf) + (0.5 if term[0].isupper() else 0)
 
     # 1. verified facts, one entry per distinct fact text

@@ -12,7 +12,10 @@ from collections import Counter
 
 from .schemas import Chunk
 
-_TOKEN = re.compile(r"[a-z0-9]+")
+# Latin words, or runs of Indic script (Devanagari to Malayalam, with their vowel signs and
+# zero-width joiners, minus the danda). Python's \w would cut "चुम्बकों" apart at the vowel signs.
+_TOKEN = re.compile(r"[a-z0-9]+|[\u0900-\u0963\u0966-\u0D7F\u200c\u200d]+")
+_INDIC_PREFIX = 6  # code points; see terms()
 STOPWORDS = frozenset(
     "a an the of and or to in on at for from by with is are was were be been being this that these those "
     "it its as into than then so such can could may might will would shall should do does did not no "
@@ -34,7 +37,17 @@ def _stem(t: str) -> str:
 
 
 def terms(text: str) -> list[str]:
-    return [_stem(t) for t in tokenize(text)]
+    """Search terms. Indic words also count by their first few letters, a stand-in for stemming:
+    Malayalam and Tamil glue endings on ("ജലാവസ്ഥ" / "ജലാവസ്ഥകളിലൂടെയുള്ള"), and so, less, does Hindi."""
+    out = []
+    for t in tokenize(text):
+        if t.isascii():
+            out.append(_stem(t))
+        else:
+            out.append(t)
+            if len(t) > _INDIC_PREFIX:
+                out.append(t[:_INDIC_PREFIX])
+    return out
 
 
 class BM25Index:

@@ -188,3 +188,13 @@ def test_tts_reads_names_with_digits_digit_by_digit_and_keeps_commas():
     from backend.textnorm import normalize_for_tts
     assert normalize_for_tts("Hi Error606, I'm Gree.") == "Hi Error six oh six, I'm Gree."
     assert normalize_for_tts("It has 1,200 cells, see?") == "It has one thousand two hundred cells, see?"
+
+
+def test_retrieval_reads_indian_scripts():
+    """Hindi/Malayalam/Tamil chapters must be searchable: whole words, vowel signs kept, endings tolerated."""
+    from backend.retrieval import terms
+    assert terms("चुम्बकों के ध्रुव।") == ["चुम्बकों", "चुम्बक", "के", "ध्रुव"]  # danda dropped, vowel signs kept
+    assert set(terms("चुम्बक")) & set(terms("चुम्बकों"))
+    assert set(terms("ജലാവസ്ഥകളിലൂടെയുള്ള")) & set(terms("ജലാവസ്ഥ"))  # Malayalam endings still match
+    assert terms("வேதிவினைகளின்")[0] == "வேதிவினைகளின்"
+    assert terms("Magnets attract") == ["magnet", "attract"]

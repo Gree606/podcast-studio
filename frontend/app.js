@@ -138,6 +138,7 @@ function renderSetup() {
 }
 
 // ------------------------------------------------------------------ home: pick + choose
+const langName = code => ((CONFIG.languages || []).find(l => l.code === code) || {}).native || code;
 async function renderHome() {
   stopPoll(); journey("pick");
   const view = ++viewId;
@@ -147,11 +148,16 @@ async function renderHome() {
     if (view !== viewId) return; // the user already moved on
     $("#samples").innerHTML = samples.length ? samples.map((s, i) => `
       <button class="sample c${i % 6}" type="button" data-id="${esc(s.id)}">
-        <span class="book b${i % 6}" aria-hidden="true"><span class="emoji">${chapterEmoji(s.title, s.subject, i)}</span></span>
-        <span class="tag">${esc(s.subject)} · Class ${esc(s.class)}</span>
-        <b>${esc(s.title)}</b><span class="blurb">${esc(s.blurb || "")}</span>
+        <span class="book b${i % 6}" aria-hidden="true"><span class="emoji">${chapterEmoji(s.title_en || s.title, s.subject, i)}</span></span>
+        <span class="tag">${esc(s.subject)} · Class ${esc(s.class)}${s.language && s.language !== "en" ? ` · ${esc(langName(s.language))}` : ""}</span>
+        <b lang="${esc(s.language || "en")}">${esc(s.title)}</b>${s.title_en ? `<span class="sub">${esc(s.title_en)}</span>` : ""}<span class="blurb">${esc(s.blurb || "")}</span>
       </button>`).join("") : `<p class="muted">No ready-made chapters here. Upload a PDF or paste some text instead!</p>`;
-    $$(".sample").forEach(b => b.onclick = () => { $$(".sample").forEach(x => x.classList.toggle("sel", x === b)); loadSource({sample_id: b.dataset.id}); });
+    $$(".sample").forEach(b => b.onclick = () => {
+      $$(".sample").forEach(x => x.classList.toggle("sel", x === b));
+      const meta = samples.find(x => x.id === b.dataset.id);
+      if (meta && meta.language) CONFIG.lastLang = meta.language;  // a Hindi chapter starts as a Hindi episode
+      loadSource({sample_id: b.dataset.id});
+    });
   } catch (e) { if (view === viewId) showErr($("#samples"), e.message); }
 
   const drop = $("#drop"), file = $("#file");

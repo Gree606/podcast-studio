@@ -6,7 +6,7 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
 
 | Spec | What this app does |
 |---|---|
-| **Input:** an NCERT chapter or section | A PDF (scanned pages go through OCR), up to 6 phone photos of pages, pasted text, or a bundled sample chapter. Pick the sections to cover. |
+| **Input:** an NCERT chapter or section | A PDF (scanned pages go through OCR), up to 6 phone photos of pages, pasted text, or one of 9 bundled NCERT sample chapters (5 English, 2 Hindi, 2 Malayalam). Pick the sections to cover. |
 | **Output:** a conversational podcast | An MP3 of about 2 minutes with a synced transcript, in any of 12 languages: English, Hindi, Hinglish, Bengali, Tamil, Telugu, Kannada, Malayalam, Marathi, Gujarati, Punjabi and Odia. |
 | **Reviewer:** regenerate specific segments | Regenerate one part, optionally with an instruction such as "simpler" or "add an example". Only that part is rewritten, re-recorded and re-stitched. Every version is kept. |
 | **Bar:** sounds real and stays faithful | Two distinct conversational voices, natural reactions and pauses. The fact-check badge counts the lines the chapter supports. |
@@ -168,4 +168,4 @@ All provider URLs come from environment variables (see `.env.example`).
 
 ## Credits
 
-Sound effects are from Pixabay under the Pixabay Content License; see `frontend/sounds/CREDITS.md`. The bundled sample chapters are excerpts from NCERT textbooks, used for education.
+Sound effects are from Pixabay under the Pixabay Content License; see `frontend/sounds/CREDITS.md`. The bundled sample chapters are excerpts from NCERT textbooks, used for education; the original pages of each are in [`samples/textbooks/`](samples/textbooks/README.md). The Hindi and Malayalam ones were imported from an OCR'd page corpus with `scripts/import_ocr_chapters.py`.

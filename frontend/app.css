@@ -890,3 +890,4 @@ body.gated { overflow: hidden; }
 .settings-summary { justify-self: start; text-align: left; background: transparent; border: 1px dashed var(--line); border-radius: var(--r-sm);
   color: var(--ink); padding: 8px 12px; font: inherit; cursor: pointer; }
 .settings-summary:hover { background: var(--surface-2); }
+.sample .sub { font-size: .78rem; color: var(--muted); line-height: 1.25; }

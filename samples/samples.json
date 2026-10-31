@@ -48,5 +48,53 @@
     "file": "nutrition-plants.md",
     "source": "NCERT gesc101.pdf",
     "words": 2921
+  },
+  {
+    "id": "hi-magnets",
+    "title": "चुम्बकों को जानें",
+    "title_en": "Exploring Magnets",
+    "subject": "Science",
+    "class": "6",
+    "language": "hi",
+    "blurb": "Exploring Magnets: poles, compasses and how magnets attract and repel.",
+    "file": "hi-magnets.md",
+    "source": "NCERT Class 6 Science in Hindi, जिज्ञासा (Curiosity), chapter 4 (pp. 59-76); text by Bodhan Indic-OCR",
+    "words": 2673
+  },
+  {
+    "id": "hi-oceans-continents",
+    "title": "महासागर एवं महाद्वीप",
+    "title_en": "Oceans and Continents",
+    "subject": "Social Science",
+    "class": "6",
+    "language": "hi",
+    "blurb": "Oceans and Continents: how land and water share the Earth, oceans, continents and islands.",
+    "file": "hi-oceans-continents.md",
+    "source": "NCERT Class 6 Social Science in Hindi, समाज का अध्ययन: भारत और उसके आगे (Exploring Society: India and Beyond), chapter 2 (pp. 27-40); text by Bodhan Indic-OCR",
+    "words": 2430
+  },
+  {
+    "id": "ml-states-of-water",
+    "title": "ജലാവസ്ഥകളിലൂടെയുള്ള ഒരു യാത്ര",
+    "title_en": "A Journey through States of Water",
+    "subject": "Science",
+    "class": "6",
+    "language": "ml",
+    "blurb": "A Journey through States of Water: solid, liquid, gas, evaporation and the water cycle.",
+    "file": "ml-states-of-water.md",
+    "source": "NCERT Class 6 Science in Malayalam, ക്യുരിയോസിറ്റി (Curiosity), chapter 8 (pp. 161-180); text by Bodhan Indic-OCR",
+    "words": 2601
+  },
+  {
+    "id": "ml-india-bharat",
+    "title": "ഇന്ത്യ, അതാണ് ഭാരതം",
+    "title_en": "India, that is Bharat",
+    "subject": "Social Science",
+    "class": "6",
+    "language": "ml",
+    "blurb": "India, that is Bharat: the many names of our land and where they come from.",
+    "file": "ml-india-bharat.md",
+    "source": "NCERT Class 6 Social Science in Malayalam, സാമൂഹത്തെ കുറിച്ച് അറിയുക: ഇന്ത്യയും അതിനപ്പുറവും (Exploring Society: India and Beyond), chapter 5 (pp. 95-104); text by Bodhan Indic-OCR",
+    "words": 874
   }
 ]

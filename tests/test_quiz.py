@@ -12,7 +12,7 @@ SAMPLES = Path(__file__).resolve().parents[1] / "samples"
 
 
 def first_sentence(text: str) -> str:
-    return re.split(r"(?<=[.!?])\s+", text.strip())[0]
+    return re.split(r"(?<=[.!?।])\s+", text.strip())[0]
 
 
 def episode_from(src: Source, facts_per_seg: int = 2, n_seg: int = 4, verified=True) -> Episode:
