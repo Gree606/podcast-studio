@@ -20,7 +20,6 @@ import base64
 import json
 import re
 import time
-from collections import deque
 
 import numpy as np
 
@@ -39,14 +38,17 @@ def _semaphore() -> asyncio.Semaphore:
     return _sem
 
 
-_sent: deque[float] = deque()  # times of recent paced TTS calls (sliding 60 s window)
+_next_slot = 0.0  # monotonic time at which the next paced TTS call may start
 _pace_lock: asyncio.Lock | None = None
 _pace_loop: asyncio.AbstractEventLoop | None = None
 
 
 async def _pace() -> None:
-    """Wait until another call fits in the provider's per-minute budget (0 = unlimited)."""
-    global _pace_lock, _pace_loop
+    """Space calls evenly at the provider's per-minute rate (0 = unlimited). A sliding 60 s window
+    let the whole minute's budget go out at once, and Bodhan refuses bursts (HTTP 429 after about
+    7 quick calls), so half the calls failed and their back-offs grew. Even spacing has the same
+    average rate and almost no refusals. Runs before retries too (see request_with_retry)."""
+    global _pace_lock, _pace_loop, _next_slot
     limit = get_settings().tts_requests_per_minute
     if limit <= 0:
         return
@@ -54,14 +56,11 @@ async def _pace() -> None:
     if _pace_lock is None or _pace_loop is not loop:
         _pace_lock, _pace_loop = asyncio.Lock(), loop
     async with _pace_lock:
-        while True:
-            now = time.monotonic()
-            while _sent and now - _sent[0] >= 60:
-                _sent.popleft()
-            if len(_sent) < limit:
-                _sent.append(now)
-                return
-            await asyncio.sleep(60 - (now - _sent[0]) + 0.05)
+        now = time.monotonic()
+        wait = _next_slot - now
+        _next_slot = max(now, _next_slot) + 60.0 / limit
+    if wait > 0:
+        await asyncio.sleep(wait)
 
 
 def voice_for(speaker: str) -> str:
@@ -121,11 +120,10 @@ def bodhan_body(text: str, speaker: str, lang_code: str | None = None) -> dict:
 
 async def _bodhan(text: str, speaker: str, lang: str | None = None) -> bytes:
     s = get_settings()
-    await _pace()
     resp = await request_with_retry(
         "Voice service", "POST", s.tts_base_url.rstrip("/") + "/v1/audio/speech", json=bodhan_body(text, speaker, lang),
         headers={"Authorization": f"{s.tts_auth_prefix}{s.tts_api_key}", "Content-Type": "application/json"},
-        timeout=s.tts_timeout_s, attempts=5, semaphore=_semaphore(),
+        timeout=s.tts_timeout_s, attempts=5, semaphore=_semaphore(), pace=_pace,
     )
     if not resp.content or resp.headers.get("content-type", "").startswith("application/json"):
         raise ServiceError("Voice service", "returned no audio", resp.text[:200])

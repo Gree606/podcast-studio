@@ -33,6 +33,10 @@ class AgentContext:
     full_index: BM25Index = field(init=False)
     # (speaker, spoken text) -> task recording that line; lets recording start before the fact-check ends
     tts_cache: dict = field(default_factory=dict)
+    # listen-back self-check health for this episode (agent/voice.py): first takes checked / badly misheard
+    asr_checked: int = 0
+    asr_bad: int = 0
+    asr_off: bool = False
 
     def __post_init__(self) -> None:
         self.index = BM25Index(self.chunks)

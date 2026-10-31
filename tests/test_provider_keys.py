@@ -186,6 +186,8 @@ def test_very_short_lines_skip_the_self_check(monkeypatch):
     monkeypatch.setattr(voice.asr, "asr_available", lambda: True)
 
     class Ctx:
+        asr_checked, asr_bad, asr_off = 0, 0, False
+
         def emit(self, *a, **kw):
             pass
 

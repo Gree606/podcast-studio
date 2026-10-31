@@ -74,13 +74,32 @@ async def _synth_turn(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> np
     return clip
 
 
+# When most first takes come back badly misheard, the recogniser can't follow this voice and
+# language mix (seen: an English script full of Malayalam names read by Bodhan's voice, heard
+# as "Nadi Nadu Nadu..."), so re-recording only burns rate-limited voice calls. Stand down then.
+ASR_TRUST_MIN_LINES = 4
+ASR_BAD_WER = 0.5
+ASR_BAD_SHARE = 0.75
+
+
+def _note_first_take(ctx: AgentContext, seg: Segment, err: float) -> None:
+    ctx.asr_checked += 1
+    ctx.asr_bad += err > ASR_BAD_WER
+    if (not ctx.asr_off and ctx.asr_checked >= ASR_TRUST_MIN_LINES
+            and ctx.asr_bad >= ASR_BAD_SHARE * ctx.asr_checked):
+        ctx.asr_off = True
+        ctx.emit(STAGE, "warning", f"The speech recogniser misheard {ctx.asr_bad} of the first {ctx.asr_checked} lines badly, "
+                 "so it can't judge this voice and language mix. Keeping first takes for the rest of the episode "
+                 "instead of re-recording them.", seg.id)
+
+
 async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> tuple[np.ndarray, Turn]:
     s = get_settings()
     sr = s.sample_rate
     lang = _lang(ctx)
     turn.tts_text = normalize_for_tts(turn.text, lang)
     best: tuple[float, np.ndarray, str] | None = None
-    check = asr.asr_available() and len(turn.tts_text.split()) >= s.asr_min_words
+    check = asr.asr_available() and len(turn.tts_text.split()) >= s.asr_min_words and not ctx.asr_off
     for attempt in range(1, s.max_tts_retries + 2):
         turn.tts_attempts = attempt
         raw = await tts.synthesize(turn.tts_text, turn.speaker, style=STYLE.get(turn.speaker), language=lang)
@@ -104,9 +123,10 @@ async def _record_line(ctx: AgentContext, seg: Segment, i: int, turn: Turn) -> t
             return clip, turn
         if attempt == 1:
             turn.first_wer = round(err, 3)
+            _note_first_take(ctx, seg, err)
         if best is None or err < best[0]:
             best = (err, clip, heard)
-        if err <= s.wer_threshold:
+        if err <= s.wer_threshold or ctx.asr_off:
             break
         ctx.emit(STAGE, "observation", f"Turn {i + 1} self-check: WER {err:.0%} > {s.wer_threshold:.0%} "
                  f"(heard: \"{heard[:80]}\"); re-synthesising.", seg.id)

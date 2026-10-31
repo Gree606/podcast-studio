@@ -12,7 +12,7 @@ import contextlib
 import logging
 import random
 import re
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -83,11 +83,16 @@ async def request_with_retry(
     attempts: int = 3,
     semaphore: asyncio.Semaphore | None = None,
     retry_timeouts: bool = True,
+    pace: Callable[[], Awaitable[None]] | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
+    """``pace`` (if given) runs before every attempt, retries included, so a rate-limited
+    provider's retries wait their turn instead of bursting back into the limit."""
     last: Exception | None = None
     server_wait: float | None = None
     for attempt in range(1, attempts + 1):
+        if pace is not None:
+            await pace()
         try:
             async with semaphore if semaphore is not None else contextlib.nullcontext():
                 resp = await http_client().request(method, url, timeout=timeout, **kwargs)
