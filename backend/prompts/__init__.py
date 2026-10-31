@@ -154,18 +154,18 @@ Reply with only the lesson."""
 # ---------------------------------------------------------------------------
 # Claim-level faithfulness check after writing
 # ---------------------------------------------------------------------------
-CLAIM_EXTRACT = """List every factual claim about the subject (science, history, geography, etc.) made in this podcast script. Ignore greetings, opinions, jokes and analogies that are clearly analogies. Rewrite each as a short standalone statement.
+CLAIM_CHECK = """You are fact-checking one part of an educational podcast against its textbook.
 
-Script:
+1. List every factual claim about the subject (science, history, geography, etc.) made in the script. Ignore greetings, opinions, jokes, questions and analogies that are clearly analogies. Rewrite each claim as a short standalone statement.
+2. For each claim decide if the textbook passages below support it. "Supported" means the passages state it or it follows directly; common-knowledge paraphrase is fine; any added specific (number, name, mechanism) not in the passages is NOT supported. Name the passage that supports it.
+
+Script (numbered lines):
 {script}
 
-Reply with ONLY JSON: {{"claims": ["...", "..."]}}"""
+Textbook passages:
+{passages}
 
-CLAIM_JUDGE = """For each numbered claim, decide if it is supported by its evidence passages from the textbook. "Supported" means the passages state it or it follows directly; common-knowledge paraphrase is fine; any added specific (number, name, mechanism) not in the passages is NOT supported.
-
-{items}
-
-Reply with ONLY JSON: {{"results": [{{"i": 1, "supported": true, "evidence": "c3", "note": "<short reason if unsupported>"}}, ...]}}"""
+Reply with ONLY JSON: {{"claims": [{{"claim": "...", "supported": true, "evidence": "c3", "note": "<short reason if unsupported>"}}, ...]}}"""
 
 CLAIM_FIX = """These statements in the script are NOT supported by the textbook passages: {claims}
 Rewrite the script so each one is removed or corrected to match the passages. Change as little else as possible. Same JSON format."""

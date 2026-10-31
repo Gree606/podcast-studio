@@ -134,15 +134,15 @@ def main() -> None:
     with TestClient(app) as c:
         check(c.get("/api/health").json()["mock"] is False, "/api/health reports mock=false")
         src = c.post("/api/sources", data={"sample_id": "chem-reactions"}).json()
-        eid = c.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short"}}).json()["id"]
+        eid = c.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short", "mode": "agent"}}).json()["id"]
         ep = wait(c, eid, lambda e: e["status"] in ("done", "failed") and not e["busy"])
         check(ep["status"] == "done", f"episode finished: {ep['status']} {ep.get('error') or ''}")
         check(all(x["status"] == "done" for x in ep["segments"]), "every segment done")
         apis = {r["api"] for r in fake_providers.LOG}
         check(apis == {"gemini", "sarvam", "bodhan"}, f"all three APIs used: {sorted(apis)}")
         g = [r for r in fake_providers.LOG if r["api"] == "gemini"]
-        check({"planner_step", "write", "critic", "claim_extract", "claim_judge"} <= {r["task"] for r in g},
-              "Gemini handled planner, writer, critic and claim checks")
+        check({"planner_step", "write", "critic", "claim_check"} <= {r["task"] for r in g},
+              f"Gemini handled planner, writer, critic and claim checks: {sorted({r['task'] for r in g})}")
         check(all(r["json"] for r in g if r["task"] in ("planner_step", "write", "critic")), "JSON mode requested for structured calls")
         voices = {r["speaker"] for r in fake_providers.LOG if r["api"] == "sarvam"}
         check(voices == {s.tts_voice_host, s.tts_voice_expert}, f"two distinct Sarvam voices: {sorted(voices)}")

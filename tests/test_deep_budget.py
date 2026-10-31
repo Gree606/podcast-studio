@@ -19,10 +19,10 @@ def ctx_with(n_parts: int, calls_so_far: int) -> AgentContext:
 
 def test_optional_calls_leave_room_for_every_fact_check(monkeypatch):
     monkeypatch.setattr(get_settings(), "deep_max_llm_calls", 24)
-    ctx = ctx_with(4, 14)              # 14 used; 4 parts still need 2 calls each = 8 -> 2 spare
+    ctx = ctx_with(4, 18)              # 18 used; 4 parts still need 1 fact-check call each -> 2 spare
     assert ctx.can_spend(2) and not ctx.can_spend(3)
     ctx.claims_checked.add("s0")       # one part checked frees its reserve
-    assert ctx.can_spend(4)
+    assert ctx.can_spend(3)
 
 
 def test_budget_counts_per_job_not_per_episode_lifetime(monkeypatch):

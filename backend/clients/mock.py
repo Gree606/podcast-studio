@@ -185,12 +185,11 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
     if task == "fact_verify":
         n = len(re.findall(r"^\d+\. FACT:", _text_of(messages[-1]), re.M))
         return json.dumps({"results": [{"i": i, "supported": True} for i in range(1, n + 1)]})
-    if task == "claim_extract":
-        sents = re.findall(r"Think of it like this: (.+?)\. It's", _text_of(messages[-1]))
-        return json.dumps({"claims": sents[:6]})
-    if task == "claim_judge":
-        n = len(re.findall(r"^\d+\. CLAIM:", _text_of(messages[-1]), re.M))
-        return json.dumps({"results": [{"i": i, "supported": True} for i in range(1, n + 1)]})
+    if task == "claim_check":
+        text = _text_of(messages[-1])
+        sents = re.findall(r"Think of it like this: (.+?)\. It's", text)
+        ev = (re.findall(r"^\[(c\d+)\]", text, re.M) or [""])[0]
+        return json.dumps({"claims": [{"claim": s, "supported": True, "evidence": ev} for s in sents[:6]]})
     if task == "ocr":
         return "Mock OCR text.\n\nThis page was a scanned image. " * 20
     if task == "judge":

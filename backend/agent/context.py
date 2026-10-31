@@ -55,14 +55,14 @@ class AgentContext:
         self.full_index = HybridIndex(self.source.chunks)
 
     def can_spend(self, n: int) -> bool:
-        """True if ``n`` more optional LLM calls fit in this job's budget while still leaving 2 calls
-        (claim extract + judge) for every part that is being made and hasn't been fact-checked yet."""
+        """True if ``n`` more optional LLM calls fit in this job's budget while still leaving 1 call
+        (the claim check) for every part that is being made and hasn't been fact-checked yet."""
         cap = get_settings().deep_max_llm_calls
         if cap <= 0:
             return True
         pending = sum(1 for seg in self.episode.segments
                       if seg.status in ("pending", "writing") and seg.id not in self.claims_checked)
-        return self.episode.metrics.llm_calls - self.llm_start + n + 2 * pending <= cap
+        return self.episode.metrics.llm_calls - self.llm_start + n + pending <= cap
 
     @property
     def n_segments(self) -> int:

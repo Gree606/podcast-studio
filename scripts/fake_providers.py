@@ -44,8 +44,7 @@ TASK_MARKERS = [
     ("You write scripts for", "write"),
     ("strict editor", "critic"),
     ("improving a podcast writer", "reflect"),
-    ("List every factual claim", "claim_extract"),
-    ("For each numbered claim", "claim_judge"),
+    ("fact-checking one part of an educational podcast", "claim_check"),
     ("evaluating an educational podcast script", "judge"),
     ("Transcribe all text on this textbook page", "ocr"),
 ]

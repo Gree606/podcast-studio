@@ -45,7 +45,7 @@ def main() -> None:
         src = r.json()
         print(f"source: {src['title']!r}, {src['word_count']} words, {len(src['sections'])} sections")
 
-        r = c.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short"}})
+        r = c.post("/api/episodes", json={"source_id": src["id"], "settings": {"length": "short", "mode": "agent"}})  # the deep agent: planner, critic, claim checks
         assert r.status_code == 200, r.text
         eid = r.json()["id"]
         ep = wait(c, eid, lambda e: e["status"] in ("done", "failed") and not e["busy"])
