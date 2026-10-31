@@ -159,6 +159,7 @@ All provider URLs come from environment variables (see `.env.example`).
 ## Known limitations
 
 - Episodes are capped at about 2 minutes in Quick mode. Long chapters are covered by choosing sections.
+- Deep agent mode writes in English only; the other 11 languages use Quick mode (the launch screen locks the language to English when Deep is picked).
 - Dense derivations and tables are summarised rather than read out, and figures are not described.
 - Number and symbol reading is rule-based (`backend/textnorm.py`), so rare notation may still be read literally.
 
