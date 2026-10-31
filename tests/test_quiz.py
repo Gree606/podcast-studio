@@ -80,7 +80,7 @@ def test_unverified_facts_are_never_used():
         assert build_quiz(episode_from(src, verified=flag), src) == []
 
 
-def test_no_quiz_when_fewer_than_three_safe_questions():
+def test_no_quiz_when_no_wrong_option_is_safe():
     # Every term appears in every passage, so no wrong option is ever safe: the quiz must be empty.
     text = "Rusting of iron needs oxygen and moisture, and paint protects the iron surface from rusting."
     chunks = [Chunk(id=f"c{i}", section="Rust", text=text) for i in range(4)]
@@ -92,11 +92,11 @@ def test_no_quiz_when_fewer_than_three_safe_questions():
     assert build_quiz(ep, src) == []
 
 
-def test_two_good_questions_are_not_enough():
+def test_one_good_question_is_not_enough():
     src = ingest_text((SAMPLES / "crop-production.md").read_text(encoding="utf-8"), 9000, origin="sample")
     full = build_quiz(episode_from(src), src)
     assert len(full) >= 3
-    keep = {q["fact"] for q in full[:2]}
+    keep = {q["fact"] for q in full[:1]}
     ep = episode_from(src)
     for s in ep.segments:
         s.key_facts = [f for f in s.key_facts if f.fact in keep]

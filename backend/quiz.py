@@ -15,7 +15,7 @@ import re
 
 from .schemas import Episode, Source
 
-MIN_QUESTIONS = 3
+MIN_QUESTIONS = 2  # a 2-minute episode often has only a few verified facts
 MAX_QUESTIONS = 5
 MAX_WRONG = 3
 
@@ -67,12 +67,34 @@ def _blank(fact: str, term: str) -> str:
     return re.sub(_word(term), "_____", fact, flags=re.IGNORECASE)
 
 
+def _chapter_terms(src: Source, topicality, limit: int = 40) -> list[str]:
+    """The chapter's own key terms, most topical first (distractor candidates)."""
+    seen: dict[str, str] = {}
+    for c in src.chunks:
+        for t in _terms(c.text):
+            seen.setdefault(t.lower(), t)
+    scored = [(topicality(t), t) for t in seen.values()]
+    return [t for sc, t in sorted((x for x in scored if x[0] is not None), key=lambda x: (-x[0], x[1].lower()))][:limit]
+
+
+def _nearby_numbers(answer: str) -> list[str]:
+    """Plausible wrong numbers for a numeric blank (half, double, a little more or less)."""
+    try:
+        v = float(answer)
+    except ValueError:
+        return []
+    out = [v * 2, v / 2, v + 10, v - 1, v + 1, v * 10] if v else [1, 2, 10]
+    return [str(int(x)) if float(x).is_integer() else f"{x:g}" for x in out if x > 0]
+
+
 def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
     if src is None:
         return []
     by_id = {c.id: c for c in src.chunks}
     n_chunks = max(1, len(src.chunks))
     lowered = [c.text.lower() for c in src.chunks]
+    # a key term should recur across passages; short chapters (a 6-page storybook) have too few passages for that
+    min_df = 2 if n_chunks >= 8 else 1
 
     def topicality(term: str) -> float | None:
         """Words the chapter keeps coming back to (its key terms) score high; words seen in only
@@ -81,7 +103,7 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
             return 2.0
         low = term.lower()
         df = sum(1 for t in lowered if low in t)
-        if df < 2 or df > max(2, 0.6 * n_chunks):
+        if df < min_df or df > max(2, 0.6 * n_chunks):
             return None
         tf = sum(len(re.findall(_word(low), t)) for t in lowered)
         return math.log1p(tf) + (0.5 if term[0].isupper() else 0)
@@ -112,7 +134,9 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
                 picked.append((seg, kf, answer, question, terms[:4]))
                 break
 
-    # 3. wrong options from other facts' terms, kept only if they can't fill the blank
+    # 3. wrong options from other facts' terms, then the chapter's key terms (and, for numbers, nearby
+    # numbers), kept only if they can't fill the blank: never a word of the cited passage
+    chapter_terms = _chapter_terms(src, topicality)
     questions = []
     for i, (seg, kf, answer, question, _) in enumerate(picked):
         passage = by_id[kf.chunk_id].text.lower()
@@ -120,6 +144,10 @@ def build_quiz(ep: Episode, src: Source | None) -> list[dict]:
         for j, (_, _, _, _, terms) in enumerate(picked):
             if j != i:
                 pool += [t for t in terms if _kind(t) == _kind(answer)]
+        pool += [t for t in chapter_terms if _kind(t) == _kind(answer)]
+        pool = [t for t in pool if t.isascii() == answer.isascii()]  # same script as the answer (no English option in a Hindi quiz)
+        if _kind(answer) == "num":
+            pool += _nearby_numbers(answer)
         wrong = []
         for t in sorted(dict.fromkeys(pool), key=lambda t: _h(kf.fact + t)):
             if t.lower() in passage or t.lower() in question.lower() or _similar(answer, t):
