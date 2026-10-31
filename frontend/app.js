@@ -329,7 +329,7 @@ async function createEpisode() {
 }
 
 // ------------------------------------------------------------------ episode
-function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
+function stopPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; clearInterval(fact.timer); fact.timer = null; }
 const langHtml = code => ((CONFIG.languages || []).find(l => l.code === code) || {}).html || "en";
 const htmlLang = ep => langHtml(ep && ep.settings.language);
 const names = ep => ({host: ep.settings.host_name || "Error606", expert: ep.settings.expert_name || "Gree"});
@@ -442,6 +442,80 @@ function friendly(e) {
   return null;
 }
 
+// ------------------------------------------------------------------ "Did you know?" while an episode is being made
+const FACTS = [
+  "Sunlight takes about 8 minutes and 20 seconds to travel from the Sun to Earth.",
+  "The International Space Station circles Earth about every 90 minutes, so astronauts see around 16 sunrises a day.",
+  "About 71% of Earth's surface is covered by water.",
+  "A day on Venus (243 Earth days) is longer than its whole year (225 Earth days).",
+  "The Moon drifts about 3.8 cm farther from Earth every year.",
+  "A lightning bolt can be about five times hotter than the surface of the Sun.",
+  "Chandrayaan-3 landed near the Moon's south pole on 23 August 2023, the first mission ever to land there.",
+  "India's Mangalyaan reached Mars orbit on its very first try, in 2014.",
+  "Aryabhata, India's first satellite, was launched in 1975.",
+  "Octopuses have three hearts.",
+  "An adult human has 206 bones; a newborn baby has nearly 300, which fuse as it grows.",
+  "Water expands when it freezes, which is why ice floats.",
+  "Sound travels about four times faster in water than in air.",
+  "Saturn is so light for its size that it would float in a (very) big bathtub of water.",
+  "Neptune takes about 165 Earth years to go around the Sun once.",
+  "The Himalayas are still rising, by a few millimetres a year, as India keeps pushing into Asia.",
+  "Mawsynram in Meghalaya is one of the rainiest places on Earth.",
+  "There are more trees on Earth (about 3 trillion) than stars in our Milky Way galaxy.",
+  "Your brain uses about a fifth of all the energy your body makes.",
+  "Some bamboo can grow almost a metre in a single day.",
+  "The oxygen you breathe was made by plants and algae during photosynthesis.",
+];
+const fact = {timer: null, i: Math.floor(Math.random() * FACTS.length)};
+function showFact() {
+  const p = $("#factText"); if (!p) return;
+  fact.i = (fact.i + 1) % FACTS.length;
+  p.classList.remove("fact-in"); void p.offsetWidth; p.classList.add("fact-in");
+  p.textContent = FACTS[fact.i];
+}
+function syncFacts(on) {
+  const card = $("#factCard"); if (!card) { clearInterval(fact.timer); fact.timer = null; return; }
+  card.classList.toggle("hidden", !on);
+  if (on && !fact.timer) { showFact(); fact.timer = setInterval(showFact, 9000); }
+  if (!on && fact.timer) { clearInterval(fact.timer); fact.timer = null; }
+}
+
+// ------------------------------------------------------------------ poke the hosts: a hop or a boost, and a quick line
+const QUIPS = {
+  host: ["Bleep! That tickles!", "Earth is so weird. I love it!", "Error606 reporting for duty!", "Wheee! Saucer spin!",
+         "Do Earthlings really drink chai every morning?", "Careful, my antenna is sensitive!"],
+  expert: ["Ready for lift-off!", "Zoom! Next stop: learning.", "Ask me anything about any chapter!",
+           "Hold on, adjusting my helmet…", "Houston, we have a question!", "Every chapter is a new planet to explore."],
+};
+function pokeHost(ship, who) {
+  const cls = who === "host" ? "boing" : "zoom";
+  if (!reducedMotion()) { ship.classList.remove(cls); void ship.getBoundingClientRect(); ship.classList.add(cls); }
+  ship.addEventListener("animationend", () => ship.classList.remove(cls), {once: true});
+  const box = ship.parentElement, lines = QUIPS[who], line = lines[Math.floor(Math.random() * lines.length)];
+  const say = who === "host" && box.querySelector(".hero-say");
+  if (say) {  // home page: the alien already has a speech bubble, so it says the line there
+    say.dataset.orig = say.dataset.orig || say.textContent;
+    say.textContent = line; say.classList.remove("pop-in"); void say.offsetWidth; say.classList.add("pop-in");
+    clearTimeout(say._t); say._t = setTimeout(() => { say.textContent = say.dataset.orig; }, 2600);
+    if (typeof sfxClick === "function") sfxClick();
+    return;
+  }
+  box.querySelectorAll(".quip").forEach(q => q.remove());
+  const q = document.createElement("span");
+  q.className = `quip ${who}`; q.setAttribute("aria-hidden", "true");
+  q.textContent = line;
+  box.append(q); setTimeout(() => q.remove(), 2400);
+  if (typeof sfxClick === "function") sfxClick();
+}
+function initPokes() {
+  document.addEventListener("click", e => {
+    const ship = e.target.closest && e.target.closest(".hero-ufo, .hero-rocket, .stage-member .ship");
+    if (!ship) return;
+    const who = ship.matches(".hero-ufo") || ship.closest("#stageHost") ? "host" : "expert";
+    pokeHost(ship, who);
+  });
+}
+
 function renderMake(ep) {
   const n = names(ep), working = ["queued", "running"].includes(ep.status);
   $("#epTitle").textContent = ep.title;
@@ -458,6 +532,7 @@ function renderMake(ep) {
   const latest = [...traceEvents].reverse().map(friendly).find(Boolean);
   $("#thought").textContent = working && latest ? latest : "";
   $("#stage").classList.toggle("busy", working);
+  syncFacts(working && !currentAudioFile && !live.on);
   if (!currentAudioFile && !live.on) {  // nothing to play yet: the speech bubble narrates the work
     const say = ep.status === "failed" ? "😕 Lost the signal. Press Try again below."
       : ep.status === "interrupted" ? "⏸️ The station restarted. Press Try again below."
@@ -1324,6 +1399,7 @@ function route() {
   $("#howBtn").onclick = () => { openDrawer(false); $("#how").showModal(); };
   $("#menuBtn").onclick = () => openDrawer(!$("#drawer").classList.contains("open"));
   initSfx();
+  initPokes();
   $$("[data-close-drawer]").forEach(b => { b.onclick = () => openDrawer(false); });
   addEventListener("keydown", e => { if (e.key === "Escape") { openDrawer(false); openSheet(null); } });
   addEventListener("resize", () => drawWave());

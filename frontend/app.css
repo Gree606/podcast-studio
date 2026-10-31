@@ -42,7 +42,7 @@ code { background: var(--surface-2); padding: 2px 8px; border-radius: 8px; font-
 /* ---------------------------------------------------------------- sky */
 .sky { position: fixed; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; }
 .stars { position: absolute; inset: -50px; background-repeat: repeat; animation: twinkle 5s ease-in-out infinite alternate; }
-.stars.s2 { opacity: .7; }
+.stars.s2 { opacity: .55; }
 @keyframes twinkle { from { opacity: .4; } to { opacity: 1; } }
 
 /* ---------------------------------------------------------------- layout + header */
@@ -891,3 +891,28 @@ body.gated { overflow: hidden; }
   color: var(--ink); padding: 8px 12px; font: inherit; cursor: pointer; }
 .settings-summary:hover { background: var(--surface-2); }
 .sample .sub { font-size: .78rem; color: var(--muted); line-height: 1.25; }
+
+/* ---------------------------------------------------------------- "Did you know?" while an episode is made */
+.fact-card { margin: 10px 0 2px; padding: 12px 14px; border: 3px solid var(--comic-ink); background: #fff8d8; color: var(--comic-ink);
+  box-shadow: 4px 4px 0 var(--comic-ink); }
+.fact-head { display: block; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: #8a5a00; margin-bottom: 4px; }
+.fact-card p { margin: 0; font-size: .95rem; line-height: 1.45; min-height: 2.9em; }
+.fact-in { animation: fact-in .45s steps(5) both; }
+@keyframes fact-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------- poke the hosts */
+.hero-ufo, .hero-rocket, .stage-member .ship { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hero-scene { position: relative; }
+.ship.boing { animation: boing .8s steps(10) both !important; }
+.ship.zoom { animation: zoom .9s steps(12) both !important; }
+@keyframes boing { 0% { transform: none; } 20% { transform: translateY(-28px) rotate(-12deg); } 40% { transform: translateY(-34px) rotate(12deg); }
+  60% { transform: translateY(-12px) rotate(-6deg); } 80% { transform: translateY(3px) scaleY(.9); } 100% { transform: none; } }
+@keyframes zoom { 0% { transform: none; } 15% { transform: translateX(-8px) rotate(-4deg); } 45% { transform: translateX(36px) translateY(-14px) rotate(-10deg) scale(1.06); }
+  70% { transform: translateX(14px) translateY(-6px) rotate(-4deg); } 100% { transform: none; } }
+.quip { position: absolute; top: -6px; z-index: 5; max-width: 190px; padding: 6px 10px; background: #fff; color: var(--comic-ink);
+  border: 3px solid var(--comic-ink); box-shadow: 3px 3px 0 var(--comic-ink); font-size: .78rem; line-height: 1.3; pointer-events: none;
+  animation: quip 2.4s steps(8) both; }
+.quip.host { left: 4%; } .quip.expert { right: 4%; }
+.hero-scene .quip.expert { right: auto; left: 52%; top: 4px; }
+@keyframes quip { 0% { opacity: 0; transform: translateY(8px) scale(.8); } 12%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .quip, .fact-in { animation: none; } }
