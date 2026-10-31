@@ -732,7 +732,7 @@ input[type=text], textarea { border: 3px solid var(--nb-border); background: #f2
 .signal i { box-shadow: none; width: 6px; height: 6px; }
 
 /* pixel sky: tiled single-pixel stars at three depths, sprite planet, moon and fleet */
-.stars { background-image: none !important; background-repeat: repeat; }
+.stars { background-repeat: repeat; image-rendering: pixelated; }  /* each layer sets its own tile below (no !important: it hid them) */
 .stars.s1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; animation: drift-px1 120s steps(240) infinite, px-twinkle 3s steps(2) infinite; }
 .stars.s2 { background: url("/sprites/stars_b.png") 0 0 / 280px 280px repeat; animation: drift-px2 80s steps(160) infinite; }
 .stars.s3 { background: url("/sprites/stars_c.png") 0 0 / 400px 400px repeat; animation: drift-px3 50s steps(100) infinite, px-twinkle 2s steps(2) infinite -1s; }
