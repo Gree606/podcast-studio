@@ -733,9 +733,9 @@ input[type=text], textarea { border: 3px solid var(--nb-border); background: #f2
 
 /* pixel sky: tiled single-pixel stars at three depths, sprite planet, moon and fleet */
 .stars { background-repeat: repeat; image-rendering: pixelated; }  /* each layer sets its own tile below (no !important: it hid them) */
-.stars.s1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; animation: drift-px1 120s steps(240) infinite, px-twinkle 3s steps(2) infinite; }
-.stars.s2 { background: url("/sprites/stars_b.png") 0 0 / 280px 280px repeat; animation: drift-px2 80s steps(160) infinite; }
-.stars.s3 { background: url("/sprites/stars_c.png") 0 0 / 400px 400px repeat; animation: drift-px3 50s steps(100) infinite, px-twinkle 2s steps(2) infinite -1s; }
+.stars.s1 { background: url("/sprites/stars_a.png?v=3") 0 0 / 192px 192px repeat; animation: drift-px1 120s steps(240) infinite, px-twinkle 3s steps(2) infinite; }
+.stars.s2 { background: url("/sprites/stars_b.png?v=3") 0 0 / 280px 280px repeat; animation: drift-px2 80s steps(160) infinite; }
+.stars.s3 { background: url("/sprites/stars_c.png?v=3") 0 0 / 400px 400px repeat; animation: drift-px3 50s steps(100) infinite, px-twinkle 2s steps(2) infinite -1s; }
 @keyframes drift-px1 { to { transform: translate3d(-384px, 192px, 0); } }
 @keyframes drift-px2 { to { transform: translate3d(-560px, 280px, 0); } }
 @keyframes drift-px3 { to { transform: translate3d(-800px, 400px, 0); } }
@@ -747,7 +747,7 @@ img.moon { position: absolute; left: 4%; bottom: 10%; width: 52px; height: auto;
 .rock.r1 { animation: fly-rock1 80s linear infinite -30s; }
 @media (max-width: 640px) { .sat { width: 40px; } .ufo-s { width: 32px; } .rocket-s { width: 46px; } .fl.station { width: 38px; } .comet { width: 58px; } .astro { width: 24px; }
   img.planet { width: 144px; } }
-.cruise .c1 { background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat; opacity: .8; animation: cruise 6s steps(48) infinite; width: calc(100% + 192px); }
+.cruise .c1 { background: url("/sprites/stars_a.png?v=3") 0 0 / 192px 192px repeat; opacity: .8; animation: cruise 6s steps(48) infinite; width: calc(100% + 192px); }
 @keyframes cruise { to { transform: translateX(-192px); } }
 .far-planet { background: url("/sprites/moon.png") center / contain no-repeat; box-shadow: none; width: 80px; height: 80px; }
 
@@ -783,7 +783,7 @@ img.moon { position: absolute; left: 4%; bottom: 10%; width: 52px; height: auto;
 .gate { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px;
   background: radial-gradient(60% 50% at 50% 40%, #241e5c, #0b0922 70%), #0b0922; }
 .gate[hidden] { display: none; }
-.gate::before { content: ""; position: absolute; inset: 0; background: url("/sprites/stars_a.png") 0 0 / 192px 192px repeat;
+.gate::before { content: ""; position: absolute; inset: 0; background: url("/sprites/stars_a.png?v=3") 0 0 / 192px 192px repeat;
   animation: drift-px1 120s steps(240) infinite; opacity: .8; }
 body.gated { overflow: hidden; }
 .gate-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 460px; width: 100%; text-align: center; }
