@@ -190,7 +190,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; paddi
 .sheet-head { position: relative; padding-top: 12px; }
 .sheet-head h2 { font-size: 1.1rem; }
 .grabber { position: absolute; top: 0; left: 50%; width: 40px; height: 4px; border-radius: 4px; background: var(--line); transform: translateX(-50%); }
-.sheet-body { flex: 1; overflow: auto; overscroll-behavior: contain; padding-bottom: 20px; }
+.sheet-body { position: relative; flex: 1; overflow: auto; overscroll-behavior: contain; padding-bottom: 20px; }  /* relative: keeps the hidden .sr labels of a long script inside this scroller instead of stretching the page */
 .sheet-body > [data-pane-sheet] { display: none; }
 .sheet-body > [data-pane-sheet].on { display: block; }
 .sheet-body > .hidden.on { display: none !important; }
