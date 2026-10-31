@@ -23,13 +23,12 @@ TEMPLATE = """\
 # Replace each DUMMY_ value with your real key, save, then restart the app
 # (scripts/run_local.sh restart). Each service switches from demo to real as soon as its key is set.
 
-# Google Gemini (script writing, fact checks, OCR): https://aistudio.google.com/apikey
-LLM_API_KEY=DUMMY_REPLACE_WITH_GEMINI_KEY
+# OpenRouter (script writing, fact checks, Ask Gree, embedding search): https://openrouter.ai/keys
+OPENROUTER_API_KEY=DUMMY_REPLACE_WITH_OPENROUTER_KEY
 
-# Optional: OpenRouter (the same Gemini models without free-tier caps, picked per episode in Settings;
-# also used for the deep agent's embedding search)
-# https://openrouter.ai/keys
-# OPENROUTER_API_KEY=your-openrouter-key
+# Optional: Google Gemini directly (AI Studio, https://aistudio.google.com/apikey), picked per episode in
+# Settings, or as the default with LLM_PROVIDER=gemini in .env
+# LLM_API_KEY=your-gemini-key
 
 # Sarvam AI bulbul (the two voices): https://dashboard.sarvam.ai
 TTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY

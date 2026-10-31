@@ -122,7 +122,7 @@ tests/             pytest suite
 
 | Service | Used for | Notes (wire formats in `backend/clients/`) |
 |---|---|---|
-| **Gemini** (`gemini-3.6-flash`, with a fallback list) | writing, checking, Ask Gree, quiz | `generateContent`, JSON mode for structured calls. Thought parts are skipped, and thinking tokens are counted. Calls fall back across models on 429/503/404, and a model whose daily quota is used up is skipped. OpenRouter (`OPENROUTER_API_KEY`) can be picked per episode in Settings; `LLM_PROVIDER` sets the default, and `openai` targets any OpenAI-compatible server. |
+| **Gemini** (`gemini-3.6-flash`, with a fallback list), through **OpenRouter** by default | writing, checking, Ask Gree, quiz | OpenRouter's chat API with JSON mode, or Google's `generateContent` directly (`LLM_PROVIDER=gemini`); each can be picked per episode in Settings when its key is set. Calls fall back across models on 429/503/404, a model whose daily quota is used up is skipped, and thinking tokens are counted. `LLM_PROVIDER=openai` targets any OpenAI-compatible server. |
 | **Sarvam** `bulbul:v4-flash` | the two voices | `dev_en_conversational` (Error606) and `simran_en_conversation` (Gree), with the language set per episode. Turns over 900 characters are split at sentence boundaries. Bodhan indic-speak (Gree = Deepika, Error606 = Amit) can be picked per episode in Settings; it uses `BODHAN_TTS_API_KEY`, or the Bodhan ASR key if that isn't set. `TTS_API_STYLE` sets the default. |
 | **Bodhan** `indic-transcribe` | listen-back self-check | Paced to 14 calls per minute. If it answers in an unexpected script, the self-check stands down instead of re-recording everything. |
 | **Bodhan** Indic-OCR | every PDF page (up to 15 pages; longer PDFs: scanned pages only) and photos | One page per request, paced at 12 pages a minute (bursts get rate-limited). A page whose OCR fails keeps the PDF's own text. NCERT print codes and the repeated vowel signs of Hindi text layers are cleaned up. Photos are straightened, downscaled and re-encoded first. |
@@ -145,13 +145,13 @@ files under `data/`.
 
 | Key | Needed for | Where to get it | Required? |
 |---|---|---|---|
-| `LLM_API_KEY` | writing and checking the script, Ask Gree | Google AI Studio: https://aistudio.google.com/apikey | yes (or the OpenRouter key below) |
+| `OPENROUTER_API_KEY` | writing and checking the script, Ask Gree, quiz, the deep agent's embedding search (Gemini models through OpenRouter) | https://openrouter.ai/keys | **yes** |
 | `TTS_API_KEY` | the two voices (Sarvam bulbul) | https://dashboard.sarvam.ai | yes |
 | `ASR_API_KEY` | listening back to its own audio (Bodhan) | Bodhan (https://bodhan.ai) | optional: without it the listen-back check is skipped |
 | `OCR_API_KEY` | reading PDF pages and photos (Bodhan Indic-OCR) | Bodhan, usually the same key as ASR | optional: without it PDFs use their own text and photos can't be read |
-| `OPENROUTER_API_KEY` | Gemini through OpenRouter (no daily cap) and the deep agent's embedding search | https://openrouter.ai/keys | optional |
+| `LLM_API_KEY` | Google Gemini directly, as an alternative to OpenRouter (pick it in Settings, or `LLM_PROVIDER=gemini` in `.env`) | Google AI Studio: https://aistudio.google.com/apikey | optional |
 
-Without the two required keys the app still runs, in **demo mode** (placeholder scripts and beeps, with a banner saying so), which is enough to click around.
+With **only the OpenRouter key**, everything except the voices is real: scripts, fact-checks, Ask Gree, quiz and RAG search; the audio is a placeholder tone and the self-check is skipped. Add the Sarvam key for real voices. With no keys at all the app runs in **demo mode** (placeholder scripts and tones, with a banner saying so), which is enough to click around.
 
 ### 2. Get the code and install
 
@@ -216,7 +216,7 @@ The app only ever reports *whether* a key is set, never its value. Each service 
 fake to the real API as soon as its own key is set.
 
 **If something goes wrong.**
-- *Demo mode banner:* `LLM_API_KEY` or `TTS_API_KEY` is still a `DUMMY_` value, or the server wasn't restarted after editing the secrets file.
+- *Demo mode banner:* `OPENROUTER_API_KEY` or `TTS_API_KEY` is still a `DUMMY_` value, or the server wasn't restarted after editing the secrets file.
 - *"Port in use":* `run_local.sh start` picks the next free port and prints it; `status` shows which one.
 - *Slow or "rate-limiting us" messages:* the providers limit bursts. Calls are paced and retried automatically; Sarvam voices are faster than Bodhan voices.
 

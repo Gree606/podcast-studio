@@ -128,8 +128,10 @@ function setTeacher(on) {
 }
 function renderSetup() {
   const c = CONFIG.configured, box = $("#setup");
-  const items = [["llm", "LLM_API_KEY", "Google Gemini: writes and checks the script"], ["tts", "TTS_API_KEY", "Sarvam AI: the two voices"],
-    ["asr", "ASR_API_KEY", "Bodhan: listens back to check the audio"], ["ocr", "OCR_API_KEY", "Bodhan Indic-OCR: reads scanned PDF pages"]];
+  const viaOpenRouter = ((CONFIG.providers || {}).llm || []).some(o => o.id === "openrouter" && o.default);
+  const items = [["llm", viaOpenRouter ? "OPENROUTER_API_KEY" : "LLM_API_KEY", `${viaOpenRouter ? "OpenRouter" : "Google Gemini"}: writes and checks the script`],
+    ["tts", "TTS_API_KEY", "Sarvam AI: the two voices"],
+    ["asr", "ASR_API_KEY", "Bodhan: listens back to check the audio"], ["ocr", "OCR_API_KEY", "Bodhan Indic-OCR: reads PDF pages and photos"]];
   const missing = !!c && items.some(([k]) => k in c && !c[k]);
   if (missing) {
     box.classList.remove("hidden");
@@ -137,8 +139,9 @@ function renderSetup() {
     $("#setupPath").textContent = CONFIG.secrets_path || "~/.config/podcast-studio/secrets.env";
     $("#setupList").innerHTML = items.filter(([k]) => k in c).map(([k, name, what]) => `<li>${c[k] ? "✅" : "⬜"} <code>${name}</code> ${esc(what)}${c[k] ? " · working" : " · demo placeholder until set"}</li>`).join("");
   } else box.classList.add("hidden");
-  $("#demoNote").innerHTML = CONFIG.mock && !missing
-    ? `<div class="notice info small">🧪 Demo mode: scripts and voices are placeholders.</div>` : "";
+  const cf = CONFIG.configured || {}, which = !cf.llm && !cf.tts ? "scripts and voices are placeholders"
+    : !cf.tts ? "scripts are real, voices are placeholder tones (no voice key on this server)" : "scripts are placeholders (no script-AI key)";
+  $("#demoNote").innerHTML = CONFIG.mock && !missing ? `<div class="notice info small">🧪 Demo mode: ${which}.</div>` : "";
 }
 
 // ------------------------------------------------------------------ home: pick + choose
