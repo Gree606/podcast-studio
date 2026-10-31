@@ -158,7 +158,7 @@ Without the two required keys the app still runs, in **demo mode** (placeholder 
 ```bash
 git clone https://github.com/Gree606/podcast-studio.git
 cd podcast-studio
-python3.12 -m venv .venv            # or: uv venv --python 3.12 .venv
+python3.12 -m venv .venv            # or, with uv: uv venv --seed --python 3.12 .venv  (--seed puts pip in it)
 . .venv/bin/activate
 pip install -r requirements.txt     # add -dev for the tests: pip install -r requirements-dev.txt
 ```
