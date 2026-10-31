@@ -198,3 +198,16 @@ def test_retrieval_reads_indian_scripts():
     assert set(terms("ജലാവസ്ഥകളിലൂടെയുള്ള")) & set(terms("ജലാവസ്ഥ"))  # Malayalam endings still match
     assert terms("வேதிவினைகளின்")[0] == "வேதிவினைகளின்"
     assert terms("Magnets attract") == ["magnet", "attract"]
+
+
+def test_pdf_lines_in_indian_scripts_are_kept_and_cleaned():
+    """A Hindi NCERT PDF lost every line (letters were counted as A-Z only) and its text layer
+    repeats vowel signs ("क्योंों")."""
+    from backend.ingest import Line, _sections_from_lines, dedupe_signs
+    assert dedupe_signs("ये सारे लोग यहाँ क्योंों आए होंोंगे?") == "ये सारे लोग यहाँ क्यों आए होंगे?"
+    assert dedupe_signs("കിളികൾ പൂവ് and English") == "കിളികൾ പൂവ് and English"
+    body = "नीमा दोपहर में दो बजे स्कूल से लौटती है। इस समय घर पर दादी उसका इंतज़ार करती हैं।"
+    lines = [Line(text="नीमा की दादी", size=20, bold=True, page=1)] + [Line(text=body, size=11, bold=False, page=1)] * 12
+    title, sections = _sections_from_lines(lines, set())
+    assert title == "नीमा की दादी"
+    assert sum(len(p.split()) for s in sections for p, _ in s.paras) >= 12 * len(body.split())

@@ -57,6 +57,19 @@ def _merge_overlap(a: str, b: str) -> str:
     return a + " " + b
 
 
+# NCERT's Hindi PDFs repeat a vowel sign with its nasal mark in the text layer ("क्योंों", "होंोंगे"),
+# the Indic version of the faux-bold duplicates below. Keep one copy, in every Indian script's block
+# (vowel signs at +0x3E..+0x4C, the signs that follow them at +0x00..+0x03 and the +0x62/+0x63 vowels).
+_BLOCKS = range(0x0900, 0x0D80, 0x80)
+_SIGN = "".join(f"\\u{b + 0x3E:04x}-\\u{b + 0x4C:04x}\\u{b + 0x62:04x}\\u{b + 0x63:04x}" for b in _BLOCKS)
+_NASAL = "".join(f"\\u{b:04x}-\\u{b + 0x03:04x}" for b in _BLOCKS)
+_REPEATED_SIGNS = re.compile(f"([{_SIGN}][{_NASAL}]?)\\1+")
+
+
+def dedupe_signs(text: str) -> str:
+    return _REPEATED_SIGNS.sub(r"\1", text)
+
+
 def _page_lines(page: pymupdf.Page, pno: int) -> list[Line]:
     """Text lines in reading order, with NCERT's faux-bold duplicates removed.
 
@@ -73,7 +86,7 @@ def _page_lines(page: pymupdf.Page, pno: int) -> list[Line]:
             spans = [s for s in ln.get("spans", []) if s.get("text", "").strip()]
             if not spans:
                 continue
-            text = re.sub(r"\s+", " ", "".join(s["text"] for s in ln["spans"])).strip()
+            text = dedupe_signs(re.sub(r"\s+", " ", "".join(s["text"] for s in ln["spans"])).strip())
             size = max(s["size"] for s in spans)
             bold = any(("bold" in s.get("font", "").lower()) or (s.get("flags", 0) & 16) for s in spans)
             x0, y0, x1, _ = ln["bbox"]
@@ -120,10 +133,14 @@ def _pretty_heading(t: str) -> str:
 DANGLING = re.compile(r"\b(and|of|in|the|for|from|to|are|—|-|with)$", re.I)
 
 
-def _guess_title(lines: list[Line]) -> str:
-    """Largest-font text on the first page, ignoring 'CHAPTER 1' / 'UNIT 3' / numbers."""
-    first = [ln for ln in lines if ln.text and ln.page == (lines[0].page if lines else 1)]
-    cands = [ln for ln in first if len(re.sub(r"[^A-Za-z]", "", ln.text)) >= 4
+def _guess_title(lines: list[Line], furniture: set[str] = frozenset()) -> str:
+    """Largest-font text on the first page, ignoring 'CHAPTER 1' / 'UNIT 3' / numbers / footers like
+    'Reprint 2026-27'. (Repeated lines without digits stay: NCERT repeats the chapter name on every page.)"""
+    def footer(t: str) -> bool:
+        k = re.sub(r"\d+", "#", t.lower())
+        return "#" in k and k in furniture
+    first = [ln for ln in lines if ln.text and ln.page == (lines[0].page if lines else 1) and not footer(ln.text)]
+    cands = [ln for ln in first if sum(ch.isalpha() for ch in ln.text) >= 4
              and not CHAPTER_LINE.match(ln.text) and not re.match(r"^\s*unit\s*\d+", ln.text, re.I)]
     if not cands:
         return ""
@@ -135,7 +152,7 @@ def _guess_title(lines: list[Line]) -> str:
 def _sections_from_lines(lines: list[Line], furniture: set[str]) -> tuple[str, list[RawSection]]:
     sizes = Counter(round(ln.size) for ln in lines if ln.text and len(ln.text) > 30)
     body = sizes.most_common(1)[0][0] if sizes else 11
-    title = _guess_title(lines)
+    title = _guess_title(lines, furniture)
     sections: list[RawSection] = [RawSection(title="Introduction")]
     buf: list[str] = []
     buf_page = 0
@@ -161,7 +178,7 @@ def _sections_from_lines(lines: list[Line], furniture: set[str]) -> tuple[str, l
         toks = t.split()
         if len(toks) >= 6 and sum(len(x) == 1 for x in toks) / len(toks) > 0.6:
             continue  # letter-spaced running header ("T h e  R i s e  o f ...")
-        letters = len(re.sub(r"[^A-Za-z]", "", t))
+        letters = sum(ch.isalpha() for ch in t)  # any script: counting only A-Z dropped every Hindi line
         if letters < 3:
             # decorative drop cap ("C" of "Consider") or stray "?" glyphs from margin boxes
             if len(t) == 1 and t.isalpha() and ln.size >= body * 1.8:
