@@ -141,9 +141,9 @@ def main() -> None:
         apis = {r["api"] for r in fake_providers.LOG}
         check(apis == {"gemini", "sarvam", "bodhan"}, f"all three APIs used: {sorted(apis)}")
         g = [r for r in fake_providers.LOG if r["api"] == "gemini"]
-        check({"planner_step", "write", "critic", "claim_check"} <= {r["task"] for r in g},
+        check({"planner_step", "write_episode", "critic_all", "verify_episode"} <= {r["task"] for r in g},
               f"Gemini handled planner, writer, critic and claim checks: {sorted({r['task'] for r in g})}")
-        check(all(r["json"] for r in g if r["task"] in ("planner_step", "write", "critic")), "JSON mode requested for structured calls")
+        check(all(r["json"] for r in g if r["task"] in ("planner_step", "write_episode", "critic_all")), "JSON mode requested for structured calls")
         voices = {r["speaker"] for r in fake_providers.LOG if r["api"] == "sarvam"}
         check(voices == {s.tts_voice_host, s.tts_voice_expert}, f"two distinct Sarvam voices: {sorted(voices)}")
         m = ep["metrics"]

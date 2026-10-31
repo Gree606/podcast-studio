@@ -180,6 +180,12 @@ async def mock_chat(messages: list[dict], *, task: str, temperature: float) -> s
         return _writer(messages, task)
     if task == "critic":
         return _critic(messages)
+    if task == "critic_all":  # part 2 scores low so tests exercise the revision path
+        n = len(re.findall(r"^PART \d+:", _text_of(messages[-1]), re.M))
+        mid = {"faithfulness": 4, "coverage": 3, "naturalness": 3, "engagement": 3, "clarity": 3}
+        good = {k: 5 for k in mid}
+        return json.dumps({"parts": [{"part": i, "scores": mid if i == 2 else good, "unsupported": [], "missing_facts": [],
+                                      "feedback": "Turn 3 lectures; let the host react." if i == 2 else "Fine."} for i in range(1, n + 1)]})
     if task == "reflect":
         return "Break long explanations with a quick question from the host."
     if task == "fact_verify":

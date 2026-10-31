@@ -27,7 +27,7 @@ from ..ingest import select_chunks
 from ..prompts import PROMPT_VERSION
 from ..schemas import Claim, Episode, Segment, SegmentVersion
 from ..store import store
-from . import fast
+from . import fast, lean
 from .allocation import initial_allocation, reallocate
 from .claims import verify_and_fix
 from .context import AgentContext
@@ -44,6 +44,8 @@ def make_context(ep: Episode) -> AgentContext:
         raise ServiceError("Storage", "lost the uploaded chapter; please upload it again")
     chunks, _ = select_chunks(src, ep.settings.section_ids, get_settings().max_input_words)
     ctx = AgentContext(episode=ep, source=src, chunks=chunks, on_change=lambda: store.save_episode(ep, force=False))
+    if lean_mode(ep):
+        ctx.parts_override = lean.PARTS
     if not fast_mode(ep) and embed.embed_ready():
         ctx.use_hybrid_search()
         ctx.emit("plan", "info", f"Retrieval: keyword (BM25) + meaning search ({get_settings().embed_model} embeddings, "
@@ -183,6 +185,11 @@ def fast_mode(ep: Episode) -> bool:
     return (ep.settings.mode or get_settings().pipeline_mode) != "agent"
 
 
+def lean_mode(ep: Episode) -> bool:
+    """Deep agent in ~10 LLM calls (agent/lean.py); the per-part variant remains for the eval."""
+    return not fast_mode(ep) and get_settings().agent_style == "lean"
+
+
 async def _run_fast(ctx: AgentContext) -> None:
     """FAST pipeline, LLM call 1: write the whole episode (skipped when resuming with a script)."""
     ep = ctx.episode
@@ -205,6 +212,7 @@ async def run_episode(eid: str) -> None:
             ctx.emit("start", "info", f"Agent started (prompts {PROMPT_VERSION}, policy {ep.settings.policy}, "
                      f"{len(ctx.chunks)} passages in scope).")
             quick = fast_mode(ep)
+            lean_run = lean_mode(ep)
 
             if quick:
                 await _run_fast(ctx)
@@ -222,12 +230,16 @@ async def run_episode(eid: str) -> None:
             need_write = [] if quick else [x for x in todo if best_candidate(x) is None]
             if need_write:
                 with _Timer(ep, "write"):
-                    await write_segments(ctx, segments, need_write)
+                    if lean_run:
+                        await lean.write_and_refine(ctx, segments)
+                        todo = [x for x in todo if x.status != "failed"]
+                    else:
+                        await write_segments(ctx, segments, need_write)
                 store.save_episode(ep)
 
             # ---- Verify claims + synthesise + ASR self-check -----------------------
             claims: dict[str, list[Claim]] = {}
-            if quick and todo:
+            if (quick or lean_run) and todo:
                 # Record while the fact-check runs (part 1 first). Nothing is released to listeners until
                 # the check is done; any line it changes misses the cache and is recorded again.
                 for x in todo:
@@ -244,7 +256,7 @@ async def run_episode(eid: str) -> None:
                 async def finish(seg: Segment) -> None:
                     nonlocal finished
                     try:
-                        if quick:
+                        if quick or lean_run:
                             await _record(ctx, seg, fast.new_version(seg, claims.get(seg.id, [])))
                         else:
                             await _finalize_segment(ctx, seg, segments)
@@ -295,7 +307,7 @@ async def regenerate_segment(eid: str, seg_id: str, instruction: str | None) -> 
             seg.status, seg.error = "writing", None
             label = f' with instruction "{instruction}"' if instruction else ""
             ctx.emit("regenerate", "info", f"Regenerating '{seg.title}'{label}.", seg.id)
-            if fast_mode(ep):  # 2 LLM calls: rewrite this part, then fact-check it
+            if fast_mode(ep) or lean_mode(ep):  # 2 LLM calls: rewrite this part, then fact-check it
                 claims = await fast.rewrite_part(ctx, seg, ep.segments, instruction)
                 await _record(ctx, seg, fast.new_version(seg, claims, instruction or "regenerate"))
             else:

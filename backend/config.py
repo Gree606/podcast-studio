@@ -131,13 +131,15 @@ class Settings(BaseSettings):
     accept_score: float = 4.2  # early-stop threshold on the 1-5 rubric
     wer_threshold: float = 0.25  # ASR self-check: re-synthesise a turn above this WER
     max_tts_retries: int = 2
-    planner_max_steps: int = 5  # each real-model step can take seconds to a minute; a TA won't wait for 14
+    planner_max_steps: int = 2  # tool steps before the outline: with the forced finish, <= 3 planner calls; each real-model step can take seconds to a minute; a TA won't wait for 14
     # "fast": 2 LLM calls per episode (write all, then verify+fix); "agent": planner + best-of-N + critic loop
     pipeline_mode: str = "fast"
     # Deep agent: at most this many LLM calls per job (generating, or regenerating one part).
     # Optional steps (extra drafts, revisions, claim fixes) give way first; planning, one draft,
     # its critic and the fact-check of every part always run. 0 = no cap.
-    deep_max_llm_calls: int = 24
+    deep_max_llm_calls: int = 10
+    # "lean": the deep agent in ~10 calls (agent/lean.py); "per_part": best-of-N per part (25-48 calls, eval ablation)
+    agent_style: str = "lean"
     # Secret code for the entry gate. When set, anything that costs API calls (making episodes,
     # uploading chapters, regenerating) needs it; listening to and sharing episodes does not.
     access_code: str = ""

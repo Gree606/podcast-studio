@@ -145,3 +145,16 @@ def test_only_the_creator_can_change_an_episode_and_there_is_no_public_list():
         visitor.cookies.set(OWNER_COOKIE, "guessed")
         assert visitor.post(f"/api/episodes/{eid}/restart").status_code == 403
         assert owner.post(f"/api/episodes/{eid}/restart").status_code == 200  # done: nothing to do, but allowed
+
+
+def test_deep_agent_stays_within_ten_llm_calls(client):
+    """The deep agent plans with tools, writes, critiques, revises the weakest part, and fact-checks,
+    all within its 10-call budget (backend/agent/lean.py)."""
+    eid = new_episode(client, {"length": "medium", "mode": "agent"})
+    ep = wait(client, eid, finished)
+    assert ep["status"] == "done", ep["message"]
+    assert ep["metrics"]["llm_calls"] <= 10, ep["metrics"]["llm_calls"]
+    kinds = {e["kind"] for e in ep["trace"]}
+    assert {"thought", "action", "observation", "decision"} <= kinds  # the agent loop is visible
+    texts = " ".join(e["text"] for e in ep["trace"])
+    assert "Critic (1 call)" in texts and "Fact-check (1 call)" in texts

@@ -44,27 +44,44 @@ PDF / photos / text ─► ingest.py   PyMuPDF text layer; OCR (Bodhan Indic-OCR
                                    drop caps, running heads, exercises skipped)
                      ─► sections ─► ~170-word passages ─► BM25 index (retrieval.py)
 
-⚡ QUICK  (agent/fast.py, default)                 🧠 DEEP AGENT  (agent/orchestrator.py)
-  Perceive  retrieve the passages in scope           Plan     ReAct planner (planner.py): {thought, action, input}
-  Act       call 1: the whole episode as 3 parts,             with list_sections / search / read / define / finish.
-            each citing the passages it used                  Key facts pass a rule-based and an LLM check (tools.py)
-  Observe   call 2: check EVERY spoken line against  Act      difficulty-aware writer budget (allocation.py);
-            those passages; rewrite only the                  draft ─► critic ─► reflection ─► revise (search.py)
-            lines the passages don't support         Observe  claim extraction ─► BM25 evidence ─► judge (claims.py)
+⚡ QUICK  (agent/fast.py, default: 2 calls)        🧠 DEEP AGENT  (agent/lean.py: at most 10 calls)
+  Perceive  retrieve the passages in scope           Plan     ReAct planner (planner.py) with tools and RAG search
+  Act       call 1: the whole episode as 3 parts,             (BM25 + embeddings); key facts pass a rule check
+            each citing the passages it used                  and one LLM judge (tools.py)
+  Observe   call 2: check EVERY spoken line against  Act      write all parts in one call, following the plan
+            those passages; rewrite only the         Observe  critic grades every part in one call
+            lines the passages don't support         Act      revise the weakest parts from the critic's note
+                                                     Observe  re-grade, keep the better draft; fact-check all lines
 
                      ─► agent/voice.py  text normalisation (H2O, 5 m/s, years, symbols) ─► TTS per line
                                         ─► ASR transcribes its own audio ─► WER > 25% ⇒ re-record
                      ─► audio/stitch.py trim, loudness-match, conversational pauses, intro/outro, MP3 + timestamps
 ```
 
-**Why Quick is the default.** The Deep agent made 25–40 LLM calls per episode (about $0.36 each through OpenRouter, versus $0.025 for Quick). That is too many for free-tier quotas, and for a 2-minute script it added little over a single call to a thinking model. It is now capped at 24 calls per job (`DEEP_MAX_LLM_CALLS`): planning, one draft, its critic and the fact-check of every part always run, and extra drafts, revisions and claim fixes give way when the budget runs low. Reflexion notes are taken from the critic's feedback instead of a separate call. The steps a single call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration. The Deep agent is still available per episode, so the two can be compared, and the eval harness measures exactly that trade-off.
+**Deep agent, step by step.** Every step shows up in the Agent panel's trace.
+
+| # | Step | LLM calls | Course idea |
+|---|---|---|---|
+| 1 | Planner: Thought → Action → Observation with `list_sections`, `search` (keyword + embedding RAG), `read`, `define`, then `finish` with an outline of 3 parts, their key facts and a difficulty for each | ≤ 3 | ReAct |
+| 2 | Key-fact check: rule-based (the cited passage must lexically support the fact), then one LLM judge for all facts | 1 | ToolACE dual-layer verification |
+| 3 | Write every part in one call, following the plan, its verified facts and earlier lessons | 1 | |
+| 4 | Critic grades every part on the 5-axis anchored rubric, plus rule checks (monologues, length, banned phrases) | 1 | ToolRL-style reward design |
+| 5 | Revise only the parts below the bar, weakest and hardest first, from the critic's note stored as a lesson | ≤ 2 | Reflexion; Snell et al. (spend compute where it helps) |
+| 6 | Re-grade the revisions and keep the better draft | 1 | best-of-2 with a verifier |
+| 7 | Fact-check every spoken line against the passages, with fixes | 1 | |
+|   | Then TTS, ASR listen-back and mixing (no LLM) | 0 | |
+|   | **Total** | **≤ 10** (`DEEP_MAX_LLM_CALLS`) | |
+
+Regenerating one part costs 2 calls (rewrite, then fact-check) in either mode.
+
+**Why Quick is the default.** A Quick episode costs about $0.025 through OpenRouter and a Deep one about $0.06. The first Deep agent drafted, critiqued and claim-checked each part separately: 25–48 calls (about $0.36 per episode), too many for free-tier quotas and rate limits, and for a 2-minute script little better than one call to a thinking model. That per-part version (best-of-N drafts per part) is still in `search.py`/`claims.py` (`AGENT_STYLE=per_part`) for the eval ablation. The steps one call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration.
 
 | Idea from the course | Where it is used |
 |---|---|
-| **Snell et al. 2024**, compute-optimal test-time scaling | Deep: difficulty-aware writer budget, with leftover calls going to segments the verifier still scores low. Quick vs Deep is itself a compute-allocation choice, and `eval/` ablates it. |
+| **Snell et al. 2024**, compute-optimal test-time scaling | Deep: the fixed revision budget goes to the parts the verifier scores lowest (hardest first), and a re-grade picks the better draft. Quick (2 calls) vs Deep (≤ 10) vs per-part best-of-N (25–48) is itself a compute-allocation choice, and `eval/` ablates it. |
 | **ReAct** (Yao et al.) | Deep planner: an interleaved Thought / Action / Observation loop over chapter tools, visible in the Agent panel. |
 | Retrieval-augmented generation | Deep agent: the planner's `search` tool and the fact-check's evidence use hybrid retrieval, keyword BM25 plus `google/gemini-embedding-001` embeddings (via OpenRouter) fused by reciprocal rank, with vectors kept in a SQLite store. Meaning search also links an English question to a Hindi or Malayalam passage. Falls back to BM25 if embeddings are unavailable. |
-| **Reflexion** (Shinn et al.) | Deep writer: the critic's feedback becomes a stored reflection that the next draft uses. |
+| **Reflexion** (Shinn et al.) | Deep agent: the critic's feedback is stored as a lesson in the part's memory and drives the revision (and later regenerations). |
 | **ToolACE** (Liu et al.), dual-layer verification | Key facts must pass both a rule-based lexical check and an LLM check. |
 | **ToolRL** (Qian et al.), fine-grained reward design | A 5-axis anchored rubric plus deterministic penalties. Overall score is capped at faithfulness + 1. |
 | Course definition of an agent: perceive → plan → act → observe | Both modes observe their own output: the fact-check reads the script, and ASR listens to the audio. |

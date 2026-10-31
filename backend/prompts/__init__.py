@@ -154,6 +154,31 @@ Reply with only the lesson."""
 # ---------------------------------------------------------------------------
 # Claim-level faithfulness check after writing
 # ---------------------------------------------------------------------------
+CRITIC_ALL = """Grade each part of this podcast episode script, one part at a time.
+
+The plan each part had to follow (goal and key facts):
+{plan}
+
+Source passages (ground truth):
+{passages}
+
+Script:
+{script}
+
+Automatic checks already found: {auto_issues}
+
+Score each part on each axis 1-5 using these anchors:
+- faithfulness: 5 = every fact matches the passages, nothing invented; 3 = one vague or slightly off statement; 1 = a wrong or invented fact.
+- coverage: 5 = all its key facts explained, not just mentioned; 3 = one key fact missing or only name-dropped; 1 = most missing.
+- naturalness: 5 = sounds like two real people (reactions, interruptions, varied rhythm); 3 = polite alternating mini-lectures; 1 = textbook read aloud.
+- engagement: 5 = hook, curiosity, vivid relatable examples; 3 = correct but flat; 1 = boring.
+- clarity: 5 = a Class 8-10 student would follow every step, terms defined; 3 = some jumps; 1 = confusing.
+Most first drafts deserve 3s. A 5 is rare.
+
+Reply with ONLY JSON:
+{{"parts": [{{"part": 1, "scores": {{"faithfulness": n, "coverage": n, "naturalness": n, "engagement": n, "clarity": n}},
+  "unsupported": ["..."], "missing_facts": ["..."], "feedback": "<2-4 concrete, actionable edits, referencing turn numbers>"}}, ...]}}"""
+
 CLAIM_CHECK = """You are fact-checking one part of an educational podcast against its textbook.
 
 1. List every factual claim about the subject (science, history, geography, etc.) made in the script. Ignore greetings, opinions, jokes, questions and analogies that are clearly analogies. Rewrite each claim as a short standalone statement.

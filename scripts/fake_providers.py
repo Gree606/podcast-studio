@@ -42,6 +42,7 @@ TASK_MARKERS = [
     ("NOT supported by the textbook passages", "claim_fix"),
     ("Here is your previous draft", "revise"),
     ("You write scripts for", "write"),
+    ("Grade each part of this podcast episode", "critic_all"),  # before "strict editor": its system prompt says that too
     ("strict editor", "critic"),
     ("improving a podcast writer", "reflect"),
     ("fact-checking one part of an educational podcast", "claim_check"),

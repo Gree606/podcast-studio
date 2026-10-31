@@ -48,7 +48,7 @@ async def run_planner(ctx: AgentContext) -> list[Segment]:
     ]
     outline: dict | None = None
     read_ids: set[str] = set()
-    for step in range(1, s.planner_max_steps + 3):
+    for step in range(1, s.planner_max_steps + 2):  # tool steps, then one forced finish
         force = step > s.planner_max_steps
         if force:
             messages.append({"role": "user", "content": "You are out of tool calls. Call finish now with the complete outline."})

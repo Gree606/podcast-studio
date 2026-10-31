@@ -41,6 +41,7 @@ class AgentContext:
     # Deep agent LLM budget (see can_spend): calls already made when this job started, parts fact-checked
     llm_start: int = field(init=False, default=0)
     claims_checked: set = field(default_factory=set)
+    parts_override: int = 0  # lean deep agent: always 3 parts (the one-call writer's shape)
 
     def __post_init__(self) -> None:
         self.llm_start = self.episode.metrics.llm_calls
@@ -66,7 +67,7 @@ class AgentContext:
 
     @property
     def n_segments(self) -> int:
-        return LENGTHS[self.episode.settings.length][0]
+        return self.parts_override or LENGTHS[self.episode.settings.length][0]
 
     @property
     def words_per_segment(self) -> int:
