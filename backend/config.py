@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # (falls back to LLM_API_KEY when empty)
     openrouter_api_key: str = ""
     # Keys for the voice service that is NOT the .env default, so each episode can pick its voices
-    # (backend/providers.py). Bodhan voices fall back to ASR_API_KEY: one Bodhan key serves TTS, ASR and OCR.
+    # (backend/providers.py). Bodhan voices use BODHAN_TTS_API_KEY; if that is empty, ASR_API_KEY is tried.
     sarvam_api_key: str = ""
     bodhan_tts_api_key: str = ""
     llm_model: str = "gemini-3.6-flash"

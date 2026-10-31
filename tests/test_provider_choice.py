@@ -99,3 +99,10 @@ def test_defaults_are_kept_when_their_keys_are_there_or_nothing_is_set():
     empty = settings(**OR)
     t = providers.settings_for(base=empty)
     assert (t.llm_provider, t.tts_api_style) == ("openrouter", "sarvam") and t.effective_mock()  # demo mode
+
+
+def test_bodhan_voices_use_their_own_key_when_asr_has_a_different_one():
+    s = settings(**OR, openrouter_api_key="sk-or-v1-t", tts_api_key="DUMMY_X", asr_api_key="bodhan_asr_key",
+                 bodhan_tts_api_key="bodhan_tts_key")
+    t = providers.settings_for(base=s)
+    assert (t.tts_api_style, t.tts_api_key, t.asr_api_key) == ("bodhan", "bodhan_tts_key", "bodhan_asr_key")

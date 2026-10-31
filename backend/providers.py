@@ -59,6 +59,8 @@ def _llm_key(s: Settings, choice: str) -> str:
 def _tts_key(s: Settings, choice: str) -> str:
     if choice == default_voices(s):
         return s.tts_api_key
+    # Bodhan voices: their own key (BODHAN_TTS_API_KEY); only if that is empty, the ASR key is tried
+    # (one Bodhan key can cover both, as on the course server)
     return s.sarvam_api_key if choice == "sarvam" else (s.bodhan_tts_api_key if is_set(s.bodhan_tts_api_key) else s.asr_api_key)
 
 

@@ -115,7 +115,7 @@ def test_init_secrets_creates_owner_only_template_and_never_overwrites(tmp_path)
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
             values[k] = v
-    assert set(values) == {"OPENROUTER_API_KEY", "TTS_API_KEY", "ASR_API_KEY", "OCR_API_KEY"}  # OpenRouter is the default script AI
+    assert set(values) == {"OPENROUTER_API_KEY", "TTS_API_KEY", "BODHAN_TTS_API_KEY", "ASR_API_KEY", "OCR_API_KEY"}  # OpenRouter is the default script AI
     assert all(v.startswith("DUMMY_") for v in values.values())
     assert not any(v in out1 for v in values.values())
 

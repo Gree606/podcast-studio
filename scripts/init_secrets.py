@@ -33,11 +33,13 @@ OPENROUTER_API_KEY=DUMMY_REPLACE_WITH_OPENROUTER_KEY
 # Sarvam AI bulbul (the two voices): https://dashboard.sarvam.ai
 TTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY
 
-# Bodhan (speech recognition self-check of the audio)
-ASR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
-
-# Bodhan Indic-OCR (reads PDF pages and photos; used when OCR_MODE=bodhan). Often the same key as ASR.
-OCR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
+# Bodhan keys: one per service (they may be the same key or different ones)
+# Bodhan indic-speak voices (used when there is no Sarvam key, or when picked in Settings)
+BODHAN_TTS_API_KEY=DUMMY_REPLACE_WITH_BODHAN_TTS_KEY
+# Bodhan indic-transcribe (speech recognition self-check of the audio)
+ASR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_ASR_KEY
+# Bodhan Indic-OCR (reads PDF pages and photos; used when OCR_MODE=bodhan)
+OCR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_OCR_KEY
 """
 
 
