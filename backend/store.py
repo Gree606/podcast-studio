@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -33,12 +34,26 @@ class Store:
         self._sources: dict[str, Source] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._last_save: dict[str, float] = {}
+        self._deleted: set[str] = set()  # a job still winding down must not write a deleted episode back
 
     # --- paths -------------------------------------------------------------
     def episode_dir(self, eid: str) -> Path:
         d = get_settings().episodes_dir / eid
         d.mkdir(parents=True, exist_ok=True)
         return d
+
+    def delete_episode(self, eid: str) -> bool:
+        """Remove an episode and its audio for good (the caller stops its job first)."""
+        if not eid.replace("_", "").isalnum():
+            return False
+        self._deleted.add(eid)
+        self._episodes.pop(eid, None)
+        self._last_save.pop(eid, None)
+        d = get_settings().episodes_dir / eid
+        if not d.is_dir():
+            return False
+        shutil.rmtree(d)
+        return True
 
     def lock(self, eid: str) -> asyncio.Lock:
         if eid not in self._locks:
@@ -65,6 +80,8 @@ class Store:
     # --- episodes ----------------------------------------------------------
     def save_episode(self, ep: Episode, force: bool = True) -> None:
         """Persist. Non-forced saves (live trace updates) are throttled to ~2/s."""
+        if ep.id in self._deleted:
+            return
         self._episodes[ep.id] = ep
         now = time.time()
         if not force and now - self._last_save.get(ep.id, 0) < 0.5:

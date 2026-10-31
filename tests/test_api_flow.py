@@ -4,6 +4,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from backend import main
 from backend.main import PRESETS, app
 from backend.schemas import EpisodeSettings
 
@@ -150,6 +151,7 @@ def test_only_the_creator_can_change_an_episode_and_there_is_no_public_list():
 def test_deep_agent_stays_within_ten_llm_calls(client):
     """The deep agent plans with tools, writes, critiques, revises the weakest part, and fact-checks,
     all within its 10-call budget (backend/agent/lean.py)."""
+    main._hits.clear()  # the per-client episode limit is shared by the whole test session
     eid = new_episode(client, {"length": "medium", "mode": "agent"})
     ep = wait(client, eid, finished)
     assert ep["status"] == "done", ep["message"]
@@ -158,3 +160,17 @@ def test_deep_agent_stays_within_ten_llm_calls(client):
     assert {"thought", "action", "observation", "decision"} <= kinds  # the agent loop is visible
     texts = " ".join(e["text"] for e in ep["trace"])
     assert "Critic (1 call)" in texts and "Fact-check (1 call)" in texts
+
+
+def test_owner_can_stop_and_delete_an_episode(client):
+    main._hits.clear()
+    eid = new_episode(client, {"length": "short"})
+    assert client.post(f"/api/episodes/{eid}/stop").json() == {"ok": True}
+    ep = wait(client, eid, lambda e: not e["busy"])
+    assert ep["status"] in ("interrupted", "done")  # stopped (or it had already finished)
+    visitor = TestClient(app)                         # someone else with the link can't delete it
+    assert visitor.delete(f"/api/episodes/{eid}").status_code == 403
+    assert client.delete(f"/api/episodes/{eid}").json() == {"ok": True}
+    assert client.get(f"/api/episodes/{eid}").status_code == 404
+    assert client.get(f"/api/episodes?ids={eid}").json() == []
+    main._hits.clear()

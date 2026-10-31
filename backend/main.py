@@ -371,6 +371,32 @@ async def restart(eid: str, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/episodes/{eid}/stop")
+async def stop(eid: str, request: Request):
+    """Stop making this episode. What is already written and recorded is kept; Try again continues."""
+    ep = _get_ep(eid)
+    _require_owner(ep, request)
+    if not jobs.is_busy(eid):
+        return {"ok": True}
+    await jobs.cancel(eid)
+    for seg in ep.segments:
+        if seg.status in ("writing", "checking", "synthesizing"):
+            seg.status = "done" if seg.current else "pending"
+    ep.status, ep.error, ep.message = "interrupted", None, "Stopped. Press Try again to continue where it stopped."
+    store.save_episode(ep, force=True)
+    return {"ok": True}
+
+
+@app.delete("/api/episodes/{eid}")
+async def delete_episode(eid: str, request: Request):
+    """Delete this episode and its audio for good (stops it first if it is still being made)."""
+    ep = _get_ep(eid)
+    _require_owner(ep, request)
+    await jobs.cancel(eid)
+    store.delete_episode(ep.id)
+    return {"ok": True}
+
+
 class RegenBody(BaseModel):
     instruction: str | None = Field(default=None, max_length=300)
 

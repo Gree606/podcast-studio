@@ -440,7 +440,7 @@ body.warp .fleet { animation: warp-fleet 1.4s ease-in both; }
 .far-planet { position: absolute; width: 90px; height: 90px; border-radius: 50%; top: 14%; right: -120px; opacity: .55;
   background: radial-gradient(circle at 35% 30%, #ffd1a6, #ff8a5c 50%, #6b2c3a 85%); box-shadow: inset -12px -8px 24px rgba(0, 0, 0, .5); animation: pass-planet 48s linear infinite; }
 @keyframes pass-planet { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - 200px)); } }
-.stage > :not(.cruise):not(.signal):not(.transmission) { position: relative; z-index: 1; }
+.stage > :not(.cruise):not(.signal):not(.transmission):not(.stop-btn) { position: relative; z-index: 1; }
 .signal { position: absolute; left: 22%; right: 22%; top: 30%; height: 10px; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .3s; }
 .stage.talk-host .signal, .stage.talk-expert .signal { opacity: 1; }
 .signal i { position: absolute; top: 0; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--host)); box-shadow: 0 0 10px var(--c, var(--host)); opacity: 0; }
@@ -919,3 +919,13 @@ body.gated { overflow: hidden; }
 /* fact area tall enough for the longest fact (measured over all of them), so the bubble keeps its size as facts rotate */
 #nowLine { --fact-h: 5.8em; }
 @media (min-width: 700px) { #nowLine { --fact-h: 8.6em; } }
+
+/* menu: delete an episode from "Your episodes"; Save sheet: delete button */
+.recent-row { display: flex; align-items: center; gap: 4px; }
+.recent-row a { flex: 1; min-width: 0; }
+.recent-del { flex: none; width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; border-radius: 8px; font-size: .95rem; opacity: .7; }
+.recent-del:hover, .recent-del:focus-visible { opacity: 1; background: rgba(255, 107, 157, .18); }
+.save-item.danger { background: #ffd9e4 !important; }
+.stop-btn { position: absolute; top: 10px; right: 10px; z-index: 3; padding: 4px 10px; font: 600 .72rem/1.4 var(--font); letter-spacing: .06em;
+  color: var(--comic-ink); background: #ffd9e4; border: 2px solid var(--comic-ink); box-shadow: 2px 2px 0 var(--comic-ink); cursor: pointer; }
+.stop-btn:hover, .stop-btn:focus-visible { background: #ffb8cc; }

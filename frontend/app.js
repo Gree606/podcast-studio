@@ -73,6 +73,7 @@ function tabs(root) {
 function openDrawer(open) {
   const d = $("#drawer"); d.classList.toggle("open", open); d.setAttribute("aria-hidden", String(!open));
   $("#menuBtn").setAttribute("aria-expanded", String(open));
+  if (open) renderRecent();  // "Your episodes" is current wherever the menu is opened
 }
 let sheetOpen = null;
 const SHEET_TITLES = {script: "Script", ask: "Ask Gree", quiz: "Quiz", agent: "How the agent made it", save: "Save & share"};
@@ -175,6 +176,16 @@ async function renderHome() {
   renderRecent();
 }
 
+// Delete for good (owner only on the server); stops it first if it is still being made.
+async function deleteEpisode(id, title) {
+  if (!confirm(`Delete "${title || "this episode"}" for good? Its audio and script will be gone.`)) return;
+  try {
+    await api(`/api/episodes/${encodeURIComponent(id)}`, {method: "DELETE"});
+    forgetEpisodes([id]); renderRecent(); toast("🗑️ Episode deleted.");
+    if (location.hash.includes(id)) { openSheet(null); location.hash = "#/"; }
+  } catch (e) { toast(e.message, "err"); }
+}
+
 // "Your episodes" in the menu: this browser's list, minus any the server no longer has
 async function renderRecent() {
   let mine = myEpisodes();
@@ -186,8 +197,10 @@ async function renderRecent() {
     } catch { /* offline: show what we remember */ }
   }
   $("#recentCard").classList.toggle("hidden", !mine.length);
-  $("#recent").innerHTML = mine.map(x => `<a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>`).join("");
+  $("#recent").innerHTML = mine.map(x => `<div class="recent-row"><a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>
+    <button class="recent-del" type="button" data-del="${esc(x.id)}" aria-label="Delete ${esc(x.title)}" title="Delete">🗑️</button></div>`).join("");
   $$("#recent a").forEach(a => { a.onclick = () => openDrawer(false); });
+  $$("#recent [data-del]").forEach(b => { b.onclick = () => deleteEpisode(b.dataset.del, (mine.find(x => x.id === b.dataset.del) || {}).title); });
 }
 
 // ------------------------------------------------------------------ photos of pages (OCR, one page per photo)
@@ -386,6 +399,8 @@ async function renderEpisode(id) {
   };
   retry($("#restartBtn"), () => postJSON(`/api/episodes/${epState.id}/restart`), "🔁 Starting that step again…");
   retry($("#resumeBtn"), () => api(`/api/episodes/${epState.id}/resume`, {method: "POST"}), "🔁 Trying again…");
+  retry($("#stopBtn"), () => postJSON(`/api/episodes/${epState.id}/stop`), "⏹ Stopped. Press Try again to continue later.");
+  $("#delEp").onclick = () => deleteEpisode(epState.id, epState.title);
   await poll(id, viewId);
 }
 
@@ -561,6 +576,8 @@ function renderMake(ep) {
   // the speech bubble already says what the crew is doing; repeat it here only when something needs attention
   $("#makeCard").classList.toggle("quiet", working && !ep.queue_position);
   $("#resumeBtn").classList.toggle("hidden", !(["failed", "interrupted"].includes(ep.status) && !ep.busy && ep.can_edit));
+  $("#stopBtn").classList.toggle("hidden", !(working && ep.can_edit));
+  $("#delEp").classList.toggle("hidden", !ep.can_edit);
   // a call that hangs: say so (never a frozen-looking screen) and offer a restart
   const slowAfter = ep.pipeline === "agent" ? 600 : 100;
   $("#slowNote").classList.toggle("hidden", !(working && ep.can_edit && !ep.audio_file && !live.on && (ep.running_for || 0) > slowAfter));
