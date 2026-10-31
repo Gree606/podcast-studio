@@ -805,6 +805,12 @@ function nextLivePart() {
 // "Incoming transmission": the two ships fly in and the banner flashes
 function launch(withSound = false) {  // withSound: the ships arriving on the page (not each replay)
   const st = $("#stage"); if (!st) return;
+  if (document.body.classList.contains("gated")) {
+    // behind the START screen: no sound is allowed yet and nobody would see the ships, so they land
+    // once START is pressed (closeGate)
+    launch.pending = launch.pending || withSound || "quiet";
+    return;
+  }
   if (withSound && !ambient.podcast) playLanding();
   if (reducedMotion()) return;
   st.classList.remove("launch"); void st.offsetWidth; st.classList.add("launch");
@@ -1369,7 +1375,10 @@ function openGate() {
 }
 function closeGate() {
   const g = $("#gate"); g.classList.add("leaving");
-  setTimeout(() => { g.hidden = true; g.classList.remove("leaving"); document.body.classList.remove("gated"); }, 650);
+  setTimeout(() => {
+    g.hidden = true; g.classList.remove("leaving"); document.body.classList.remove("gated");
+    if (launch.pending) { const withSound = launch.pending === true; launch.pending = false; launch(withSound); }
+  }, 650);
 }
 function initGate() {
   stingLoad("intro"); stingLoad("landing"); ambientLoad();
@@ -1392,7 +1401,7 @@ function initGate() {
       $("#gateGo").disabled = false;
     }
     gateSay("Code accepted. Welcome aboard!");
-    playIntro();
+    if (launch.pending !== true) playIntro();  // on an episode page the ships' landing sound plays instead
     startAmbient(5);
     setTimeout(closeGate, 700);
   });
