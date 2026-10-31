@@ -182,7 +182,7 @@ async function deleteEpisode(id, title) {
   try {
     await api(`/api/episodes/${encodeURIComponent(id)}`, {method: "DELETE"});
     forgetEpisodes([id]); renderRecent(); toast("🗑️ Episode deleted.");
-    if (location.hash.includes(id)) { openSheet(null); location.hash = "#/"; }
+    if (location.hash.includes(id)) { openSheet(null); go("#/"); }
   } catch (e) { toast(e.message, "err"); }
 }
 
@@ -341,7 +341,7 @@ async function createEpisode() {
     host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
   try {
     const r = await postJSON("/api/episodes", {source_id: SOURCE.id, settings});
-    rememberEpisode(r.id, SOURCE.title); location.hash = `#/episode/${r.id}`;
+    rememberEpisode(r.id, SOURCE.title); go(`#/episode/${r.id}`);
   } catch (e) { btn.disabled = false; btn.textContent = "🚀 Launch"; showErr($("#estimate"), e.message); }
 }
 
@@ -1419,6 +1419,18 @@ function initGate() {
 }
 
 // ------------------------------------------------------------------ router + boot
+// Back always returns to the home screen: the history is kept as [home, the episode you're on].
+// Leaving an episode (for another one, or for home) replaces its history entry instead of adding one.
+const onEpisode = () => /^#\/episode\//.test(location.hash);
+function go(hash) {
+  if (onEpisode()) location.replace(hash); else location.hash = hash;
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest && e.target.closest('a[href^="#/"]');
+  if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  go(a.getAttribute("href"));
+});
 function route() {
   const m = location.hash.match(/^#\/episode\/([\w-]+)/);
   openDrawer(false);
@@ -1447,5 +1459,10 @@ function route() {
     $("#demoNote").innerHTML = `<div class="notice warn small">😴 The studio is waking up. Please refresh in a few seconds.</div>`;
   }
   addEventListener("hashchange", route);
+  if (onEpisode()) {  // opened from a link or refreshed: put home underneath, so Back goes there
+    const here = location.hash;
+    history.replaceState(null, "", "#/");
+    history.pushState(null, "", here);
+  }
   route();
 })();
