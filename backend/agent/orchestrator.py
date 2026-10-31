@@ -19,6 +19,7 @@ import traceback
 import numpy as np
 
 from ..audio.stitch import concat_segments, decode_audio, encode_mp3, to_wav_bytes
+from ..clients import embed
 from ..clients.base import ServiceError
 from ..clients.usage import current_metrics
 from ..config import get_settings
@@ -42,7 +43,12 @@ def make_context(ep: Episode) -> AgentContext:
     if src is None:
         raise ServiceError("Storage", "lost the uploaded chapter; please upload it again")
     chunks, _ = select_chunks(src, ep.settings.section_ids, get_settings().max_input_words)
-    return AgentContext(episode=ep, source=src, chunks=chunks, on_change=lambda: store.save_episode(ep, force=False))
+    ctx = AgentContext(episode=ep, source=src, chunks=chunks, on_change=lambda: store.save_episode(ep, force=False))
+    if not fast_mode(ep) and embed.embed_ready():
+        ctx.use_hybrid_search()
+        ctx.emit("plan", "info", f"Retrieval: keyword (BM25) + meaning search ({get_settings().embed_model} embeddings, "
+                 "SQLite vector store), fused by reciprocal rank.")
+    return ctx
 
 
 class _Timer:

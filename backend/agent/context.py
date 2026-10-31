@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from ..config import get_settings
-from ..retrieval import BM25Index
+from ..retrieval import BM25Index, HybridIndex
 from ..schemas import Chunk, Episode, Source, TraceEvent
 
 log = logging.getLogger("podcast.agent")
@@ -47,6 +47,12 @@ class AgentContext:
         self.index = BM25Index(self.chunks)
         self.full_index = BM25Index(self.source.chunks)
         self.by_id = {c.id: c for c in self.source.chunks}
+
+    def use_hybrid_search(self) -> None:
+        """Deep agent: keyword + embedding search (see retrieval.HybridIndex) for the planner's
+        search tool and the fact-check's evidence."""
+        self.index = HybridIndex(self.chunks)
+        self.full_index = HybridIndex(self.source.chunks)
 
     def can_spend(self, n: int) -> bool:
         """True if ``n`` more optional LLM calls fit in this job's budget while still leaving 2 calls

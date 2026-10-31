@@ -165,6 +165,7 @@ class TraceEvent(BaseModel):
 
 class Metrics(BaseModel):
     llm_calls: int = 0
+    embed_calls: int = 0  # embedding requests (deep agent hybrid retrieval)
     prompt_tokens: int = 0
     completion_tokens: int = 0
     tts_calls: int = 0

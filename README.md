@@ -63,6 +63,7 @@ PDF / photos / text ─► ingest.py   PyMuPDF text layer; OCR (Bodhan Indic-OCR
 |---|---|
 | **Snell et al. 2024**, compute-optimal test-time scaling | Deep: difficulty-aware writer budget, with leftover calls going to segments the verifier still scores low. Quick vs Deep is itself a compute-allocation choice, and `eval/` ablates it. |
 | **ReAct** (Yao et al.) | Deep planner: an interleaved Thought / Action / Observation loop over chapter tools, visible in the Agent panel. |
+| Retrieval-augmented generation | Deep agent: the planner's `search` tool and the fact-check's evidence use hybrid retrieval, keyword BM25 plus `google/gemini-embedding-001` embeddings (via OpenRouter) fused by reciprocal rank, with vectors kept in a SQLite store. Meaning search also links an English question to a Hindi or Malayalam passage. Falls back to BM25 if embeddings are unavailable. |
 | **Reflexion** (Shinn et al.) | Deep writer: the critic's feedback becomes a stored reflection that the next draft uses. |
 | **ToolACE** (Liu et al.), dual-layer verification | Key facts must pass both a rule-based lexical check and an LLM check. |
 | **ToolRL** (Qian et al.), fine-grained reward design | A 5-axis anchored rubric plus deterministic penalties. Overall score is capped at faithfulness + 1. |
@@ -82,7 +83,8 @@ backend/
   main.py          FastAPI routes, access gate, owner cookie, rate limits, static frontend
   jobs.py          background episode jobs, progress events, resume / restart
   ingest.py        PDF / text ─► sections;  photos.py  phone photos ─► OCR'd pages
-  retrieval.py     BM25 over passages (also used by Ask Gree and the fact-check)
+  retrieval.py     BM25 over passages; HybridIndex = BM25 + embeddings fused by reciprocal rank (deep agent)
+  vectors.py       SQLite vector store: passage/query embeddings cached by model + text hash
   agent/           fast.py (Quick) · planner, writer, critic, search, allocation, claims (Deep) · voice.py
   audio/           stitch.py, wer.py
   clients/         llm.py (Gemini / OpenRouter / OpenAI-compatible), tts.py, asr.py, ocr.py, mock.py

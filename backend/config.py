@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     sarvam_api_key: str = ""
     bodhan_tts_api_key: str = ""
     llm_model: str = "gemini-3.6-flash"
+    # --- Embeddings (deep agent's hybrid retrieval; backend/clients/embed.py) -----------------
+    # OpenRouter's /v1/embeddings; the key falls back to OPENROUTER_API_KEY. "" model = keyword search only.
+    embed_model: str = "google/gemini-embedding-001"
+    embed_base_url: str = "https://openrouter.ai/api"
+    embed_api_key: str = ""
     # Tried in order when the main model is overloaded (503), rate-limited (429) or retired (404).
     # Measured 2026-10-21: popular models regularly return 503 "high demand" for minutes at a time.
     llm_fallback_models: str = "gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite,gemini-flash-lite-latest"
@@ -156,6 +161,12 @@ class Settings(BaseSettings):
         if self.llm_provider == "openrouter" and is_set(self.openrouter_api_key):
             return self.openrouter_api_key
         return self.llm_api_key
+
+    def embed_key(self) -> str:
+        return self.embed_api_key if is_set(self.embed_api_key) else self.openrouter_api_key
+
+    def embed_ready(self) -> bool:
+        return bool(self.embed_model and self.embed_base_url) and is_set(self.embed_key())
 
     def tts_ready(self) -> bool:
         return bool(self.tts_base_url) and (is_set(self.tts_api_key) or self.tts_api_style not in ("sarvam", "bodhan"))

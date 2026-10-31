@@ -36,11 +36,11 @@ def tool_list_sections(ctx: AgentContext, _: dict) -> str:
     return "\n".join(lines)
 
 
-def tool_search(ctx: AgentContext, inp: dict) -> str:
+async def tool_search(ctx: AgentContext, inp: dict) -> str:
     q = str(inp.get("query") or inp.get("q") or "").strip()
     if not q:
         return "Error: search needs a non-empty 'query'."
-    hits = ctx.index.search(q, k=4)
+    hits = await ctx.index.asearch(q, k=4)
     if not hits:
         return f"No passages match '{q}'. Try other words, or list_sections."
     out = [f"[{c.id}] ({c.section}) {c.text[:380]}{'...' if len(c.text) > 380 else ''}" for c, _ in hits]

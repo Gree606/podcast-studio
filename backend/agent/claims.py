@@ -8,6 +8,8 @@ unsupported is surfaced in the UI rather than hidden.
 """
 from __future__ import annotations
 
+import asyncio
+
 import json
 
 from ..clients.llm import chat_json
@@ -32,8 +34,9 @@ async def check_claims(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> li
         return []
     evid: list[list[str]] = []  # per claim: the passages shown to the judge (BM25 hits + the segment's first passage)
     items = []
-    for i, cl in enumerate(claims, 1):
-        ids = [c.id for c, _ in ctx.full_index.search(cl, k=2)]
+    found = await asyncio.gather(*(ctx.full_index.asearch(cl, k=2) for cl in claims))
+    for i, (cl, hits) in enumerate(zip(claims, found), 1):
+        ids = [c.id for c, _ in hits]
         ids += [cid for cid in seg.chunk_ids[:1] if cid not in ids]
         evid.append(ids)
         passages = "\n".join(f"   [{cid}] {ctx.by_id[cid].text[:550]}" for cid in ids)

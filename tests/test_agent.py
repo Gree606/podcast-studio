@@ -54,7 +54,7 @@ def test_select_chunks_respects_section_choice(ctx):
 
 
 def test_tools_search_read_define(ctx):
-    assert "Rusting of iron" in tool_search(ctx, {"query": "rusting iron"})
+    assert "Rusting of iron" in asyncio.run(tool_search(ctx, {"query": "rusting iron"}))
     assert tool_read(ctx, {"chunk_id": "nope"}).startswith("Error")
     d = tool_define(ctx, {"term": "reactants"})
     assert "are called reactants" in d

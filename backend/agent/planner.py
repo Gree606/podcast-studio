@@ -8,6 +8,8 @@ are dropped and logged in the trace.
 """
 from __future__ import annotations
 
+import inspect
+
 import json
 import re
 
@@ -84,6 +86,8 @@ async def run_planner(ctx: AgentContext) -> list[Segment]:
             obs = f"Error: unknown tool '{action}'. Available: {', '.join(TOOLS)} or finish."
         else:
             obs = tool(ctx, inp)
+            if inspect.isawaitable(obs):  # search is async (embedding lookups)
+                obs = await obs
             read_ids.update(re.findall(r"\[(c\d+)\]", obs))
         ctx.emit(STAGE, "action", f"{action}({json.dumps(inp, ensure_ascii=False)[:120]})")
         ctx.emit(STAGE, "observation", obs[:600] + ("..." if len(obs) > 600 else ""))
