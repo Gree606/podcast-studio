@@ -104,11 +104,11 @@ async def main() -> int:
         except ServiceError as e:
             line(False, f"{e.service} {e.user_message}  {e.detail[:300]}")
 
-    print("4. OCR (scanned PDF pages)")
+    print("4. OCR (PDF pages and photos)")
     if s.ocr_mode != "bodhan":
         line(None, f"OCR_MODE={s.ocr_mode}: scanned pages are read by {'the LLM' if s.ocr_mode == 'llm' else s.ocr_mode}")
     elif not s.ocr_ready():
-        line(False, f"OCR_API_KEY is missing or still a placeholder in {secrets_path()}")
+        line(None, f"OCR_API_KEY not set: PDFs will use their own text and photos can't be read (optional)")
     else:
         import fitz
 
