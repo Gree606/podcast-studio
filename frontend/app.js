@@ -474,7 +474,7 @@ function showFact() {
   p.innerHTML = `<b>Did you know?</b> ${esc(FACTS[fact.i])}`;
 }
 function syncFacts(on) {
-  if (on && !fact.timer) { showFact(); fact.timer = setInterval(showFact, 3000); }
+  if (on && !fact.timer) { showFact(); fact.timer = setInterval(showFact, 6000); }
   if (!on && fact.timer) { clearInterval(fact.timer); fact.timer = null; }
 }
 
