@@ -75,7 +75,7 @@ PDF / photos / text ─► ingest.py   Bodhan Indic-OCR for every PDF page (pace
 
 Regenerating one part costs 2 calls (rewrite, then fact-check) in either mode.
 
-**Why Quick is the default.** A Quick episode costs about $0.025 through OpenRouter and a Deep one about $0.06. The first Deep agent drafted, critiqued and claim-checked each part separately: 25–48 calls (about $0.36 per episode), too many for free-tier quotas and rate limits, and for a 2-minute script little better than one call to a thinking model. That per-part version (best-of-N drafts per part) is still in `search.py`/`claims.py` (`AGENT_STYLE=per_part`) for the eval ablation. The steps one call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration.
+**Why Quick is the default.** Quick is cheaper and faster than deep agent with only necessory checks and it might miss some fact checks of mistakes. But the deep agent has several checks on the pipeline which makes it more reliable. The first Deep agent drafted, critiqued and claim-checked each part separately: 25–48 calls (about $0.36 per episode), too many for free-tier quotas and rate limits, and for a 2-minute script little better than one call to a thinking model. That per-part version (best-of-N drafts per part) is still in `search.py`/`claims.py` (`AGENT_STYLE=per_part`) for the eval ablation. The steps one call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration.
 
 | Idea from the course | Where it is used |
 |---|---|
