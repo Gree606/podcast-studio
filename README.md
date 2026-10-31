@@ -14,9 +14,12 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
 ## Using it
 
 1. Open the link and give Error606 the secret code. The code is required because generating an episode spends API calls.
-2. Pick a sample chapter, upload a PDF, take photos or paste text. Then choose the language and the mode:
-   - **⚡ Quick** (default) makes 2 LLM calls.
-   - **🧠 Deep agent** plans, drafts and critiques.
+2. Pick a sample chapter, upload a PDF, take photos or paste text, then choose the language. **☰ Menu → ⚙️ Settings** (also reachable from the launch screen's "Studio" line) picks, for each new episode:
+   - **Mode:** ⚡ Quick (default, 2 LLM calls) or 🧠 Deep agent (plans, drafts and critiques).
+   - **Script AI:** Gemini with its own key, or the same Gemini models through OpenRouter.
+   - **Voices:** Sarvam bulbul or Bodhan indic-speak.
+
+   Each episode remembers its choices, so regenerating a part uses the same AI and voices. Options whose key isn't set on the server are greyed out (`backend/providers.py`).
 3. Start listening as soon as the first part is recorded; the remaining parts are recorded in the background. The dock at the bottom opens:
    - **Script:** the transcript, highlighted line by line as it plays. Click a line to jump to it.
    - **Ask Gree:** type a doubt in any language. Gree answers in 2–5 spoken sentences using only the chapter, and cites the section and page. If the chapter doesn't cover the question, she says so; off-topic questions are steered back to the chapter. Tap 🔊 to hear the answer. (`backend/ask.py`)
@@ -95,8 +98,8 @@ tests/             pytest suite
 
 | Service | Used for | Notes (wire formats in `backend/clients/`) |
 |---|---|---|
-| **Gemini** (`gemini-3.6-flash`, with a fallback list) | writing, checking, Ask Gree, quiz | `generateContent`, JSON mode for structured calls. Thought parts are skipped, and thinking tokens are counted. Calls fall back across models on 429/503/404, and a model whose daily quota is used up is skipped. `LLM_PROVIDER=openrouter` runs the same models through OpenRouter; `openai` targets any OpenAI-compatible server. |
-| **Sarvam** `bulbul:v4-flash` | the two voices | `dev_en_conversational` (Error606) and `simran_en_conversation` (Gree), with the language set per episode. Turns over 900 characters are split at sentence boundaries. Bodhan indic-speak is a drop-in alternative (`TTS_API_STYLE=bodhan`). |
+| **Gemini** (`gemini-3.6-flash`, with a fallback list) | writing, checking, Ask Gree, quiz | `generateContent`, JSON mode for structured calls. Thought parts are skipped, and thinking tokens are counted. Calls fall back across models on 429/503/404, and a model whose daily quota is used up is skipped. OpenRouter (`OPENROUTER_API_KEY`) can be picked per episode in Settings; `LLM_PROVIDER` sets the default, and `openai` targets any OpenAI-compatible server. |
+| **Sarvam** `bulbul:v4-flash` | the two voices | `dev_en_conversational` (Error606) and `simran_en_conversation` (Gree), with the language set per episode. Turns over 900 characters are split at sentence boundaries. Bodhan indic-speak (Gree = Deepika, Error606 = Amit) can be picked per episode in Settings; it uses `BODHAN_TTS_API_KEY`, or the Bodhan ASR key if that isn't set. `TTS_API_STYLE` sets the default. |
 | **Bodhan** `indic-transcribe` | listen-back self-check | Paced to 14 calls per minute. If it answers in an unexpected script, the self-check stands down instead of re-recording everything. |
 | **Bodhan** Indic-OCR | scanned pages and photos | One page per request. Photos are straightened, downscaled and re-encoded first. |
 
