@@ -121,14 +121,18 @@ class Settings(BaseSettings):
     sample_rate: int = 24000
     # Total writer-candidate budget per episode is budget_per_segment * n_segments,
     # redistributed across segments by difficulty (Snell et al. compute-optimal allocation).
-    budget_per_segment: float = 2.0
+    budget_per_segment: float = 1.5
     max_candidates_per_segment: int = 4
     accept_score: float = 4.2  # early-stop threshold on the 1-5 rubric
     wer_threshold: float = 0.25  # ASR self-check: re-synthesise a turn above this WER
     max_tts_retries: int = 2
-    planner_max_steps: int = 8  # each real-model step can take seconds to a minute; a TA won't wait for 14
+    planner_max_steps: int = 5  # each real-model step can take seconds to a minute; a TA won't wait for 14
     # "fast": 2 LLM calls per episode (write all, then verify+fix); "agent": planner + best-of-N + critic loop
     pipeline_mode: str = "fast"
+    # Deep agent: at most this many LLM calls per job (generating, or regenerating one part).
+    # Optional steps (extra drafts, revisions, claim fixes) give way first; planning, one draft,
+    # its critic and the fact-check of every part always run. 0 = no cap.
+    deep_max_llm_calls: int = 24
     # Secret code for the entry gate. When set, anything that costs API calls (making episodes,
     # uploading chapters, regenerating) needs it; listening to and sharing episodes does not.
     access_code: str = ""

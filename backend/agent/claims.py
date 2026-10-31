@@ -57,10 +57,16 @@ async def check_claims(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> li
 
 async def verify_and_fix(ctx: AgentContext, seg: Segment, segments: list[Segment], turns: list[Turn]) -> tuple[list[Turn], list[Claim]]:
     claims = await check_claims(ctx, seg, turns)
+    if hasattr(ctx, "claims_checked"):
+        ctx.claims_checked.add(seg.id)
     bad = [c for c in claims if not c.supported]
     ctx.emit(STAGE, "observation", f"Claim check: {len(claims) - len(bad)}/{len(claims)} claims supported by the chapter.",
              seg.id, data={"unsupported": [c.claim for c in bad]})
     if not bad:
+        return turns, claims
+    if hasattr(ctx, "can_spend") and not ctx.can_spend(3):  # fix + re-check (extract, judge)
+        ctx.emit(STAGE, "decision", f"LLM budget for this episode is used up: flagging {len(bad)} unsupported "
+                 "claim(s) for the listener instead of rewriting.", seg.id)
         return turns, claims
     ctx.emit(STAGE, "action", "Rewriting to remove/correct: " + " | ".join(c.claim[:90] for c in bad[:4]), seg.id)
     st = ctx.episode.settings

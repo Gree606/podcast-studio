@@ -105,6 +105,14 @@ async def critique(ctx: AgentContext, seg: Segment, turns: list[Turn]) -> tuple[
     return scores, feedback or "No major issues.", issues
 
 
+def lesson_from(feedback: str, issues: list[str]) -> str:
+    """Reflexion memory entry without another model call: the top automatic issue, else the
+    first sentence of the critic's feedback."""
+    text = issues[0] if issues else (feedback or "").strip().split("\n")[0]
+    first = text.split(". ")[0].strip()
+    return (first if first.endswith(".") else first + ".")[:220] if first else "Keep it faithful and conversational."
+
+
 async def reflect(feedback: str, issues: list[str]) -> str:
     """Reflexion: compress feedback into a one-line lesson stored in episodic memory."""
     try:

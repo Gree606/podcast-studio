@@ -13,7 +13,7 @@ from ..clients.base import ServiceError
 from ..schemas import Candidate, Segment, Turn
 from .allocation import search_shape
 from .context import AgentContext
-from .critic import critique, reflect
+from .critic import critique, lesson_from
 from .writer import WriterError, revise, write
 
 STAGE = "write"
@@ -37,7 +37,9 @@ async def _score(ctx: AgentContext, seg: Segment, cand: Candidate, use_critic: b
              f"clarity {scores.clarity:.0f}; rule penalty {scores.deterministic_penalty})", seg.id,
              data={"scores": scores.model_dump(), "feedback": feedback})
     if scores.overall < accept:
-        lesson = await reflect(feedback, issues)
+        # Reflexion: the critic's verbal feedback, kept as a one-line lesson in the part's memory for
+        # the next draft. (Compressing it with an extra model call cost ~6 calls per episode.)
+        lesson = lesson_from(feedback, issues)
         seg.reflections.append(lesson)
         ctx.emit(STAGE, "thought", f"Reflection stored in memory: {lesson}", seg.id)
 
@@ -68,6 +70,14 @@ async def run_search(ctx: AgentContext, seg: Segment, segments: list[Segment], b
         ctx.emit(STAGE, "action", f"Writer produced draft {cand.index + 1} ({sum(len(t.text.split()) for t in turns)} words, {len(turns)} turns)", seg.id)
         await _score(ctx, seg, cand, use_critic, accept)
 
+    # Each extra draft or revision costs 2 calls (write + critic); drop the ones the budget can't take.
+    while n_par + n_rev > 1 and not ctx.can_spend(2 * (n_par + n_rev - 1)):
+        if n_rev:
+            n_rev -= 1
+        else:
+            n_par -= 1
+        if n_par + n_rev == 1:
+            ctx.emit(STAGE, "decision", "LLM budget for this episode is nearly used: one draft for this part.", seg.id)
     if n_par:
         await asyncio.gather(*(one_draft(k) for k in range(n_par)))
     for r in range(n_rev):

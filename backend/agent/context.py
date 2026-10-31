@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+from ..config import get_settings
 from ..retrieval import BM25Index
 from ..schemas import Chunk, Episode, Source, TraceEvent
 
@@ -37,11 +38,25 @@ class AgentContext:
     asr_checked: int = 0
     asr_bad: int = 0
     asr_off: bool = False
+    # Deep agent LLM budget (see can_spend): calls already made when this job started, parts fact-checked
+    llm_start: int = field(init=False, default=0)
+    claims_checked: set = field(default_factory=set)
 
     def __post_init__(self) -> None:
+        self.llm_start = self.episode.metrics.llm_calls
         self.index = BM25Index(self.chunks)
         self.full_index = BM25Index(self.source.chunks)
         self.by_id = {c.id: c for c in self.source.chunks}
+
+    def can_spend(self, n: int) -> bool:
+        """True if ``n`` more optional LLM calls fit in this job's budget while still leaving 2 calls
+        (claim extract + judge) for every part that is being made and hasn't been fact-checked yet."""
+        cap = get_settings().deep_max_llm_calls
+        if cap <= 0:
+            return True
+        pending = sum(1 for seg in self.episode.segments
+                      if seg.status in ("pending", "writing") and seg.id not in self.claims_checked)
+        return self.episode.metrics.llm_calls - self.llm_start + n + 2 * pending <= cap
 
     @property
     def n_segments(self) -> int:

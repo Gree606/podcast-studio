@@ -57,7 +57,7 @@ PDF / photos / text ─► ingest.py   PyMuPDF text layer; OCR (Bodhan Indic-OCR
                      ─► audio/stitch.py trim, loudness-match, conversational pauses, intro/outro, MP3 + timestamps
 ```
 
-**Why Quick is the default.** The Deep agent makes 25–40 LLM calls per episode. That is too many for free-tier quotas, and for a 2-minute script it added little over a single call to a thinking model. The steps a single call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration. The Deep agent is still available per episode, so the two can be compared, and the eval harness measures exactly that trade-off.
+**Why Quick is the default.** The Deep agent made 25–40 LLM calls per episode (about $0.36 each through OpenRouter, versus $0.025 for Quick). That is too many for free-tier quotas, and for a 2-minute script it added little over a single call to a thinking model. It is now capped at 24 calls per job (`DEEP_MAX_LLM_CALLS`): planning, one draft, its critic and the fact-check of every part always run, and extra drafts, revisions and claim fixes give way when the budget runs low. Reflexion notes are taken from the critic's feedback instead of a separate call. The steps a single call cannot do stay as tool steps: checking the script against the book, listening back to its own audio, OCR and per-part regeneration. The Deep agent is still available per episode, so the two can be compared, and the eval harness measures exactly that trade-off.
 
 | Idea from the course | Where it is used |
 |---|---|
