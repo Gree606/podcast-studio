@@ -244,9 +244,11 @@ function saveStudio() {
   if (onStudioChange) onStudioChange();
 }
 function syncStudioSummary() {
+  const btn = $("#settingsSummary");  // on the launch screen, which only exists while the home page shows
+  if (!btn) return;
   const P = CONFIG.providers || {llm: [], voices: []}, name = (list, id) => (list.find(o => o.id === id) || {}).label;
   const parts = [STUDIO.mode === "agent" ? "🧠 Deep agent" : "⚡ Quick", name(P.llm, STUDIO.llm), name(P.voices, STUDIO.voices)].filter(Boolean);
-  $("#settingsSummary").innerHTML = `${esc(parts.join(" · "))} <span class="muted">⚙️ change</span>`;
+  btn.innerHTML = `${esc(parts.join(" · "))} <span class="muted">⚙️ change</span>`;
 }
 
 function presetGroup(box, name, items, checked) {
@@ -283,7 +285,7 @@ function showConfigure() {
     $("#langChoices").classList.toggle("locked", deep);
     $("#langChoices").title = deep ? "The deep agent writes in English only for now" : "";
   };
-  onStudioChange = () => { syncMode(); upd(); }; syncMode();
+  onStudioChange = () => { syncMode(); upd(); }; syncMode(); syncStudioSummary();
   $("#settingsSummary").onclick = () => openDrawer(true);
   $$("#configure input").forEach(i => i.addEventListener("change", upd)); upd();
   $("#selAll").onclick = () => { $$("#sections input").forEach(i => { i.checked = true; }); upd(); };
