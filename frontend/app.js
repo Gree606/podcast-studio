@@ -188,16 +188,20 @@ async function deleteEpisode(id, title) {
 
 // "Your episodes" in the menu: this browser's list, minus any the server no longer has
 async function renderRecent() {
-  let mine = myEpisodes();
+  let mine = myEpisodes(), info = new Map();
   if (mine.length) {
     try {
-      const alive = new Set((await api(`/api/episodes?ids=${mine.map(x => encodeURIComponent(x.id)).join(",")}`)).map(e => e.id));
-      forgetEpisodes(mine.filter(x => !alive.has(x.id)).map(x => x.id));
-      mine = mine.filter(x => alive.has(x.id));
+      info = new Map((await api(`/api/episodes?ids=${mine.map(x => encodeURIComponent(x.id)).join(",")}`)).map(e => [e.id, e]));
+      forgetEpisodes(mine.filter(x => !info.has(x.id)).map(x => x.id));
+      mine = mine.filter(x => info.has(x.id));
     } catch { /* offline: show what we remember */ }
   }
+  const agentTag = id => {
+    const p = (info.get(id) || {}).pipeline;
+    return p ? `<b class="agent-tag ${p}">${p === "agent" ? "🧠 Deep" : "⚡ Quick"}</b>` : "";
+  };
   $("#recentCard").classList.toggle("hidden", !mine.length);
-  $("#recent").innerHTML = mine.map(x => `<div class="recent-row"><a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${esc(new Date(x.t).toLocaleString())}</span></a>
+  $("#recent").innerHTML = mine.map(x => `<div class="recent-row"><a href="#/episode/${esc(x.id)}">${esc(x.title)}<span>${agentTag(x.id)}${esc(new Date(x.t).toLocaleString())}</span></a>
     <button class="recent-del" type="button" data-del="${esc(x.id)}" aria-label="Delete ${esc(x.title)}" title="Delete">🗑️</button></div>`).join("");
   $$("#recent a").forEach(a => { a.onclick = () => openDrawer(false); });
   $$("#recent [data-del]").forEach(b => { b.onclick = () => deleteEpisode(b.dataset.del, (mine.find(x => x.id === b.dataset.del) || {}).title); });

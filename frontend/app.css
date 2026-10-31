@@ -882,8 +882,8 @@ body.gated { overflow: hidden; }
 .drawer-settings h3 { font-size: .9rem; margin: 4px 0 4px; }
 .drawer-settings > p { margin: 0 0 10px; }
 .set-group { display: grid; gap: 4px; margin-bottom: 12px; }
-.presets.stack { flex-direction: column; gap: 8px; padding: 2px 4px 4px 0; }
-.presets.stack label { justify-content: flex-start; text-align: left; flex-wrap: wrap; gap: 2px 8px; padding: 9px 12px; border-radius: var(--r-sm); }
+.presets.stack { display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 4px 0; }  /* not the 3-column grid phones use for other presets */
+.presets.stack label { flex-direction: row; align-items: baseline; justify-content: flex-start; text-align: left; flex-wrap: wrap; gap: 2px 8px; padding: 9px 12px; border-radius: var(--r-sm); }
 .presets.stack label span.small { display: block; flex-basis: 100%; color: #4a4570; font-size: .78rem; line-height: 1.3; }
 .presets.stack input:checked + label { outline: 3px solid var(--accent-2); outline-offset: 0; }
 .presets input:disabled + label { opacity: .45; cursor: not-allowed; }
@@ -929,3 +929,5 @@ body.gated { overflow: hidden; }
 .stop-btn { position: absolute; top: 10px; right: 10px; z-index: 3; padding: 4px 10px; font: 600 .72rem/1.4 var(--font); letter-spacing: .06em;
   color: var(--comic-ink); background: #ffd9e4; border: 2px solid var(--comic-ink); box-shadow: 2px 2px 0 var(--comic-ink); cursor: pointer; }
 .stop-btn:hover, .stop-btn:focus-visible { background: #ffb8cc; }
+.agent-tag { display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 4px; font-size: .68rem; font-weight: 600; }
+.agent-tag.agent { background: rgba(157, 139, 255, .25); color: #d9d2ff; } .agent-tag.fast { background: rgba(95, 205, 185, .2); color: #a8f0e2; }

@@ -305,7 +305,8 @@ async def list_episodes(ids: str = ""):
     for eid in [x for x in ids.split(",") if x][:30]:
         e = store.get_episode(eid.strip())
         if e:
-            out.append({"id": e.id, "title": e.title, "status": e.status, "created_at": e.created_at, "duration": e.duration})
+            out.append({"id": e.id, "title": e.title, "status": e.status, "created_at": e.created_at, "duration": e.duration,
+                        "pipeline": "fast" if fast_mode(e) else "agent"})
     return out
 
 
