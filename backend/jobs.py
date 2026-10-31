@@ -12,6 +12,7 @@ import logging
 import time
 from typing import Awaitable, Callable
 
+from . import providers
 from .config import get_settings
 from .store import store
 
@@ -48,7 +49,9 @@ def submit(eid: str, kind: str, fn: Callable[[], Awaitable[None]]) -> None:
                 _waiting.remove(eid)
                 _active[eid] = kind
                 _started[eid] = time.monotonic()
-                await fn()
+                ep = store.get_episode(eid)
+                with providers.using(ep.settings.llm, ep.settings.voices) if ep else contextlib.nullcontext():
+                    await fn()
         finally:
             if eid in _waiting:
                 _waiting.remove(eid)

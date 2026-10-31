@@ -10,6 +10,7 @@ file outside the repo (``~/.config/podcast-studio/secrets.env``, or the path in
 from __future__ import annotations
 
 import os
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
 
@@ -52,6 +53,10 @@ class Settings(BaseSettings):
     # OpenRouter's key, kept separate so switching LLM_PROVIDER back to gemini keeps working
     # (falls back to LLM_API_KEY when empty)
     openrouter_api_key: str = ""
+    # Keys for the voice service that is NOT the .env default, so each episode can pick its voices
+    # (backend/providers.py). Bodhan voices fall back to ASR_API_KEY: one Bodhan key serves TTS, ASR and OCR.
+    sarvam_api_key: str = ""
+    bodhan_tts_api_key: str = ""
     llm_model: str = "gemini-3.6-flash"
     # Tried in order when the main model is overloaded (503), rate-limited (429) or retired (404).
     # Measured 2026-10-21: popular models regularly return 503 "high demand" for minutes at a time.
@@ -191,8 +196,20 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> Settings:
+def _base_settings() -> Settings:
     s = Settings(_env_file=(ROOT / ".env", secrets_path()))
     s.episodes_dir.mkdir(parents=True, exist_ok=True)
     s.sources_dir.mkdir(parents=True, exist_ok=True)
     return s
+
+
+# An episode's own provider choices (backend/providers.py) for the code running on its behalf.
+# A ContextVar is per asyncio task, so episodes made with different providers can run side by side.
+_override: ContextVar[Settings | None] = ContextVar("settings_override", default=None)
+
+
+def get_settings() -> Settings:
+    return _override.get() or _base_settings()
+
+
+get_settings.cache_clear = _base_settings.cache_clear  # type: ignore[attr-defined]

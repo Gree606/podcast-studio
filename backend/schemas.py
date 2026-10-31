@@ -61,6 +61,9 @@ class EpisodeSettings(BaseModel):
     # "fast" = 2 LLM calls (write, then fact-check); "agent" = planner + best-of-N + critic loop;
     # "" = the server's PIPELINE_MODE
     mode: Literal["", "fast", "agent"] = ""
+    # Script AI and voices from the Settings panel (backend/providers.py); "" = the server default
+    llm: Literal["", "gemini", "openrouter"] = ""
+    voices: Literal["", "sarvam", "bodhan"] = ""
 
 
 class Turn(BaseModel):

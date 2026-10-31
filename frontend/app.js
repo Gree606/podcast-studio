@@ -218,6 +218,37 @@ async function loadSource(input) {
   } catch (e) { if (view === viewId) showErr(st, e.message); }
 }
 
+// ------------------------------------------------------------------ settings (☰ menu): mode, script AI, voices
+// Kept in this browser and sent with each new episode; the server rejects options whose key isn't set.
+const STUDIO = {mode: "fast", llm: "", voices: ""};
+let onStudioChange = null;  // set while the launch screen is showing
+function loadStudio() { try { Object.assign(STUDIO, JSON.parse(localStorage.getItem("studio") || "{}")); } catch { /* private mode */ } }
+function renderSettings() {
+  const P = CONFIG.providers || {llm: [], voices: []};
+  const group = (box, name, items) => {
+    const def = (items.find(o => o.default) || items.find(o => o.ready) || {}).id || "";
+    if (items.length && !items.some(o => o.id === STUDIO[name] && o.ready)) STUDIO[name] = def;  // e.g. its key was removed
+    box.innerHTML = items.map(o => `<input type="radio" name="${name}" id="${name}-${esc(o.id)}" value="${esc(o.id)}" ${o.id === STUDIO[name] ? "checked" : ""} ${o.ready ? "" : "disabled"}>
+      <label for="${name}-${esc(o.id)}"><b>${esc(o.label)}</b><span class="small">${o.ready ? esc(o.hint) : "needs a key on the server"}${o.default ? " · default" : ""}</span></label>`).join("");
+    box.closest(".set-group").classList.toggle("hidden", !items.length);
+  };
+  group($("#llmChoices"), "llm", P.llm);
+  group($("#voiceChoices"), "voices", P.voices);
+  ($$("input[name=mode]").find(i => i.value === STUDIO.mode) || $("#mode-fast")).checked = true;
+  $$("#settingsCard input").forEach(i => { i.onchange = () => { STUDIO[i.name] = i.value; saveStudio(); }; });
+  syncStudioSummary();
+}
+function saveStudio() {
+  try { localStorage.setItem("studio", JSON.stringify(STUDIO)); } catch { /* private mode */ }
+  syncStudioSummary();
+  if (onStudioChange) onStudioChange();
+}
+function syncStudioSummary() {
+  const P = CONFIG.providers || {llm: [], voices: []}, name = (list, id) => (list.find(o => o.id === id) || {}).label;
+  const parts = [STUDIO.mode === "agent" ? "🧠 Deep agent" : "⚡ Quick", name(P.llm, STUDIO.llm), name(P.voices, STUDIO.voices)].filter(Boolean);
+  $("#settingsSummary").innerHTML = `${esc(parts.join(" · "))} <span class="muted">⚙️ change</span>`;
+}
+
 function presetGroup(box, name, items, checked) {
   box.innerHTML = items.map(p => `<input type="radio" name="${name}" id="${name}-${esc(p.value)}" value="${esc(p.value)}" ${p.value === checked ? "checked" : ""}>
     <label for="${name}-${esc(p.value)}" title="${esc(p.hint)}"><span class="e" aria-hidden="true">${esc(p.emoji)}</span><b>${esc(p.label)}</b><span class="small" data-hint="${esc(p.value)}">${esc(p.hint)}</span></label>`).join("");
@@ -252,7 +283,8 @@ function showConfigure() {
     $("#langChoices").classList.toggle("locked", deep);
     $("#langChoices").title = deep ? "The deep agent writes in English only for now" : "";
   };
-  $$("input[name=mode]").forEach(i => i.addEventListener("change", syncMode)); syncMode();
+  onStudioChange = () => { syncMode(); upd(); }; syncMode();
+  $("#settingsSummary").onclick = () => openDrawer(true);
   $$("#configure input").forEach(i => i.addEventListener("change", upd)); upd();
   $("#selAll").onclick = () => { $$("#sections input").forEach(i => { i.checked = true; }); upd(); };
   $("#selNone").onclick = () => { $$("#sections input").forEach(i => { i.checked = false; }); upd(); };
@@ -267,6 +299,7 @@ async function createEpisode() {
   const mode = ($("input[name=mode]:checked") || {}).value || "fast";
   const language = mode === "agent" ? "en" : (($("input[name=language]:checked") || {}).value || "en"); CONFIG.lastLang = language;
   const settings = {length: $("input[name=length]:checked").value, tone: $("input[name=tone]:checked").value, language, mode,
+    llm: STUDIO.llm, voices: STUDIO.voices,
     host_name: $("#hostName").value, expert_name: $("#expertName").value, section_ids: sel.length === all.length ? [] : sel};
   try {
     const r = await postJSON("/api/episodes", {source_id: SOURCE.id, settings});
@@ -973,11 +1006,12 @@ function renderQuality(ep) {
         <td class="small">${s.reflections.slice(-2).map(esc).join("<br>") || "–"}</td></tr>`;
     }).join("")}</tbody></table></div>`
     : `<h3>Quick mode: 2 model calls</h3>
-    <p class="small muted">Call 1 writes the whole episode from the chapter's passages. Call 2 fact-checks every spoken line against those passages and rewrites only the lines it can't support. The planner, critic, best-of-N drafts and Reflexion memory run only in <b>Deep agent</b> mode (pick it on the launch screen).</p>
+    <p class="small muted">Call 1 writes the whole episode from the chapter's passages. Call 2 fact-checks every spoken line against those passages and rewrites only the lines it can't support. The planner, critic, best-of-N drafts and Reflexion memory run only in <b>Deep agent</b> mode (pick it in ☰ Settings).</p>
     <div class="scroll-x"><table><thead><tr><th>Part</th><th>Lines spoken</th><th>Lines with a fact</th><th>Supported</th><th>Corrected</th><th>Flagged</th></tr></thead><tbody>
     ${done.map(s => { const v = currentVersion(s), g = factCheck(v.claims);
       return `<tr><td>${s.index + 1}. ${esc(s.title)}</td><td>${v.turns.length}</td><td>${g.n}</td><td>${g.ok}</td><td>${g.corrected}</td><td>${g.flagged}</td></tr>`; }).join("")}</tbody></table></div>`;
-  $("#teacherQuality").innerHTML = `<div class="kpis">
+  const pv = ep.providers;
+  $("#teacherQuality").innerHTML = `${pv ? `<p class="small muted">Script AI: <b>${esc(pv.llm)}</b> (${esc(pv.llm_model)}) · Voices: <b>${esc(pv.voices)}</b></p>` : ""}<div class="kpis">
     ${deep ? k(sc != null ? `${sc.toFixed(2)}/5` : "–", "average critic score") : k("Quick", "pipeline (write + fact-check)")}
     ${k(f.n ? `${f.ok}/${f.n}` : "–", `${f.unit} supported by the chapter${f.corrected ? ` · ${f.corrected} corrected` : ""}${f.flagged ? ` · ${f.flagged} flagged` : ""}`)}
     ${k(wers.length ? `${(100 * avg(wers)).toFixed(1)}%` : "–", `audio self-check WER · ${retried} line(s) re-recorded`)}
@@ -1260,6 +1294,7 @@ function initGate() {
 function route() {
   const m = location.hash.match(/^#\/episode\/([\w-]+)/);
   openDrawer(false);
+  onStudioChange = null;
   if (m) renderEpisode(m[1]); else renderHome();
   window.scrollTo(0, 0);
 }
@@ -1273,8 +1308,10 @@ function route() {
   $("#teacherToggle").onclick = () => setTeacher(!document.body.classList.contains("teacher"));
   let teacher = false; try { teacher = localStorage.getItem("teacherView") === "1"; } catch { /* ignore */ }
   setTeacher(teacher);
+  loadStudio(); renderSettings();
   try {
     CONFIG = {...CONFIG, ...(await api("/api/config"))};
+    renderSettings();
     renderSetup();
     initGate();
   } catch {

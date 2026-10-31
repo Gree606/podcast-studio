@@ -87,6 +87,16 @@
     <button class="drawer-item" id="teacherToggle" type="button" aria-pressed="false">🛰️ Show the agent's work everywhere</button>
     <button class="drawer-item" id="soundToggle" type="button" aria-pressed="true">🔊 Sound: on</button>
     <a class="drawer-item" href="/classic">🗂️ Classic view</a>
+    <section class="drawer-settings" id="settingsCard" aria-labelledby="settingsTitle">
+      <h3 id="settingsTitle">⚙️ Settings</h3>
+      <p class="small muted">Used for the next episode you launch. Greyed-out options have no key on this server yet.</p>
+      <div class="set-group"><span class="opt-label" id="modeLabel">Mode</span><div class="presets stack" id="modeChoices" role="radiogroup" aria-labelledby="modeLabel">
+        <input type="radio" name="mode" id="mode-fast" value="fast" checked><label for="mode-fast"><span class="e" aria-hidden="true">⚡</span><b>Quick</b><span class="small">2 AI calls: write, then fact-check every line. About a minute.</span></label>
+        <input type="radio" name="mode" id="mode-agent" value="agent"><label for="mode-agent"><span class="e" aria-hidden="true">🧠</span><b>Deep agent</b><span class="small">Plans with search tools, drafts scored by a critic. A few minutes, English only.</span></label>
+      </div></div>
+      <div class="set-group"><span class="opt-label" id="llmLabel">Script AI</span><div class="presets stack" id="llmChoices" role="radiogroup" aria-labelledby="llmLabel"></div></div>
+      <div class="set-group"><span class="opt-label" id="voiceLabel">Voices</span><div class="presets stack" id="voiceChoices" role="radiogroup" aria-labelledby="voiceLabel"></div></div>
+    </section>
     <section class="hidden" id="recentCard" aria-labelledby="recentTitle">
       <h3 id="recentTitle">Your episodes</h3>
       <div class="recent" id="recent"></div>
@@ -186,10 +196,7 @@
     <div class="opts">
       <div class="opt"><span class="opt-label">Length</span><div class="presets" id="lengthChoices" role="radiogroup" aria-label="Length"></div></div>
       <div class="opt"><span class="opt-label">Style</span><div class="presets" id="toneChoices" role="radiogroup" aria-label="Style"></div></div>
-      <div class="opt"><span class="opt-label">Mode</span><div class="presets" id="modeChoices" role="radiogroup" aria-label="How the agent works">
-        <input type="radio" name="mode" id="mode-fast" value="fast" checked><label for="mode-fast" title="Writes the whole episode in one call, then fact-checks it in a second: about a minute"><span class="e" aria-hidden="true">⚡</span><b>Quick</b><span class="small">2 AI calls</span></label>
-        <input type="radio" name="mode" id="mode-agent" value="agent"><label for="mode-agent" title="Plans with search tools, writes several drafts scored by a critic, checks every claim: a few minutes"><span class="e" aria-hidden="true">🧠</span><b>Deep agent</b><span class="small">plans · drafts · critic</span></label>
-      </div></div>
+      <div class="opt"><span class="opt-label">Studio</span><button class="settings-summary" id="settingsSummary" type="button" aria-label="Studio settings: mode, script AI and voices (opens the menu)"></button></div>
       <div class="opt"><span class="opt-label">Language</span><div class="langs" id="langChoices" role="radiogroup" aria-label="Language of the episode"></div></div>
     </div>
     <details class="more">

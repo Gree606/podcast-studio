@@ -19,7 +19,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from . import ask, jobs
+from . import ask, jobs, providers
 from .agent import fast
 from .agent.context import LENGTHS
 from .agent.orchestrator import fast_mode, regenerate_segment, run_episode, switch_version
@@ -167,7 +167,7 @@ async def config(request: Request):
     s = get_settings()
     return {"mock": s.effective_mock(), "max_input_words": s.max_input_words,
             "lengths": {k: estimate_minutes(k) for k in LENGTHS},
-            "presets": PRESETS, "configured": s.configured(),
+            "presets": PRESETS, "configured": s.configured(), "providers": providers.options(s),
             "languages": [{"code": x.code, "name": x.name, "native": x.native, "html": x.html} for x in LANGUAGES.values()],
             "locked": bool(s.access_code), "unlocked": gate_unlocked(request)}
 
@@ -281,6 +281,8 @@ async def create_episode(body: CreateEpisode, request: Request, response: Respon
         raise HTTPException(400, "That language isn't supported yet.")
     if st.mode == "agent" and st.language != "en":
         raise HTTPException(400, "The deep agent writes in English only for now. Pick Quick mode for other languages.")
+    if problem := providers.check_choice(st.llm, st.voices):
+        raise HTTPException(400, problem)
     st.host_name = (st.host_name or "Error606").strip()[:20] or "Error606"
     st.expert_name = (st.expert_name or "Gree").strip()[:20] or "Gree"
     valid = {x.id for x in src.sections}
@@ -318,7 +320,10 @@ def episode_view(ep: Episode, since: int, request: Request | None = None) -> dic
     d["queue_position"] = jobs.queue_position(ep.id)
     d["busy"] = jobs.is_busy(ep.id)
     d["running_for"] = jobs.running_for(ep.id)
-    d["pipeline"] = "fast" if fast_mode(ep) else "agent"  # which pipeline made it (the UI shows only what really ran)
+    d["pipeline"] = "fast" if fast_mode(ep) else "agent"
+    used = providers.settings_for(ep.settings.llm, ep.settings.voices)
+    d["providers"] = {"llm": providers.LLM_CHOICES[providers.default_llm(used)]["label"], "llm_model": used.llm_model,
+                      "voices": providers.VOICE_CHOICES[providers.default_voices(used)]["label"]}  # which pipeline made it (the UI shows only what really ran)
     d["can_edit"] = can_edit(ep, request) if request is not None else False
     return d
 
@@ -490,8 +495,9 @@ async def ask_gree(eid: str, body: AskIn, request: Request):
         raise HTTPException(404, "This episode's chapter is missing.")
     rate_limit(request, "question", 40)
     try:
-        return await ask.answer(ep, src, body.question, segment_id=body.segment_id,
-                                history=[h.model_dump() for h in body.history])
+        with providers.using(ep.settings.llm, ep.settings.voices):
+            return await ask.answer(ep, src, body.question, segment_id=body.segment_id,
+                                    history=[h.model_dump() for h in body.history])
     except ask.AskError as e:
         raise HTTPException(400, str(e)) from e
     except ServiceError as e:
@@ -503,7 +509,8 @@ async def ask_gree_audio(eid: str, aid: str):
     """Gree speaking one answer (made on first request, then cached)."""
     ep = _get_ep(eid)
     try:
-        path = await ask.answer_audio(ep, aid)
+        with providers.using(ep.settings.llm, ep.settings.voices):
+            path = await ask.answer_audio(ep, aid)
     except ServiceError as e:
         raise HTTPException(503, f"Gree's voice isn't available right now ({e.user_message}).") from e
     if not path:
