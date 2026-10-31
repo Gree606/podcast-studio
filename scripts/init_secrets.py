@@ -26,7 +26,8 @@ TEMPLATE = """\
 # Google Gemini (script writing, fact checks, OCR): https://aistudio.google.com/apikey
 LLM_API_KEY=DUMMY_REPLACE_WITH_GEMINI_KEY
 
-# Optional: OpenRouter (the same Gemini models without free-tier caps; set LLM_PROVIDER=openrouter in .env)
+# Optional: OpenRouter (the same Gemini models without free-tier caps, picked per episode in Settings;
+# also used for the deep agent's embedding search)
 # https://openrouter.ai/keys
 # OPENROUTER_API_KEY=your-openrouter-key
 
@@ -36,7 +37,7 @@ TTS_API_KEY=DUMMY_REPLACE_WITH_SARVAM_KEY
 # Bodhan (speech recognition self-check of the audio)
 ASR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
 
-# Bodhan Indic-OCR (reads scanned PDF pages; used when OCR_MODE=bodhan). Often the same key as ASR.
+# Bodhan Indic-OCR (reads PDF pages and photos; used when OCR_MODE=bodhan). Often the same key as ASR.
 OCR_API_KEY=DUMMY_REPLACE_WITH_BODHAN_KEY
 """
 

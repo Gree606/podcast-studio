@@ -6,7 +6,7 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
 
 | Spec | What this app does |
 |---|---|
-| **Input:** an NCERT chapter or section | A PDF (scanned pages go through OCR), up to 6 phone photos of pages, pasted text, or one of 9 bundled NCERT sample chapters (5 English, 2 Hindi, 2 Malayalam). Pick the sections to cover. |
+| **Input:** an NCERT chapter or section | A PDF (every page read with Bodhan Indic-OCR, up to 15 pages), up to 6 phone photos of pages, pasted text, or one of 9 bundled NCERT sample chapters (5 English, 2 Hindi, 2 Malayalam). Pick the sections to cover. |
 | **Output:** a conversational podcast | An MP3 of about 2 minutes with a synced transcript, in any of 12 languages: English, Hindi, Hinglish, Bengali, Tamil, Telugu, Kannada, Malayalam, Marathi, Gujarati, Punjabi and Odia. |
 | **Reviewer:** regenerate specific segments | Regenerate one part, optionally with an instruction such as "simpler" or "add an example". Only that part is rewritten, re-recorded and re-stitched. Every version is kept. |
 | **Bar:** sounds real and stays faithful | Two distinct conversational voices, natural reactions and pauses. The fact-check badge counts the lines the chapter supports. |
@@ -15,7 +15,7 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
 
 1. Open the link and give Error606 the secret code. The code is required because generating an episode spends API calls.
 2. Pick a sample chapter, upload a PDF, take photos or paste text, then choose the language. **☰ Menu → ⚙️ Settings** (also reachable from the launch screen's "Studio" line) picks, for each new episode:
-   - **Mode:** ⚡ Quick (default, 2 LLM calls) or 🧠 Deep agent (plans, drafts and critiques).
+   - **Mode:** ⚡ Quick (default, 2 LLM calls) or 🧠 Deep agent (ReAct planner with RAG search, a critic and a targeted revision; at most 10 LLM calls, English only).
    - **Script AI:** Gemini with its own key, or the same Gemini models through OpenRouter.
    - **Voices:** Sarvam bulbul or Bodhan indic-speak.
 
@@ -27,6 +27,7 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
    - **Agent:** what actually ran for this episode, including the fact-check, sources, compute and (in Deep mode) the full agent trace. Steps that didn't run are not shown.
    - **Save:** download the MP3 and the transcript.
 4. To change something, open a part and regenerate it. Old and new versions can be compared and switched.
+5. **☰ Menu → Your episodes** lists the episodes made in this browser, each tagged ⚡ Quick or 🧠 Deep. While an episode is being made, a ⏹ Stop button sits on the stage (what's done is kept; Try again continues). 🗑 deletes an episode for good, from the list or from the Save panel. The browser's Back button always returns to the home screen.
 
 **Privacy and ownership.** There is no public list of episodes; each episode is reachable only through its link. The browser that made an episode holds an owner cookie, and only that browser can regenerate parts, switch versions or restart. Anyone with the link can listen, take the quiz and ask Gree. `/api/config` reveals no server paths or key values. Expensive calls are rate-limited per client, and repeated wrong codes are slowed down.
 
@@ -39,9 +40,9 @@ Turn an NCERT chapter into a two-host podcast. **Gree**, an astronaut from India
 Both modes share the same ingestion, tools and audio stages. The mode only changes how the script is written.
 
 ```
-PDF / photos / text ─► ingest.py   PyMuPDF text layer; OCR (Bodhan Indic-OCR, or the LLM's vision input)
-                                   for scanned pages and photos; NCERT clean-up (faux-bold duplicates,
-                                   drop caps, running heads, exercises skipped)
+PDF / photos / text ─► ingest.py   Bodhan Indic-OCR for every PDF page (paced; the PDF's own text as fallback)
+                                   and for photos; NCERT clean-up (print codes, repeated vowel signs,
+                                   faux-bold duplicates, drop caps, running heads, exercises skipped)
                      ─► sections ─► ~170-word passages ─► BM25 index (retrieval.py)
 
 ⚡ QUICK  (agent/fast.py, default: 2 calls)        🧠 DEEP AGENT  (agent/lean.py: at most 10 calls)
@@ -102,12 +103,16 @@ backend/
   ingest.py        PDF / text ─► sections;  photos.py  phone photos ─► OCR'd pages
   retrieval.py     BM25 over passages; HybridIndex = BM25 + embeddings fused by reciprocal rank (deep agent)
   vectors.py       SQLite vector store: passage/query embeddings cached by model + text hash
-  agent/           fast.py (Quick) · planner, writer, critic, search, allocation, claims (Deep) · voice.py
+  providers.py     per-episode choice of script AI (Gemini / OpenRouter) and voices (Sarvam / Bodhan)
+  agent/           fast.py (Quick) · lean.py (Deep: plan, write, critic, revise, fact-check in ≤ 10 calls)
+                   planner.py, tools.py (ReAct + RAG search) · critic.py, writer.py · voice.py (TTS + ASR listen-back)
+                   search.py, allocation.py, claims.py: the older per-part agent, kept for the eval ablation
   audio/           stitch.py, wer.py
-  clients/         llm.py (Gemini / OpenRouter / OpenAI-compatible), tts.py, asr.py, ocr.py, mock.py
+  clients/         llm.py (Gemini / OpenRouter / OpenAI-compatible), embed.py, tts.py, asr.py, ocr.py, mock.py
   prompts/         every prompt in one place
   ask.py quiz.py languages.py textnorm.py store.py schemas.py config.py
 frontend/          plain JS + CSS, no build step (index.html, app.js, app.css, sprites, sounds)
+samples/           the 9 bundled chapters (Markdown) + textbooks/ (their original pages as PDFs)
 eval/run_eval.py   ablation harness with an independent judge
 scripts/           run_local.sh, check_apis.py, init_secrets.py, smoke / contract tests
 tests/             pytest suite
@@ -124,27 +129,101 @@ tests/             pytest suite
 
 Every call has a timeout and retries with backoff. 429 responses honour `Retry-After` / `retryDelay`. A bad key produces a plain-language message in the UI.
 
-## Run it
+## Run your own copy
+
+These steps take a fresh Linux or macOS machine to a running app. The app is one Python process
+(FastAPI); there is no database server, no build step and no GPU. Episodes and audio are saved as
+files under `data/`.
+
+### 1. What you need
+
+- **Python 3.12** (3.11 may work; the app is developed and tested on 3.12). Check with `python3.12 --version`.
+  If you don't have it, [uv](https://docs.astral.sh/uv/) can fetch one: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+- **git**.
+- Nothing else to install: ffmpeg comes with the `imageio-ffmpeg` package, and the audio library with `soundfile`.
+- **API keys** (all are paid or free-tier web APIs, no local models):
+
+| Key | Needed for | Where to get it | Required? |
+|---|---|---|---|
+| `LLM_API_KEY` | writing and checking the script, Ask Gree | Google AI Studio: https://aistudio.google.com/apikey | yes (or the OpenRouter key below) |
+| `TTS_API_KEY` | the two voices (Sarvam bulbul) | https://dashboard.sarvam.ai | yes |
+| `ASR_API_KEY` | listening back to its own audio (Bodhan) | Bodhan (https://bodhan.ai) | optional: without it the listen-back check is skipped |
+| `OCR_API_KEY` | reading PDF pages and photos (Bodhan Indic-OCR) | Bodhan, usually the same key as ASR | optional: without it PDFs use their own text and photos can't be read |
+| `OPENROUTER_API_KEY` | Gemini through OpenRouter (no daily cap) and the deep agent's embedding search | https://openrouter.ai/keys | optional |
+
+Without the two required keys the app still runs, in **demo mode** (placeholder scripts and beeps, with a banner saying so), which is enough to click around.
+
+### 2. Get the code and install
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env                 # non-secret settings: models, voices, knobs; set ACCESS_CODE to turn on the gate
-python scripts/init_secrets.py       # creates ~/.config/podcast-studio/secrets.env (mode 600)
-#   ...replace the DUMMY_ values there: LLM_API_KEY (or OPENROUTER_API_KEY), TTS_API_KEY, ASR_API_KEY, OCR_API_KEY
-python scripts/check_apis.py         # one tiny call per API to confirm keys and voices
-scripts/run_local.sh start           # background server on :8000, logs in data/server.log
-scripts/run_local.sh status | stop | restart
+git clone https://github.com/Gree606/podcast-studio.git
+cd podcast-studio
+python3.12 -m venv .venv            # or: uv venv --python 3.12 .venv
+. .venv/bin/activate
+pip install -r requirements.txt     # add -dev for the tests: pip install -r requirements-dev.txt
 ```
 
-Always start the server with `scripts/run_local.sh`. It loads `scripts/dev_env.sh` (thread caps for shared machines) and the secrets file. The server needs a single worker, because job state and locks live in-process.
+### 3. Settings and keys
 
-**Keys stay out of the repo.** They live in the file named by `PODCAST_SECRETS_FILE` (default `~/.config/podcast-studio/secrets.env`). Settings load in this order, with later sources winning: repo `.env`, then the secrets file, then real environment variables. The app reports only *whether* each key is set, never its value. Each service switches from its offline fake to the real API as soon as its own key is set. While a required key is still a `DUMMY_` placeholder, the app runs in **demo mode** and shows a banner saying so.
+```bash
+cp .env.example .env                # non-secret settings: models, voices, limits
+python scripts/init_secrets.py      # creates ~/.config/podcast-studio/secrets.env, readable only by you
+```
+
+Open `~/.config/podcast-studio/secrets.env` and replace each `DUMMY_...` value with your key (leave optional
+ones as they are, or delete those lines). Keys never go in the repo: the secrets file lives outside it, and
+`.env` (git-ignored) holds only settings. To keep the secrets file somewhere else, run
+`python scripts/init_secrets.py --path /your/path/secrets.env` and add `PODCAST_SECRETS_FILE=/your/path/secrets.env` to `.env`.
+
+Worth setting in `.env`:
+- `ACCESS_CODE=...`: the secret code Error606 asks for before anyone can make episodes (strongly recommended on a public link, since every episode spends your API credit). Empty means no gate.
+- `DATA_DIR`: where episodes are kept (default `./data`). Back this folder up to keep episodes.
+
+Then check the keys with one tiny call per service:
+
+```bash
+python scripts/check_apis.py
+```
+
+### 4. Start, stop, restart
+
+```bash
+scripts/run_local.sh start          # runs in the background on port 8000 (or the next free one)
+scripts/run_local.sh status
+scripts/run_local.sh restart        # after changing .env, the secrets file, or the code
+scripts/run_local.sh stop
+```
+
+Open http://localhost:8000 (logs: `data/server.log`). On a remote server, the start command prints an
+`ssh -L` line for viewing it from your laptop.
+
+Always use `scripts/run_local.sh`: it caps thread use for shared machines, loads the secrets file, and runs
+**exactly one worker** (episode jobs and their locks live in that process).
+
+### 5. Give it a public link
+
+- **Quickest:** a Cloudflare quick tunnel (no account needed), as used for the course demo:
+  `cloudflared tunnel --url http://localhost:8000` prints an `https://...trycloudflare.com` address.
+  The address changes each time the tunnel restarts. Requests are cut off after about 100 s, which is why
+  PDF uploads OCR at most 15 pages.
+- **Your own domain:** put nginx or Caddy in front of port 8000 (proxy everything; nothing else to configure).
+- **Docker / Render:** a `Dockerfile` (Python 3.12, one worker, data in `/data`) and a Render blueprint
+  (`render.yaml`) are included, but were not re-tested for this release. Pass the keys as environment
+  variables, mount a persistent volume at `/data`, and use `/api/health` as the health check.
+
+**How settings load.** The repo `.env`, then the secrets file, then real environment variables (later wins).
+The app only ever reports *whether* a key is set, never its value. Each service switches from its offline
+fake to the real API as soon as its own key is set.
+
+**If something goes wrong.**
+- *Demo mode banner:* `LLM_API_KEY` or `TTS_API_KEY` is still a `DUMMY_` value, or the server wasn't restarted after editing the secrets file.
+- *"Port in use":* `run_local.sh start` picks the next free port and prints it; `status` shows which one.
+- *Slow or "rate-limiting us" messages:* the providers limit bursts. Calls are paced and retried automatically; Sarvam voices are faster than Bodhan voices.
 
 ## Tests
 
 ```bash
-pytest -q                                  # 150 tests
+pytest -q                                  # 178 tests, no network or keys needed
 MOCK_MODE=1 python scripts/smoke_test.py   # end to end with in-process mocks
 python scripts/contract_test.py            # real client code against local fakes of Gemini / Sarvam / Bodhan
                                            # (wire formats, auth headers, 429 retry, bad keys, regeneration)
@@ -157,7 +236,7 @@ python eval/run_eval.py --chapters chem-reactions,crop-production,nationalism-eu
 EVAL_JUDGE_BASE_URL=... EVAL_JUDGE_MODEL=... python eval/run_eval.py     # optional independent judge
 ```
 
-The planner runs once per chapter. Four write policies then share the same outline:
+The harness compares compute policies on the per-part agent (`AGENT_STYLE=per_part`), which spends a writer budget per part. The planner runs once per chapter. Four write policies then share the same outline:
 
 | Policy | What it does |
 |---|---|
@@ -168,22 +247,14 @@ The planner runs once per chapter. Four write policies then share the same outli
 
 The harness reports writer calls, tokens and time; independent judge scores for faithfulness, naturalness, engagement and pedagogy; the claim-support rate; and, with `--audio`, the ASR WER before and after the self-check. Results go to `eval/results/<timestamp>/results.md`.
 
-## Deploy
-
-The live instance is served by `scripts/run_local.sh` behind a public URL. For a hosted setup there is a `Dockerfile` and a Render blueprint (`render.yaml`). Either way the deployment needs:
-- one worker;
-- a persistent disk at `DATA_DIR`;
-- an always-on plan, so there is no cold start;
-- `/api/health` as the health check.
-
-All provider URLs come from environment variables (see `.env.example`).
-
 ## Known limitations
 
 - Episodes are capped at about 2 minutes in Quick mode. Long chapters are covered by choosing sections.
 - Deep agent mode writes in English only; the other 11 languages use Quick mode (the launch screen locks the language to English when Deep is picked).
 - Dense derivations and tables are summarised rather than read out, and figures are not described.
 - Number and symbol reading is rule-based (`backend/textnorm.py`), so rare notation may still be read literally.
+- PDFs longer than 15 pages are OCR'd only on their scanned pages (the rest use the PDF's own text), so uploads finish within the public link's time limit.
+- End-of-chapter exercises are recognised by English headings only; in Hindi and other PDFs they may be included.
 
 ## Credits
 
